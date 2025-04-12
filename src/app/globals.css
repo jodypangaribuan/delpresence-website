@@ -17,10 +17,46 @@
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+  
+  /* Memastikan halaman legal selalu menggunakan tema terang */
+  [data-theme="light"],
+  [data-force-light="true"],
+  .force-light {
+    --background: #ffffff !important;
+    --foreground: #334155 !important;
+    background-color: #ffffff !important;
+    color: #334155 !important;
+  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Tambahan override untuk halaman legal */
+[data-theme="light"],
+[data-force-light="true"],
+.force-light {
+  background-color: #ffffff !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] *,
+[data-force-light="true"] *,
+.force-light * {
+  color-scheme: light !important;
+  forced-color-adjust: none !important;
+}
+
+/* Override khusus untuk komponen di halaman legal */
+[data-theme="light"] [class*="bg-"],
+[data-force-light="true"] [class*="bg-"] {
+  --tw-bg-opacity: 1 !important;
+}
+
+/* Memastikan canvas untuk Click Spark berada di atas semua elemen */
+canvas[style*="z-index: 9999"] {
+  position: fixed !important;
 }
