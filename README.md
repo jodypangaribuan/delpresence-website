@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DelPresence - Sistem Kehadiran Digital IT Del
 
-## Getting Started
+DelPresence adalah platform terintegrasi untuk manajemen presensi perkuliahan yang efisien, cepat dan akurat bagi seluruh civitas akademika Institut Teknologi Del.
 
-First, run the development server:
+## Struktur Proyek
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Proyek ini dibangun menggunakan Next.js dengan pendekatan Clean Architecture:
+
+```
+src/
+├── app/              # Next.js app router
+├── components/       # Komponen UI reusable
+│   └── ui/           # Komponen UI dasar
+├── features/         # Fitur per domain
+│   └── home/         # Implementasi fitur homepage 
+├── shared/           # Kode yang digunakan di seluruh aplikasi
+│   ├── hooks/        # React hooks
+│   ├── styles/       # Shared styles
+│   ├── types/        # Type definitions
+│   └── utils/        # Utility functions dan constants
+└── public/           # Asset statis
+    └── images/       # Gambar dan media
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Fitur
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Homepage responsif dengan animasi interaktif
+- Stack component untuk menampilkan gambar dengan efek 3D
+- Kompatibilitas dengan device mobile dan desktop
+- Integrase penuh dengan backend API (work in progress)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Teknologi
 
-## Learn More
+- **Framework**: Next.js 14
+- **Styling**: Tailwind CSS
+- **Animasi**: Framer Motion
+- **Deployment**: Vercel
 
-To learn more about Next.js, take a look at the following resources:
+## Development
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Persyaratan
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Node.js 18+ 
+- npm atau yarn
 
-## Deploy on Vercel
+### Instalasi
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Clone repository
+git clone https://github.com/your-username/delpresence-website.git
+cd delpresence-website
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Install dependencies
+npm install
+# atau
+yarn install
+
+# Jalankan development server
+npm run dev
+# atau
+yarn dev
+```
+
+## Deployment
+
+Aplikasi dapat di-deploy menggunakan Vercel atau platform hosting lainnya yang mendukung Next.js.
+
+```bash
+npm run build
+# atau
+yarn build
+```
+
+## Kontribusi
+
+Kontribusi dipersilakan! Silakan buka issue atau submit pull request.
+
+## Lisensi
+
+© 2023 Institut Teknologi Del. All Rights Reserved.
