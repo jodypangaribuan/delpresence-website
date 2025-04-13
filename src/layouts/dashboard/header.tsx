@@ -76,8 +76,8 @@ const CalendarDisplay = memo(function CalendarDisplay() {
         <div className="absolute right-0 mt-2 bg-white rounded-md shadow-lg p-4 border border-neutral-100 z-50 min-w-[280px]">
           <div className="text-sm font-medium mb-3">Kalender</div>
           <div className="p-2 text-center text-sm border rounded-md bg-neutral-50">
-            <div className="font-medium text-[#0687C9]">{format(new Date(), "MMMM yyyy", { locale: id })}</div>
-            <div className="mt-1 text-xs text-[#0687C9]/70">Kalender lengkap akan tersedia segera</div>
+            <div className="font-medium text-neutral-800">{format(new Date(), "MMMM yyyy", { locale: id })}</div>
+            <div className="mt-1 text-xs text-neutral-600">Kalender lengkap akan tersedia segera</div>
           </div>
           <div className="mt-2 text-xs text-primary text-center">
             Hari ini: {format(new Date(), "EEEE, d MMMM yyyy", { locale: id })}
@@ -139,34 +139,34 @@ const ProfileMenu = memo(function ProfileMenu() {
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="hidden md:block text-right min-w-[120px]">
-          <div className="text-sm font-medium text-[#0687C9]">{getFullName()}</div>
-          <div className="text-xs text-[#0687C9]/80">{getRoleText()}</div>
+          <div className="text-sm font-medium text-neutral-800">{getFullName()}</div>
+          <div className="text-xs text-neutral-600">{getRoleText()}</div>
         </div>
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E6F3FB] text-[#0687C9]">
           <UserIcon className="h-5 w-5" />
         </div>
-        <ChevronDown className="h-4 w-4 text-[#0687C9] hidden md:block" />
+        <ChevronDown className="h-4 w-4 text-neutral-500 hidden md:block" />
       </button>
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-52 rounded-md bg-white shadow-lg border border-neutral-100 z-50">
           <div className="py-1">
             <div className="px-4 py-2 border-b border-neutral-100">
-              <p className="text-sm font-medium text-[#0687C9]">{getFullName()}</p>
-              <p className="text-xs text-[#0687C9]/80">{getRoleText()}</p>
+              <p className="text-sm font-medium text-neutral-800">{getFullName()}</p>
+              <p className="text-xs text-neutral-600">{getRoleText()}</p>
             </div>
             <Link
               href="/dashboard/settings/profile"
-              className="px-4 py-2 text-sm text-[#0687C9] hover:bg-[#E6F3FB] w-full text-left flex items-center block"
+              className="px-4 py-2 text-sm text-neutral-700 hover:bg-[#E6F3FB] w-full text-left flex items-center block"
             >
-              <Settings className="mr-2 h-4 w-4 text-[#0687C9]" />
+              <Settings className="mr-2 h-4 w-4 text-neutral-500" />
               Pengaturan Akun
             </Link>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 text-sm text-[#0687C9] hover:bg-[#E6F3FB] w-full text-left flex items-center"
+              className="px-4 py-2 text-sm text-neutral-700 hover:bg-[#E6F3FB] w-full text-left flex items-center"
             >
-              <LogOut className="mr-2 h-4 w-4 text-[#0687C9]" />
+              <LogOut className="mr-2 h-4 w-4 text-neutral-500" />
               Keluar
             </button>
           </div>
@@ -247,16 +247,16 @@ const NotificationsMenu = memo(function NotificationsMenu() {
                     <p
                       className={`text-sm font-medium ${
                         notification.read
-                          ? "text-[#0687C9]/80"
-                          : "text-[#0687C9]"
+                          ? "text-neutral-700"
+                          : "text-neutral-900"
                       }`}
                     >
                       {notification.title}
                     </p>
-                    <p className="text-xs text-[#0687C9]/70">
+                    <p className="text-xs text-neutral-600">
                       {notification.message}
                     </p>
-                    <p className="mt-1 text-xs text-[#0687C9]/50">
+                    <p className="mt-1 text-xs text-neutral-500">
                       {notification.time}
                     </p>
                   </div>
@@ -329,7 +329,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               <h2 className="text-lg font-medium text-[#002A5C] group-hover:text-primary transition-colors">
                 Selamat datang di DelPresence Management System
               </h2>
-              <p className="text-sm text-[#0687C9]/80">
+              <p className="text-sm text-neutral-600">
                 {formatDate(currentDateTime)} {formatTime(currentDateTime)}
               </p>
             </Link>
@@ -340,11 +340,11 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div className="flex items-center">
           {/* Search Box - only on larger screens */}
           <div className="hidden lg:flex items-center relative mx-4 w-80">
-            <Search className="absolute left-3 h-4 w-4 text-[#0687C9]" />
+            <Search className="absolute left-3 h-4 w-4 text-neutral-500" />
             <input
               type="text"
               placeholder="Cari mata kuliah, mahasiswa, dosen..."
-              className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#0687C9] focus:ring-1 focus:ring-[#0687C9] transition-all placeholder:text-[#0687C9]/70"
+              className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#0687C9] focus:ring-1 focus:ring-[#0687C9] transition-all placeholder:text-neutral-500"
             />
           </div>
 

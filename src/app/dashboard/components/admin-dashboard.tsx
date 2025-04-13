@@ -67,11 +67,11 @@ export default function AdminDashboard() {
         <Card className="p-6 bg-white border-l-4 border-l-primary border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-[#0687C9]/80">
+              <h3 className="text-sm font-medium text-neutral-600">
                 Total Mahasiswa
               </h3>
               <div className="mt-2">
-                <span className="text-3xl font-bold text-[#0687C9]">
+                <span className="text-3xl font-bold text-neutral-800">
                   {stats.totalStudents}
                 </span>
               </div>
@@ -85,11 +85,11 @@ export default function AdminDashboard() {
         <Card className="p-6 bg-white border-l-4 border-l-primary border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-[#0687C9]/80">
+              <h3 className="text-sm font-medium text-neutral-600">
                 Total Dosen
               </h3>
               <div className="mt-2">
-                <span className="text-3xl font-bold text-[#0687C9]">
+                <span className="text-3xl font-bold text-neutral-800">
                   {stats.totalLecturers}
                 </span>
               </div>
@@ -103,11 +103,11 @@ export default function AdminDashboard() {
         <Card className="p-6 bg-white border-l-4 border-l-primary border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-[#0687C9]/80">
+              <h3 className="text-sm font-medium text-neutral-600">
                 Total Asisten
               </h3>
               <div className="mt-2">
-                <span className="text-3xl font-bold text-[#0687C9]">
+                <span className="text-3xl font-bold text-neutral-800">
                   {stats.totalAssistants}
                 </span>
               </div>
@@ -151,19 +151,19 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <div>
-                      <h3 className="font-medium text-[#0687C9]">
+                      <h3 className="font-medium text-neutral-800">
                         {activity.title}
                       </h3>
-                      <p className="text-sm text-[#0687C9]/70">
+                      <p className="text-sm text-neutral-600">
                         {activity.description}
                       </p>
-                      <p className="text-xs text-[#0687C9]/50 mt-1">
+                      <p className="text-xs text-neutral-500 mt-1">
                         {activity.time}
                       </p>
                     </div>
                   </div>
                   <div>
-                    <button className="text-[#0687C9]/60 hover:text-[#0687C9]">
+                    <button className="text-neutral-400 hover:text-neutral-600">
                       <MoreHorizontal className="h-5 w-5" />
                     </button>
                   </div>
@@ -319,7 +319,7 @@ function FeatureCard({
             <div className={`p-2 rounded-full bg-[#E6F3FB]`}>{icon}</div>
             <h3 className={`ml-3 font-medium ${textColor}`}>{title}</h3>
           </div>
-          <p className="mt-2 text-sm text-[#0687C9]/70">{description}</p>
+          <p className="mt-2 text-sm text-neutral-600">{description}</p>
         </div>
       </Card>
     </Link>
@@ -339,7 +339,7 @@ function QuickMenuItem({
     <Link href={href}>
       <div className="flex items-center p-2 rounded-lg hover:bg-neutral-50 transition-colors">
         <div className="p-1.5 rounded-md bg-[#E6F3FB] mr-3">{icon}</div>
-        <span className="text-sm font-medium text-[#0687C9]">{title}</span>
+        <span className="text-sm font-medium text-neutral-700">{title}</span>
       </div>
     </Link>
   );
@@ -361,8 +361,8 @@ function StatCard({
       <div className="flex items-center space-x-3">
         <div className="p-2 rounded-full bg-primary/10">{icon}</div>
         <div>
-          <h3 className="text-sm font-medium text-[#0687C9]/80">{title}</h3>
-          <p className={`text-lg font-bold text-[#0687C9] ${isText ? "" : ""}`}>
+          <h3 className="text-sm font-medium text-neutral-600">{title}</h3>
+          <p className={`text-lg font-bold text-neutral-800 ${isText ? "" : ""}`}>
             {value}
           </p>
         </div>
