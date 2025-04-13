@@ -3,6 +3,37 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* Card */
+  --card: #ffffff;
+  --card-foreground: #171717;
+  
+  /* Primary Color */
+  --primary: #0687C9;
+  --primary-foreground: #ffffff;
+  
+  /* Secondary Colors */
+  --secondary: #f1f5f9;
+  --secondary-foreground: #334155;
+  
+  /* Accents */
+  --accent: #f8fafc;
+  --accent-foreground: #334155;
+  
+  /* Muted */
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  
+  /* Border */
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  
+  /* Ring */
+  --ring: #0687C9;
+  
+  /* Destructive */
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
 }
 
 @theme inline {

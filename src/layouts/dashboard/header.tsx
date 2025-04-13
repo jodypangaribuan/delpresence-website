@@ -1,14 +1,14 @@
 "use client";
 
-import {
-  Bell,
-  Menu,
+import { 
+  Bell, 
+  Menu, 
   Search,
   Calendar as CalendarIcon,
   HelpCircle,
   User as UserIcon,
   ChevronDown,
-  LogOut,
+  LogOut, 
   Settings,
   AlertTriangle,
   Loader2,
@@ -214,67 +214,67 @@ const NotificationsMenu = memo(function NotificationsMenu() {
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
+          <button
         className="relative rounded-full p-2 hover:bg-[#E6F3FB]"
         onClick={() => setIsOpen(!isOpen)}
       >
         <Bell className="h-5 w-5 text-[#0687C9]" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1.5 h-2.5 w-2.5 rounded-full bg-red-500"></span>
-        )}
-      </button>
+              )}
+            </button>
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md bg-white shadow-lg border border-neutral-100 z-50">
-          <div className="p-4">
-            <div className="mb-3 flex items-center justify-between">
+                <div className="p-4">
+                  <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-medium">
-                Notifikasi
-              </h3>
+                      Notifikasi
+                    </h3>
               <button className="text-xs text-primary hover:text-primary/80">
-                Tandai semua dibaca
-              </button>
-            </div>
-            <div className="space-y-3">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`flex items-start rounded-md p-2 ${
+                      Tandai semua dibaca
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`flex items-start rounded-md p-2 ${
                     notification.read ? "" : "bg-[#E6F3FB]"
-                  }`}
-                >
-                  <div className="flex-1">
-                    <p
-                      className={`text-sm font-medium ${
-                        notification.read
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <p
+                            className={`text-sm font-medium ${
+                              notification.read
                           ? "text-neutral-700"
                           : "text-neutral-900"
-                      }`}
-                    >
-                      {notification.title}
-                    </p>
+                            }`}
+                          >
+                            {notification.title}
+                          </p>
                     <p className="text-xs text-neutral-600">
-                      {notification.message}
-                    </p>
+                            {notification.message}
+                          </p>
                     <p className="mt-1 text-xs text-neutral-500">
-                      {notification.time}
-                    </p>
+                            {notification.time}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex justify-center border-t border-gray-100 pt-3">
+                    <Link
+                      href="/dashboard/notifications"
+                className="text-xs text-[#0687C9] hover:text-[#056ba0]"
+                    >
+                      Lihat Semua Notifikasi
+                    </Link>
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className="mt-3 flex justify-center border-t border-gray-100 pt-3">
-              <Link
-                href="/dashboard/notifications"
-                className="text-xs text-[#0687C9] hover:text-[#056ba0]"
-              >
-                Lihat Semua Notifikasi
-              </Link>
-            </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
   );
 });
 

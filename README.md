@@ -1,80 +1,131 @@
-# DelPresence - Sistem Kehadiran Digital IT Del
+# DelPresence Website
 
-DelPresence adalah platform terintegrasi untuk manajemen presensi perkuliahan yang efisien, cepat dan akurat bagi seluruh civitas akademika Institut Teknologi Del.
+DelPresence is a web application for academic management with authentication features.
 
-## Struktur Proyek
+## Project Structure
 
-Proyek ini dibangun menggunakan Next.js dengan pendekatan Clean Architecture:
+This project is divided into two main parts:
+
+1. **Frontend**: A Next.js application with React
+2. **Backend**: A Go API server with PostgreSQL database
+
+## Prerequisites
+
+- Node.js 18 or later
+- Go 1.21 or later
+- PostgreSQL 15 or later
+- Docker and Docker Compose (optional)
+
+## Frontend
+
+The frontend is built with Next.js and uses:
+
+- Tailwind CSS for styling
+- React components from shadcn/ui
+- Client-side authentication
+
+### Running the Frontend
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Create a `.env.local` file with:
 
 ```
-src/
-├── app/              # Next.js app router
-├── components/       # Komponen UI reusable
-│   └── ui/           # Komponen UI dasar
-├── features/         # Fitur per domain
-│   └── home/         # Implementasi fitur homepage 
-├── shared/           # Kode yang digunakan di seluruh aplikasi
-│   ├── hooks/        # React hooks
-│   ├── styles/       # Shared styles
-│   ├── types/        # Type definitions
-│   └── utils/        # Utility functions dan constants
-└── public/           # Asset statis
-    └── images/       # Gambar dan media
+NEXT_PUBLIC_API_URL=http://localhost:8080
 ```
 
-## Fitur
+3. Start the development server:
 
-- Homepage responsif dengan animasi interaktif
-- Stack component untuk menampilkan gambar dengan efek 3D
-- Kompatibilitas dengan device mobile dan desktop
-- Integrase penuh dengan backend API (work in progress)
+```bash
+npm run dev
+```
 
-## Teknologi
+The frontend will run on `http://localhost:3000`.
 
-- **Framework**: Next.js 14
-- **Styling**: Tailwind CSS
-- **Animasi**: Framer Motion
-- **Deployment**: Vercel
+## Backend
+
+The backend is built with Go and uses:
+
+- Gin web framework
+- PostgreSQL database
+- JWT authentication
+
+### Running the Backend
+
+1. Navigate to the backend directory:
+
+```bash
+cd backend
+```
+
+2. Create a PostgreSQL database:
+
+```sql
+CREATE DATABASE delpresence;
+```
+
+3. Configure environment variables in `.env`:
+
+```
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=delpresence
+JWT_SECRET=delpresence_secret_key
+SERVER_PORT=8080
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+```
+
+4. Install dependencies:
+
+```bash
+go mod download
+```
+
+5. Run the server:
+
+```bash
+go run cmd/server/main.go
+```
+
+The backend will run on `http://localhost:8080`.
+
+### Using Docker Compose
+
+You can also run the backend with Docker Compose:
+
+```bash
+cd backend
+docker-compose up -d
+```
+
+This will start both the API server and PostgreSQL database.
+
+## Default Admin User
+
+- Username: `admin`
+- Password: `delpresence`
+
+## API Endpoints
+
+### Authentication
+
+- `POST /api/auth/login`: Log in with username and password
+- `POST /api/auth/refresh`: Refresh an expired token
+- `GET /api/auth/me`: Get current user information (protected)
 
 ## Development
 
-### Persyaratan
+- Frontend code is in the `src` directory
+- Backend code is in the `backend` directory
+- UI components are in `src/components`
+- Authentication logic is in `backend/internal/auth`
 
-- Node.js 18+ 
-- npm atau yarn
+## License
 
-### Instalasi
-
-```bash
-# Clone repository
-git clone https://github.com/your-username/delpresence-website.git
-cd delpresence-website
-
-# Install dependencies
-npm install
-# atau
-yarn install
-
-# Jalankan development server
-npm run dev
-# atau
-yarn dev
-```
-
-## Deployment
-
-Aplikasi dapat di-deploy menggunakan Vercel atau platform hosting lainnya yang mendukung Next.js.
-
-```bash
-npm run build
-# atau
-yarn build
-```
-
-## Kontribusi
-
-Kontribusi dipersilakan! Silakan buka issue atau submit pull request.
-
-## Lisensi
-
-© 2023 Institut Teknologi Del. All Rights Reserved.
+MIT

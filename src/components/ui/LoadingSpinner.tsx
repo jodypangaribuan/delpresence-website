@@ -1,39 +1,28 @@
 "use client";
 
-import { PuffLoader } from "react-spinners";
-import { motion } from "framer-motion";
-import { siteConfig } from "@/shared/utils/siteConfig";
+import React from "react";
 
-interface LoadingSpinnerProps {
-  size?: number;
+type LoadingSpinnerProps = {
+  size?: "sm" | "md" | "lg";
   text?: string;
-}
+};
 
 export default function LoadingSpinner({
-  size = 60,
-  text = "Memuat..."
+  size = "md",
+  text,
 }: LoadingSpinnerProps) {
-  const { colors } = siteConfig;
+  const sizeClasses = {
+    sm: "h-4 w-4",
+    md: "h-8 w-8",
+    lg: "h-12 w-12",
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="flex flex-col items-center justify-center"
-    >
-      <PuffLoader
-        color={colors.primary}
-        size={size}
-        speedMultiplier={0.8}
+    <div className="flex flex-col items-center justify-center gap-3">
+      <div
+        className={`animate-spin rounded-full border-2 border-t-transparent border-[#0687C9] ${sizeClasses[size]}`}
       />
-      <motion.p
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="mt-4 text-slate-600 font-medium"
-      >
-        {text}
-      </motion.p>
-    </motion.div>
+      {text && <p className="text-sm text-gray-500">{text}</p>}
+    </div>
   );
 } 
