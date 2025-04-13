@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { siteConfig } from "@/shared/utils/siteConfig";
 import ClickSparkProvider from "@/components/ui/ClickSpark/ClickSparkProvider";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,10 +21,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id">
+    <html lang="en">
       <body className={inter.className}>
         <ClickSparkProvider>
           {children}
+          <Toaster position="bottom-right" />
         </ClickSparkProvider>
       </body>
     </html>

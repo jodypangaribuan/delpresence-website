@@ -64,9 +64,13 @@ func Initialize() {
 	log.Println("Connected to database successfully")
 
 	// Auto-migrate the schema
-	err = DB.AutoMigrate(&models.User{})
+	err = DB.AutoMigrate(
+		&models.User{},
+		&models.Lecturer{},
+		// Add more models here as needed
+	)
 	if err != nil {
-		log.Fatalf("Error migrating database schema: %v", err)
+		log.Fatalf("Error auto-migrating models: %v\n", err)
 	}
 
 	log.Println("Database schema migrated successfully")
@@ -82,4 +86,9 @@ func Close() {
 		}
 		sqlDB.Close()
 	}
+}
+
+// GetDB returns the database connection
+func GetDB() *gorm.DB {
+	return DB
 } 

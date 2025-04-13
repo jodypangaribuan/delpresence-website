@@ -430,16 +430,16 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <li>
                 <Link
-                  href="/dashboard/academic/lecturers"
+                  href="/dashboard/users/lecturers"
                   className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/academic/lecturers")
+                    isLinkActive("/dashboard/users/lecturers")
                       ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
                       : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
                   }`}
                 >
                   <Users
                     className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/academic/lecturers")
+                      isLinkActive("/dashboard/users/lecturers")
                         ? "text-[#0687C9]"
                         : "text-neutral-600 group-hover:text-[#0687C9]"
                     }`}
@@ -449,16 +449,16 @@ export function Sidebar() {
               </li>
               <li>
                 <Link
-                  href="/dashboard/academic/assistants"
+                  href="/dashboard/users/assistants"
                   className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/academic/assistants")
+                    isLinkActive("/dashboard/users/assistants")
                       ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
                       : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
                   }`}
                 >
                   <UserCog
                     className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/academic/assistants")
+                      isLinkActive("/dashboard/users/assistants")
                         ? "text-[#0687C9]"
                         : "text-neutral-600 group-hover:text-[#0687C9]"
                     }`}
@@ -468,16 +468,16 @@ export function Sidebar() {
               </li>
               <li>
                 <Link
-                  href="/dashboard/academic/students"
+                  href="/dashboard/users/students"
                   className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/academic/students")
+                    isLinkActive("/dashboard/users/students")
                       ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
                       : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
                   }`}
                 >
                   <GraduationCap
                     className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/academic/students")
+                      isLinkActive("/dashboard/users/students")
                         ? "text-[#0687C9]"
                         : "text-neutral-600 group-hover:text-[#0687C9]"
                     }`}
