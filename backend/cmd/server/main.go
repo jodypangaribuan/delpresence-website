@@ -53,8 +53,9 @@ func main() {
 	// Register campus authentication routes
 	router.POST("/api/auth/campus/login", handlers.CampusLogin)
 
-	// Create lecturers handler
+	// Create handlers
 	lecturerHandler := handlers.NewLecturerHandler()
+	campusAuthHandler := handlers.NewCampusAuthHandler()
 
 	// Protected routes
 	authRequired := router.Group("/api")
@@ -67,6 +68,10 @@ func main() {
 		adminRoutes := authRequired.Group("/admin")
 		adminRoutes.Use(middleware.RoleMiddleware("Admin"))
 		{
+			// Campus API token management (admin only)
+			adminRoutes.GET("/campus/token", campusAuthHandler.GetToken)
+			adminRoutes.POST("/campus/token/refresh", campusAuthHandler.RefreshToken)
+			
 			// Admin access to lecturer data
 			adminRoutes.GET("/lecturers", lecturerHandler.GetAllLecturers)
 			adminRoutes.GET("/lecturers/:id", lecturerHandler.GetLecturerByID)

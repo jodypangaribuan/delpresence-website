@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/delpresence/backend/internal/services"
 	"github.com/gin-gonic/gin"
@@ -58,26 +59,27 @@ func (h *LecturerHandler) GetLecturerByID(c *gin.Context) {
 
 // SyncLecturers syncs lecturers from the campus API
 func (h *LecturerHandler) SyncLecturers(c *gin.Context) {
-	// Get campus token from header
-	token := c.GetHeader("Authorization")
-	if token == "" {
-		// Try to get token from cookie
-		token, _ = c.Cookie("campus_token")
-		if token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "No campus token provided"})
-			return
-		}
-	} else {
-		// Remove "Bearer " prefix if present
-		if len(token) > 7 && token[:7] == "Bearer " {
-			token = token[7:]
-		}
-	}
-
-	// Sync lecturers
-	count, err := h.service.SyncLecturers(token)
+	// Sync lecturers using the service (which now handles authentication internally)
+	count, err := h.service.SyncLecturers()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to sync lecturers: " + err.Error()})
+		// Determine a more specific error message and status code
+		statusCode := http.StatusInternalServerError
+		errorMsg := err.Error()
+		
+		// Check for authentication errors
+		if strings.Contains(errorMsg, "authentication failed") || 
+		   strings.Contains(errorMsg, "token") {
+			statusCode = http.StatusUnauthorized
+			errorMsg = "Failed to authenticate with campus API: " + errorMsg
+		} else if strings.Contains(errorMsg, "network error") || 
+		          strings.Contains(errorMsg, "timeout") {
+			errorMsg = "Network error when connecting to campus API: " + errorMsg
+		} else if strings.Contains(errorMsg, "unmarshal") || 
+		          strings.Contains(errorMsg, "parse") {
+			errorMsg = "Error processing campus API response: " + errorMsg
+		}
+		
+		c.JSON(statusCode, gin.H{"error": errorMsg})
 		return
 	}
 

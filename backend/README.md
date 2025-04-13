@@ -1,23 +1,27 @@
 # DelPresence Backend
 
-This is the backend API for the DelPresence application, providing authentication and other APIs.
+Backend services for the DelPresence application.
 
-## Prerequisites
+## Overview
 
-- Go 1.21 or later
-- PostgreSQL database
-- Docker (optional)
+The DelPresence backend is a Go API service that provides functionality for attendance tracking, user management, and integration with the IT Del campus information system.
 
 ## Features
 
-- Clean architecture with repository pattern
-- GORM for database operations
-- JWT authentication with refresh tokens
-- Role-based authorization
-- Automatic database migrations
-- Docker and Docker Compose support
+- User authentication and authorization
+- Lecturer data synchronization from campus API
+- Attendance tracking and management
+- Role-based access control
 
-## Environment Variables
+## Setup and Installation
+
+### Prerequisites
+
+- Go 1.23 or higher
+- PostgreSQL database
+- Docker and Docker Compose (optional)
+
+### Environment Variables
 
 Create a `.env` file in the root directory with the following variables:
 
@@ -27,95 +31,75 @@ DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=postgres
 DB_NAME=delpresence
-JWT_SECRET=delpresence_secret_key
+JWT_SECRET=your_secret_key
 SERVER_PORT=8080
 CORS_ALLOWED_ORIGINS=http://localhost:3000
+CAMPUS_API_USERNAME=your_campus_api_username
+CAMPUS_API_PASSWORD=your_campus_api_password
 ```
 
-## Database Setup
+### Running with Docker
 
-1. Create a PostgreSQL database:
-
-```sql
-CREATE DATABASE delpresence;
+```bash
+docker-compose up -d
 ```
 
-2. The application will automatically create the necessary tables and admin user on startup through GORM auto-migration.
-
-## Running the Application
-
-### Local Development
+### Running Locally
 
 1. Install dependencies:
-
 ```bash
 go mod download
 ```
 
-2. Start the server:
-
+2. Run the server:
 ```bash
 go run cmd/server/main.go
 ```
 
-The server will run on `http://localhost:8080`.
-
-### Using Docker
-
-1. Build the Docker image:
-
-```bash
-docker build -t delpresence-backend .
-```
-
-2. Run the container:
-
-```bash
-docker run -p 8080:8080 --env-file .env delpresence-backend
-```
-
-## Project Structure
-
-```
-backend/
-├── cmd/                  # Command line applications
-│   └── server/           # Main API server
-├── internal/             # Internal packages
-│   ├── auth/             # Authentication logic
-│   ├── database/         # Database connection
-│   ├── handlers/         # HTTP handlers
-│   ├── middleware/       # HTTP middleware
-│   ├── models/           # Data models
-│   ├── repositories/     # Database repositories
-│   └── utils/            # Utility functions
-├── .env                  # Environment variables
-├── go.mod                # Go module definition
-├── go.sum                # Go module checksums
-├── docker-compose.yml    # Docker Compose configuration
-└── Dockerfile            # Docker build instructions
-```
-
 ## API Endpoints
 
-### Public Endpoints
+### Authentication
 
-- `POST /api/auth/login`: Log in with username and password
-  - Request: `{ "username": "admin", "password": "delpresence" }`
-  - Response: `{ "token": "...", "refresh_token": "...", "user": { ... } }`
+- `POST /api/auth/login` - Login with username and password
+- `POST /api/auth/refresh` - Refresh authentication token
 
-- `POST /api/auth/refresh`: Refresh an expired token
-  - Request: `{ "refresh_token": "..." }`
-  - Response: `{ "token": "...", "refresh_token": "...", "user": { ... } }`
+### Campus API Integration
 
-### Protected Endpoints
+The backend includes a service for authenticating with the campus API (CIS) and managing tokens.
 
-All protected endpoints require an `Authorization` header with a valid JWT token:
-`Authorization: Bearer YOUR_TOKEN_HERE`
+#### Token Management
 
-- `GET /api/auth/me`: Get current user information
-  - Response: `{ "id": 1, "username": "admin", "role": "Admin" }`
+- `GET /api/admin/campus/token` - Get a valid token from the campus API (admin only)
+- `POST /api/admin/campus/token/refresh` - Force refresh the campus API token (admin only)
 
-## Default Admin User
+### Lecturers
 
-Username: `admin`  
-Password: `delpresence` 
+- `GET /api/admin/lecturers` - Get all lecturers (admin only)
+- `GET /api/admin/lecturers/:id` - Get lecturer by ID (admin only)
+- `POST /api/admin/lecturers/sync` - Sync lecturers from campus API (admin only)
+
+### Campus API Integration Architecture
+
+The application uses a dedicated `CampusAuthService` to handle authentication with the campus API. This service:
+
+1. Manages a single token for all campus API requests
+2. Automatically refreshes tokens when they expire
+3. Provides token caching to minimize authentication requests
+4. Is used by other services (like `LecturerService`) to make authenticated requests to the campus API
+
+#### How It Works
+
+1. When a service needs to access the campus API, it requests a token from the `CampusAuthService`
+2. The `CampusAuthService` checks if it has a valid cached token:
+   - If yes, it returns the cached token
+   - If no, it authenticates with the campus API and returns a new token
+3. The service uses the token to make requests to the campus API
+4. If the token expires, the service can request a refresh from the `CampusAuthService`
+
+## Contributing
+
+1. Fork the repository
+2. Create a new branch: `git checkout -b my-feature-branch`
+3. Make changes and commit: `git commit -m "Add new feature"`
+4. Push to the branch: `git push origin my-feature-branch`
+5. Create a pull request 

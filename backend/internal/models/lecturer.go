@@ -16,7 +16,7 @@ type Lecturer struct {
 	NIP                 string         `json:"nip" gorm:"type:varchar(20)"`
 	FullName            string         `json:"full_name" gorm:"type:varchar(100);not null"`
 	Email               string         `json:"email" gorm:"type:varchar(255)"`
-	StudyProgramID      int            `json:"study_program_id" gorm:"column:prodi_id"`
+	StudyProgramID      string         `json:"study_program_id" gorm:"column:prodi_id;type:varchar(20)"`
 	StudyProgram        string         `json:"study_program" gorm:"column:prodi;type:varchar(100)"`
 	AcademicRank        string         `json:"academic_rank" gorm:"column:jabatan_akademik;type:varchar(10)"`
 	AcademicRankDesc    string         `json:"academic_rank_desc" gorm:"column:jabatan_akademik_desc;type:varchar(50)"`
@@ -52,16 +52,16 @@ type CampusLecturerResponse struct {
 
 // CampusLecturer represents a lecturer from the campus API
 type CampusLecturer struct {
-	PegawaiID           int    `json:"pegawai_id"`
-	DosenID             int    `json:"dosen_id"`
-	NIP                 string `json:"nip"`
-	Nama                string `json:"nama"`
-	Email               string `json:"email"`
-	ProdiID             int    `json:"prodi_id"`
-	Prodi               string `json:"prodi"`
-	JabatanAkademik     string `json:"jabatan_akademik"`
-	JabatanAkademikDesc string `json:"jabatan_akademik_desc"`
-	JenjangPendidikan   string `json:"jenjang_pendidikan"`
-	NIDN                string `json:"nidn"`
-	UserID              int    `json:"user_id"`
+	PegawaiID           interface{} `json:"pegawai_id"`
+	DosenID             interface{} `json:"dosen_id"`   
+	NIP                 string      `json:"nip"`
+	Nama                string      `json:"nama"`
+	Email               string      `json:"email"`
+	ProdiID             interface{} `json:"prodi_id"`   
+	Prodi               string      `json:"prodi"`
+	JabatanAkademik     string      `json:"jabatan_akademik"`
+	JabatanAkademikDesc string      `json:"jabatan_akademik_desc"`
+	JenjangPendidikan   string      `json:"jenjang_pendidikan"`
+	NIDN                string      `json:"nidn"`
+	UserID              interface{} `json:"user_id"`
 } 
