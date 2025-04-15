@@ -1,10 +1,10 @@
 version: '3.8'
 
 services:
-  nextjs-dev:
+  nextjs-app:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:

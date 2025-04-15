@@ -7,11 +7,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-    restart: always
     volumes:
-      - ./public:/app/public
-    # Add any environment variables you need from your .env file
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
     env_file:
-      - .env 
+      - .env.local
+    restart: unless-stopped 

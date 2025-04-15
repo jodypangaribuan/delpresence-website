@@ -1,37 +1,19 @@
-FROM node:20-alpine AS base
+FROM node:20-alpine
 
 # Create app directory
 WORKDIR /app
 
+# Copy package.json and package-lock.json
+COPY package.json package-lock.json* .npmrc ./
+
 # Install dependencies
-FROM base AS deps
-COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --quiet
 
-# Build the app
-FROM deps AS builder
+# Copy the rest of the application
 COPY . .
-RUN npm run build
 
-# Production image
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV production
-
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-USER nextjs
-
-# Copy necessary files
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
+# Expose port
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
-
-CMD ["node", "server.js"] 
+# Start the development server
+CMD ["npm", "run", "dev"] 
