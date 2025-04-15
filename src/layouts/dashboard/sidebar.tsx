@@ -446,7 +446,7 @@ export function Sidebar() {
                   />
                   Daftar Dosen
                 </Link>
-              </li>
+              </li>i
               <li>
                 <Link
                   href="/dashboard/users/assistants"

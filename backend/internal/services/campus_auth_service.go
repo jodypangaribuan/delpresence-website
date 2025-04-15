@@ -30,6 +30,81 @@ type CampusAuthService struct {
 	mutex       sync.Mutex
 }
 
+// CampusAuthTransport is an http.RoundTripper that automatically handles authentication token
+// management for requests to the campus API
+type CampusAuthTransport struct {
+	Base      http.RoundTripper
+	authService *CampusAuthService
+}
+
+// NewCampusAuthTransport creates a new transport that automatically handles token refresh
+func NewCampusAuthTransport(base http.RoundTripper, authService *CampusAuthService) *CampusAuthTransport {
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return &CampusAuthTransport{
+		Base:        base,
+		authService: authService,
+	}
+}
+
+// RoundTrip implements the http.RoundTripper interface
+func (t *CampusAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone the request to avoid modifying the original
+	reqClone := req.Clone(req.Context())
+	
+	// Get a valid token
+	token, err := t.authService.GetToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get authentication token: %w", err)
+	}
+	
+	// Add the token to the request
+	if reqClone.Header == nil {
+		reqClone.Header = make(http.Header)
+	}
+	reqClone.Header.Set("Authorization", "Bearer "+token)
+	
+	// Send the request
+	resp, err := t.Base.RoundTrip(reqClone)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Check if the response indicates an expired token (401 Unauthorized)
+	if resp.StatusCode == http.StatusUnauthorized {
+		// Try to refresh the token
+		log.Println("Token expired, attempting to refresh...")
+		token, err = t.authService.RefreshToken()
+		if err != nil {
+			return resp, err // Return the original 401 response and the error
+		}
+		
+		// Clone the original request again
+		reqClone = req.Clone(req.Context())
+		if reqClone.Header == nil {
+			reqClone.Header = make(http.Header)
+		}
+		reqClone.Header.Set("Authorization", "Bearer "+token)
+		
+		// Close the previous response body to avoid leaking resources
+		resp.Body.Close()
+		
+		// Retry the request with the new token
+		return t.Base.RoundTrip(reqClone)
+	}
+	
+	return resp, nil
+}
+
+// GetClient returns an http client that automatically handles token management
+func (s *CampusAuthService) GetClient() *http.Client {
+	return &http.Client{
+		Transport: NewCampusAuthTransport(http.DefaultTransport, s),
+		Timeout:   30 * time.Second,
+	}
+}
+
 // NewCampusAuthService creates a new CampusAuthService
 func NewCampusAuthService() *CampusAuthService {
 	// Get credentials from environment variables with fallbacks
