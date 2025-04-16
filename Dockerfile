@@ -1,19 +1,18 @@
+# Use Node.js LTS version
 FROM node:20-alpine
 
-# Create app directory
+# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package.json package-lock.json* .npmrc ./
-
-# Install dependencies
-RUN npm ci --quiet
+# Install dependencies first (caching optimization)
+COPY package*.json ./
+RUN npm install
 
 # Copy the rest of the application
 COPY . .
 
-# Expose port
+# Expose the port Next.js runs on
 EXPOSE 3000
 
 # Start the development server
-CMD ["npm", "run", "dev"] 
+CMD ["npm", "run", "dev"]
