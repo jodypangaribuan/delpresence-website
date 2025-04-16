@@ -54,8 +54,9 @@ func main() {
 	router.POST("/api/auth/campus/login", handlers.CampusLogin)
 
 	// Create handlers
-	lecturerHandler := handlers.NewLecturerHandler()
 	campusAuthHandler := handlers.NewCampusAuthHandler()
+	lecturerHandler := handlers.NewLecturerHandler()
+	studentHandler := handlers.NewStudentHandler()
 
 	// Protected routes
 	authRequired := router.Group("/api")
@@ -76,6 +77,11 @@ func main() {
 			adminRoutes.GET("/lecturers", lecturerHandler.GetAllLecturers)
 			adminRoutes.GET("/lecturers/:id", lecturerHandler.GetLecturerByID)
 			adminRoutes.POST("/lecturers/sync", lecturerHandler.SyncLecturers)
+
+			// Admin access to student data
+			adminRoutes.GET("/students", studentHandler.GetAllStudents)
+			adminRoutes.GET("/students/:id", studentHandler.GetStudentByID)
+			adminRoutes.POST("/students/sync", studentHandler.SyncStudents)
 		}
 		
 		// Lecturer routes

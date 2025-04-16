@@ -67,6 +67,7 @@ func Initialize() {
 	err = DB.AutoMigrate(
 		&models.User{},
 		&models.Lecturer{},
+		&models.Student{},
 		// Add more models here as needed
 	)
 	if err != nil {
