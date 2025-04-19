@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -31,10 +32,47 @@ import {
   MessageSquare,
   Smartphone,
   FileCheck,
+  LucideProps
 } from "lucide-react";
 import { getUserRole, UserRole } from "@/app/dashboard/page";
 import { useEffect, useState } from "react";
 import LoadingLink from "@/components/ui/LoadingLink";
+
+// Create customized icons with consistent size
+const createSidebarIcon = (Icon: React.ComponentType<LucideProps>) => {
+  return (props: LucideProps) => <Icon size={18} strokeWidth={2} {...props} />;
+};
+
+// Create sized variants of all icons
+const SidebarIcons = {
+  LayoutDashboard: createSidebarIcon(LayoutDashboard),
+  BookOpen: createSidebarIcon(BookOpen),
+  Calendar: createSidebarIcon(Calendar),
+  Users: createSidebarIcon(Users),
+  ClipboardList: createSidebarIcon(ClipboardList),
+  BarChart2: createSidebarIcon(BarChart2),
+  UserCog: createSidebarIcon(UserCog),
+  Building: createSidebarIcon(Building),
+  FileOutput: createSidebarIcon(FileOutput),
+  FileSpreadsheet: createSidebarIcon(FileSpreadsheet),
+  AlertTriangle: createSidebarIcon(AlertTriangle),
+  GraduationCap: createSidebarIcon(GraduationCap),
+  School: createSidebarIcon(School),
+  Layers: createSidebarIcon(Layers),
+  BookCopy: createSidebarIcon(BookCopy),
+  LibrarySquare: createSidebarIcon(LibrarySquare),
+  Building2: createSidebarIcon(Building2),
+  Settings: createSidebarIcon(Settings),
+  QrCode: createSidebarIcon(QrCode),
+  CalendarDays: createSidebarIcon(CalendarDays),
+  BarChart4: createSidebarIcon(BarChart4),
+  Microscope: createSidebarIcon(Microscope),
+  ScanFace: createSidebarIcon(ScanFace),
+  UserCheck: createSidebarIcon(UserCheck),
+  MessageSquare: createSidebarIcon(MessageSquare),
+  Smartphone: createSidebarIcon(Smartphone),
+  FileCheck: createSidebarIcon(FileCheck),
+};
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -73,7 +111,7 @@ export function Sidebar() {
           }`}
           isActive={active}
         >
-          <div className={`mr-3 h-5 w-5 ${
+          <div className={`mr-3 h-5 w-5 flex items-center justify-center ${
             active
               ? "text-[#0687C9]"
               : "text-neutral-600 group-hover:text-[#0687C9]"
@@ -110,7 +148,7 @@ export function Sidebar() {
         <ul className="space-y-1 mb-6">
           <MenuLink 
             href="/dashboard"
-            icon={<LayoutDashboard />}
+            icon={<SidebarIcons.LayoutDashboard />}
           >
             Dashboard
           </MenuLink>
@@ -128,19 +166,19 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/courses"
-                icon={<BookOpen />}
+                icon={<SidebarIcons.BookOpen />}
               >
                 Mata Kuliah
               </MenuLink>
               <MenuLink
                 href="/dashboard/schedules"
-                icon={<Calendar />}
+                icon={<SidebarIcons.Calendar />}
               >
                 Jadwal
               </MenuLink>
               <MenuLink
                 href="/dashboard/attendance"
-                icon={<ClipboardList />}
+                icon={<SidebarIcons.ClipboardList />}
               >
                 Kehadiran
               </MenuLink>
@@ -160,31 +198,31 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/academic/departments"
-                icon={<School />}
+                icon={<SidebarIcons.School />}
               >
                 Program Studi
               </MenuLink>
               <MenuLink
                 href="/dashboard/academic/faculty"
-                icon={<Building2 />}
+                icon={<SidebarIcons.Building2 />}
               >
                 Fakultas
               </MenuLink>
               <MenuLink
                 href="/dashboard/academic/buildings"
-                icon={<Building />}
+                icon={<SidebarIcons.Building />}
               >
                 Gedung
               </MenuLink>
               <MenuLink
                 href="/dashboard/academic/rooms"
-                icon={<LibrarySquare />}
+                icon={<SidebarIcons.LibrarySquare />}
               >
                 Ruangan
               </MenuLink>
               <MenuLink
                 href="/dashboard/academic/years"
-                icon={<Calendar />}
+                icon={<SidebarIcons.Calendar />}
               >
                 Tahun Akademik
               </MenuLink>
@@ -199,25 +237,25 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/courses/manage"
-                icon={<BookOpen />}
+                icon={<SidebarIcons.BookOpen />}
               >
                 Mata Kuliah
               </MenuLink>
               <MenuLink
                 href="/dashboard/courses/groups"
-                icon={<Layers />}
+                icon={<SidebarIcons.Layers />}
               >
                 Kelompok Mata Kuliah
               </MenuLink>
               <MenuLink
                 href="/dashboard/courses/classes"
-                icon={<Users />}
+                icon={<SidebarIcons.Users />}
               >
                 Kelas Kuliah
               </MenuLink>
               <MenuLink
                 href="/dashboard/courses/assignments"
-                icon={<UserCog />}
+                icon={<SidebarIcons.UserCog />}
               >
                 Penugasan Dosen
               </MenuLink>
@@ -232,31 +270,31 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/schedules/manage"
-                icon={<Calendar />}
+                icon={<SidebarIcons.Calendar />}
               >
                 Jadwal Perkuliahan
               </MenuLink>
               <MenuLink
                 href="/dashboard/schedules/import"
-                icon={<FileSpreadsheet />}
+                icon={<SidebarIcons.FileSpreadsheet />}
               >
                 Import Excel
               </MenuLink>
               <MenuLink
                 href="/dashboard/schedules/export"
-                icon={<FileOutput />}
+                icon={<SidebarIcons.FileOutput />}
               >
                 Export Excel
               </MenuLink>
               <MenuLink
                 href="/dashboard/schedules/conflicts"
-                icon={<AlertTriangle />}
+                icon={<SidebarIcons.AlertTriangle />}
               >
                 Pengecekan Konflik
               </MenuLink>
               <MenuLink
                 href="/dashboard/schedules/reschedule-approval"
-                icon={<CalendarDays />}
+                icon={<SidebarIcons.CalendarDays />}
               >
                 Persetujuan Kelas Pengganti
               </MenuLink>
@@ -271,19 +309,19 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/users/lecturers"
-                icon={<Users />}
+                icon={<SidebarIcons.Users />}
               >
                 Daftar Dosen
               </MenuLink>
               <MenuLink
                 href="/dashboard/users/employees"
-                icon={<UserCog />}
+                icon={<SidebarIcons.UserCog />}
               >
                 Daftar Pegawai
               </MenuLink>
               <MenuLink
                 href="/dashboard/users/students"
-                icon={<GraduationCap />}
+                icon={<SidebarIcons.GraduationCap />}
               >
                 Daftar Mahasiswa
               </MenuLink>
@@ -298,31 +336,31 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/attendance/overview"
-                icon={<BarChart4 />}
+                icon={<SidebarIcons.BarChart4 />}
               >
                 Tinjauan Kehadiran
               </MenuLink>
               <MenuLink
                 href="/dashboard/attendance/summary"
-                icon={<BarChart2 />}
+                icon={<SidebarIcons.BarChart2 />}
               >
                 Rekap Kehadiran
               </MenuLink>
               <MenuLink
                 href="/dashboard/attendance/permissions"
-                icon={<FileCheck />}
+                icon={<SidebarIcons.FileCheck />}
               >
                 Verifikasi Izin Mahasiswa
               </MenuLink>
               <MenuLink
                 href="/dashboard/attendance/reports"
-                icon={<FileOutput />}
+                icon={<SidebarIcons.FileOutput />}
               >
                 Laporan Kehadiran
               </MenuLink>
               <MenuLink
                 href="/dashboard/attendance/face-recognition"
-                icon={<ScanFace />}
+                icon={<SidebarIcons.ScanFace />}
               >
                 Manajemen Face Recognition
               </MenuLink>
@@ -342,13 +380,13 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/lecturer/courses"
-                icon={<BookOpen />}
+                icon={<SidebarIcons.BookOpen />}
               >
                 Mata Kuliah Saya
               </MenuLink>
               <MenuLink
                 href="/dashboard/lecturer/classes"
-                icon={<Users />}
+                icon={<SidebarIcons.Users />}
               >
                 Kelas Saya
               </MenuLink>
@@ -363,13 +401,13 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/lecturer/schedules"
-                icon={<Calendar />}
+                icon={<SidebarIcons.Calendar />}
               >
                 Jadwal Mengajar
               </MenuLink>
               <MenuLink
                 href="/dashboard/lecturer/reschedule"
-                icon={<CalendarDays />}
+                icon={<SidebarIcons.CalendarDays />}
               >
                 Pengajuan Kelas Pengganti
               </MenuLink>
@@ -384,31 +422,31 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/lecturer/attendance/manage"
-                icon={<ClipboardList />}
+                icon={<SidebarIcons.ClipboardList />}
               >
                 Kelola Presensi
               </MenuLink>
               <MenuLink
                 href="/dashboard/lecturer/attendance/qr"
-                icon={<QrCode />}
+                icon={<SidebarIcons.QrCode />}
               >
                 Generate QR Presensi
               </MenuLink>
               <MenuLink
                 href="/dashboard/lecturer/attendance/face"
-                icon={<ScanFace />}
+                icon={<SidebarIcons.ScanFace />}
               >
                 Aktivasi Face Recognition
               </MenuLink>
               <MenuLink
                 href="/dashboard/lecturer/attendance/summary"
-                icon={<BarChart2 />}
+                icon={<SidebarIcons.BarChart2 />}
               >
                 Rekap Kehadiran
               </MenuLink>
               <MenuLink
                 href="/dashboard/lecturer/attendance/permissions"
-                icon={<FileCheck />}
+                icon={<SidebarIcons.FileCheck />}
               >
                 Izin Mahasiswa
               </MenuLink>
@@ -423,7 +461,7 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/lecturer/announcements"
-                icon={<MessageSquare />}
+                icon={<SidebarIcons.MessageSquare />}
               >
                 Pengumuman Kelas
               </MenuLink>
@@ -443,13 +481,13 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/assistant/courses"
-                icon={<BookOpen />}
+                icon={<SidebarIcons.BookOpen />}
               >
                 Mata Kuliah Asisten
               </MenuLink>
               <MenuLink
                 href="/dashboard/assistant/classes"
-                icon={<Users />}
+                icon={<SidebarIcons.Users />}
               >
                 Kelas Asisten
               </MenuLink>
@@ -464,7 +502,7 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/assistant/schedules"
-                icon={<Calendar />}
+                icon={<SidebarIcons.Calendar />}
               >
                 Jadwal Asistensi
               </MenuLink>
@@ -479,19 +517,19 @@ export function Sidebar() {
             <ul className="space-y-1 mb-6">
               <MenuLink
                 href="/dashboard/assistant/attendance/manage"
-                icon={<ClipboardList />}
+                icon={<SidebarIcons.ClipboardList />}
               >
                 Kelola Presensi
               </MenuLink>
               <MenuLink
                 href="/dashboard/assistant/attendance/qr"
-                icon={<QrCode />}
+                icon={<SidebarIcons.QrCode />}
               >
                 Generate QR Presensi
               </MenuLink>
               <MenuLink
                 href="/dashboard/assistant/attendance/summary"
-                icon={<BarChart2 />}
+                icon={<SidebarIcons.BarChart2 />}
               >
                 Rekap Kehadiran
               </MenuLink>
