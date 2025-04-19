@@ -1,33 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import DashboardLayout from "@/layouts/dashboard/dashboard-layout";
-import { isAuthenticated } from "./page";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { UserRole, useAuth } from "@/context/authContext";
 
 export default function DashboardRootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const [authorized, setAuthorized] = useState(false);
-
-  // Check authentication on client-side
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  // Add debugging log for dashboard layout
   useEffect(() => {
-    // Check if user is authenticated
-    if (!isAuthenticated()) {
-      router.push("/login");
-      return;
-    }
-
-    setAuthorized(true);
-  }, [router]);
-
-  // Show nothing while checking authentication
-  if (!authorized) {
-    return null;
-  }
-
-  return <DashboardLayout>{children}</DashboardLayout>;
+    console.log("[DashboardLayout] Rendering dashboard, auth state:", { isAuthenticated, isLoading });
+  }, [isAuthenticated, isLoading]);
+  
+  // All users with valid authentication can access the dashboard
+  // Role-specific restrictions are handled in each section
+  return (
+    <ProtectedRoute>
+      <DashboardLayout>{children}</DashboardLayout>
+    </ProtectedRoute>
+  );
 } 

@@ -40,7 +40,7 @@ import LoadingLink from "@/components/ui/LoadingLink";
 
 // Create customized icons with consistent size
 const createSidebarIcon = (Icon: React.ComponentType<LucideProps>) => {
-  return (props: LucideProps) => <Icon size={18} strokeWidth={2} {...props} />;
+  return (props: LucideProps) => <Icon size={20} strokeWidth={2} {...props} />;
 };
 
 // Create sized variants of all icons
@@ -111,7 +111,7 @@ export function Sidebar() {
           }`}
           isActive={active}
         >
-          <div className={`mr-3 h-5 w-5 flex items-center justify-center ${
+          <div className={`mr-3 h-6 w-6 flex items-center justify-center ${
             active
               ? "text-[#0687C9]"
               : "text-neutral-600 group-hover:text-[#0687C9]"

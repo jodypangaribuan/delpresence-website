@@ -1,9 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Header } from "./header";
 import { Sidebar } from "./sidebar";
 import LoadingBar from "@/components/ui/LoadingBar";
+
+// Helper function to get page title from pathname
+const getPageTitleFromPath = (pathname: string): string => {
+  if (pathname === "/" || pathname === "/dashboard") return "Dashboard";
+  
+  // Get last segment of the path for the menu name
+  const segments = pathname.split('/').filter(Boolean);
+  const lastSegment = segments[segments.length - 1];
+  
+  // Convert to title case
+  return lastSegment
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
 
 export default function DashboardLayout({
   children,
@@ -11,6 +27,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Update document title based on the current path
+    const pageTitle = getPageTitleFromPath(pathname);
+    document.title = `Dashboard - ${pageTitle}`;
+  }, [pathname]);
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);

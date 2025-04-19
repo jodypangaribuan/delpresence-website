@@ -59,9 +59,9 @@ type LoginRequest struct {
 
 // LoginResponse represents the login response body
 type LoginResponse struct {
+	User         User   `json:"user"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
-	User         User   `json:"user"`
 }
 
 // RefreshRequest represents the refresh token request body

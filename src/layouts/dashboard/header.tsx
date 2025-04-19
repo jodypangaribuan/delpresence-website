@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useRef, memo } from "react";
 import { useRouter } from "next/navigation";
-import { logout, getUserRole, UserRole, getUser } from "@/app/dashboard/page";
+import { useAuth, UserRole } from "@/context/authContext";
 import Link from "next/link";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
@@ -92,6 +92,7 @@ const CalendarDisplay = memo(function CalendarDisplay() {
 const ProfileMenu = memo(function ProfileMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { user, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -107,21 +108,24 @@ const ProfileMenu = memo(function ProfileMenu() {
     };
   }, []);
 
-  const userRole = getUserRole();
-  const user = getUser();
+  const userRole = user?.role || "";
 
   const getFullName = () => {
-    return user?.name || "Pengguna";
+    return user?.name || user?.username || "Pengguna";
   };
 
   const getRoleText = () => {
     switch (userRole) {
-      case UserRole.ADMIN:
+      case "Admin":
         return "Administrator";
-      case UserRole.LECTURER:
+      case "Dosen":
         return "Dosen";
-      case UserRole.ASSISTANT:
+      case "Asisten Dosen":
         return "Asisten Dosen";
+      case "Pegawai":
+        return "Pegawai";
+      case "Mahasiswa":
+        return "Mahasiswa";
       default:
         return "Pengguna";
     }
@@ -129,7 +133,6 @@ const ProfileMenu = memo(function ProfileMenu() {
 
   const handleLogout = () => {
     logout();
-    router.push("/login");
   };
 
   return (

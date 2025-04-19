@@ -5,6 +5,7 @@ import { siteConfig } from "@/shared/utils/siteConfig";
 import ClickSparkProvider from "@/components/ui/ClickSpark/ClickSparkProvider";
 import { Toaster } from "sonner";
 import { LoadingProvider } from "@/context/loadingContext";
+import { AuthProvider } from "@/context/authContext";
 
 const dmSans = localFont({
   src: [
@@ -32,7 +33,19 @@ export const metadata: Metadata = {
   title: siteConfig.fullName,
   description: siteConfig.description,
   icons: {
-    icon: "/favicon.ico"
+    icon: [
+      { url: "/favicon/favicon.ico" },
+      { url: "/favicon/favicon.png" },
+      { url: "/images/icon-webpage.png" }
+    ],
+    shortcut: "/favicon/favicon.png",
+    apple: "/favicon/apple-touch-icon.png",
+    other: [
+      {
+        rel: "apple-touch-icon-precomposed",
+        url: "/favicon/apple-touch-icon.png",
+      },
+    ],
   }
 };
 
@@ -43,13 +56,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Standard favicon */}
+        <link rel="icon" href="/favicon/favicon.ico" />
+        <link rel="icon" type="image/png" href="/favicon/favicon.png" />
+        
+        {/* iOS/macOS specific favicons */}
+        <link rel="apple-touch-icon" href="/favicon/apple-touch-icon.png" />
+        
+        {/* Also keep the original paths for backwards compatibility */}
+        <link rel="icon" href="/images/icon-webpage.png" />
+        <link rel="shortcut icon" href="/images/icon-webpage.png" />
+      </head>
       <body className={dmSans.className}>
-        <LoadingProvider>
-          <ClickSparkProvider>
-            {children}
-            <Toaster position="bottom-right" />
-          </ClickSparkProvider>
-        </LoadingProvider>
+        <AuthProvider>
+          <LoadingProvider>
+            <ClickSparkProvider>
+              {children}
+              <Toaster position="bottom-right" />
+            </ClickSparkProvider>
+          </LoadingProvider>
+        </AuthProvider>
       </body>
     </html>
   );

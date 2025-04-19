@@ -44,7 +44,8 @@ func main() {
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{utils.GetEnvWithDefault("CORS_ALLOWED_ORIGINS", "http://localhost:3000")}
 	config.AllowCredentials = true
-	config.AllowHeaders = append(config.AllowHeaders, "Authorization")
+	config.AllowHeaders = append(config.AllowHeaders, "Authorization", "Content-Type")
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	router.Use(cors.New(config))
 
 	// Register authentication routes
