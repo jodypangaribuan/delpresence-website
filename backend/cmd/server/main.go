@@ -29,6 +29,7 @@ func main() {
 
 	// Initialize auth service
 	auth.Initialize()
+	auth.InitializeStudentAuth()
 
 	// Create admin user
 	err = auth.CreateAdminUser()
@@ -52,11 +53,15 @@ func main() {
 	
 	// Register campus authentication routes
 	router.POST("/api/auth/campus/login", handlers.CampusLogin)
+	
+	// Register student authentication routes
+	router.POST("/api/auth/student/login", handlers.StudentLogin)
 
 	// Create handlers
 	campusAuthHandler := handlers.NewCampusAuthHandler()
 	lecturerHandler := handlers.NewLecturerHandler()
 	studentHandler := handlers.NewStudentHandler()
+	employeeHandler := handlers.NewEmployeeHandler()
 
 	// Protected routes
 	authRequired := router.Group("/api")
@@ -78,6 +83,11 @@ func main() {
 			adminRoutes.GET("/lecturers/:id", lecturerHandler.GetLecturerByID)
 			adminRoutes.POST("/lecturers/sync", lecturerHandler.SyncLecturers)
 
+			// Admin access to employee data (replacing assistant lecturer)
+			adminRoutes.GET("/employees", employeeHandler.GetAllEmployees)
+			adminRoutes.GET("/employees/:id", employeeHandler.GetEmployeeByID)
+			adminRoutes.POST("/employees/sync", employeeHandler.SyncEmployees)
+
 			// Admin access to student data
 			adminRoutes.GET("/students", studentHandler.GetAllStudents)
 			adminRoutes.GET("/students/:id", studentHandler.GetStudentByID)
@@ -92,12 +102,20 @@ func main() {
 			lecturerRoutes.GET("/profile", handlers.GetCurrentUser)
 		}
 		
-		// Assistant routes
-		assistantRoutes := authRequired.Group("/assistant")
-		assistantRoutes.Use(middleware.RoleMiddleware("Asisten Dosen"))
+		// Employee routes (replacing assistant routes)
+		employeeRoutes := authRequired.Group("/employee")
+		employeeRoutes.Use(middleware.RoleMiddleware("Pegawai"))
 		{
-			// Assistant profile
-			assistantRoutes.GET("/profile", handlers.GetCurrentUser)
+			// Employee profile
+			employeeRoutes.GET("/profile", handlers.GetCurrentUser)
+		}
+		
+		// Student routes
+		studentRoutes := authRequired.Group("/student")
+		studentRoutes.Use(middleware.RoleMiddleware("Mahasiswa"))
+		{
+			// Student profile
+			studentRoutes.GET("/profile", handlers.GetCurrentUser)
 		}
 	}
 

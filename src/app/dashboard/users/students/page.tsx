@@ -438,7 +438,14 @@ export default function StudentsPage() {
             </div>
           ) : (
             <div>
-              <div className="flex flex-col sm:flex-row justify-between gap-4 py-4">
+              {/* Total count display */}
+              <div className="flex justify-end mb-2">
+                <div className="text-sm font-medium text-[#0687C9]">
+                  Total: <span className="font-bold">{filteredStudents.length}</span> mahasiswa
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-4">
                 {/* Search */}
                 <div className="relative w-full sm:max-w-sm">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -498,7 +505,8 @@ export default function StudentsPage() {
               <DataTable
                 columns={columns}
                 data={filteredStudents}
-                showPagination={true}
+                pageSize={10}
+                dataType="mahasiswa"
               />
             </div>
           )}

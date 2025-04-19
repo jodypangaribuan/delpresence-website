@@ -47,6 +47,19 @@ func (r *StudentRepository) FindByNIM(nim string) (*models.Student, error) {
 	return &student, nil
 }
 
+// FindByUserID returns a student by external UserID from campus
+func (r *StudentRepository) FindByUserID(userID int) (*models.Student, error) {
+	var student models.Student
+	result := r.db.Where("user_id = ?", userID).First(&student)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, result.Error
+	}
+	return &student, nil
+}
+
 // UpsertMany creates or updates multiple students
 func (r *StudentRepository) UpsertMany(students []models.Student) error {
 	if len(students) == 0 {

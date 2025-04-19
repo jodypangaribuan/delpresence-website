@@ -45,6 +45,7 @@ func Initialize() {
 	// Connect to database
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: newLogger,
+		DisableForeignKeyConstraintWhenMigrating: true, // Disable foreign key checks during migrations
 	})
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)
@@ -63,17 +64,44 @@ func Initialize() {
 
 	log.Println("Connected to database successfully")
 
-	// Auto-migrate the schema
-	err = DB.AutoMigrate(
-		&models.User{},
-		&models.Lecturer{},
-		&models.Student{},
-		// Add more models here as needed
-	)
+	// Auto-migrate in specific order to handle dependencies
+	log.Println("Starting database migration...")
+	
+	// First migrate the User model (no external dependencies)
+	err = DB.AutoMigrate(&models.User{})
 	if err != nil {
-		log.Fatalf("Error auto-migrating models: %v\n", err)
+		log.Fatalf("Error auto-migrating User model: %v\n", err)
 	}
-
+	log.Println("User table migrated successfully")
+	
+	// Then migrate the Student model
+	err = DB.AutoMigrate(&models.Student{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Student model: %v\n", err)
+	}
+	log.Println("Student table migrated successfully")
+	
+	// Then migrate the Lecturer model
+	err = DB.AutoMigrate(&models.Lecturer{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Lecturer model: %v\n", err)
+	}
+	log.Println("Lecturer table migrated successfully")
+	
+	// Then migrate the Employee model
+	err = DB.AutoMigrate(&models.Employee{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Employee model: %v\n", err)
+	}
+	log.Println("Employee table migrated successfully")
+	
+	// Finally migrate the Admin model
+	err = DB.AutoMigrate(&models.Admin{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Admin model: %v\n", err)
+	}
+	log.Println("Admin table migrated successfully")
+	
 	log.Println("Database schema migrated successfully")
 }
 

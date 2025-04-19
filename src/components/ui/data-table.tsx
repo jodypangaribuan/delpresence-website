@@ -29,6 +29,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[]
   showPagination?: boolean
   pageSize?: number
+  dataType?: string // Optional data type name for the total count display
   // Pass table props directly
   sorting?: SortingState
   onSortingChange?: OnChangeFn<SortingState>
@@ -41,6 +42,7 @@ export function DataTable<TData, TValue>({
   data,
   showPagination = true,
   pageSize = 10,
+  dataType = "data", // Default to "data" if not specified
   sorting: externalSorting,
   onSortingChange,
   columnFilters: externalColumnFilters,
@@ -123,11 +125,7 @@ export function DataTable<TData, TValue>({
       </div>
 
       {showPagination && (
-        <div className="flex items-center justify-between px-2">
-          <div className="flex-1 text-sm text-muted-foreground">
-            {table.getFilteredSelectedRowModel().rows.length} dari{" "}
-            {table.getFilteredRowModel().rows.length} baris terpilih.
-          </div>
+        <div className="flex items-center justify-end px-2">
           <div className="flex items-center space-x-6 lg:space-x-8">
             <div className="flex items-center space-x-2">
               <p className="text-sm font-medium">Baris per halaman</p>

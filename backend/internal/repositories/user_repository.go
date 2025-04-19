@@ -46,6 +46,19 @@ func (r *UserRepository) FindByID(id uint) (*models.User, error) {
 	return &user, nil
 }
 
+// FindByExternalUserID finds a user by external user ID
+func (r *UserRepository) FindByExternalUserID(externalUserID int) (*models.User, error) {
+	var user models.User
+	result := r.DB.Where("external_user_id = ?", externalUserID).First(&user)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, nil // Return nil, nil when user not found
+		}
+		return nil, result.Error
+	}
+	return &user, nil
+}
+
 // Create creates a new user
 func (r *UserRepository) Create(user *models.User) error {
 	return r.DB.Create(user).Error

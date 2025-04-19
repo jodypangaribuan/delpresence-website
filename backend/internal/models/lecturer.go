@@ -16,13 +16,14 @@ type Lecturer struct {
 	NIP                 string         `json:"nip" gorm:"type:varchar(20)"`
 	FullName            string         `json:"full_name" gorm:"type:varchar(100);not null"`
 	Email               string         `json:"email" gorm:"type:varchar(255)"`
-	StudyProgramID      string         `json:"study_program_id" gorm:"column:prodi_id;type:varchar(20)"`
-	StudyProgram        string         `json:"study_program" gorm:"column:prodi;type:varchar(100)"`
-	AcademicRank        string         `json:"academic_rank" gorm:"column:jabatan_akademik;type:varchar(10)"`
-	AcademicRankDesc    string         `json:"academic_rank_desc" gorm:"column:jabatan_akademik_desc;type:varchar(50)"`
-	EducationLevel      string         `json:"education_level" gorm:"column:jenjang_pendidikan;type:varchar(255)"`
+	StudyProgramID      string         `json:"study_program_id" gorm:"type:varchar(20)"`
+	StudyProgram        string         `json:"study_program" gorm:"type:varchar(100)"`
+	AcademicRank        string         `json:"academic_rank" gorm:"type:varchar(10)"`
+	AcademicRankDesc    string         `json:"academic_rank_desc" gorm:"type:varchar(50)"`
+	EducationLevel      string         `json:"education_level" gorm:"type:varchar(255)"`
 	NIDN                string         `json:"nidn" gorm:"type:varchar(20)"`
-	UserID              int            `json:"user_id"`
+	UserID              int            `json:"user_id" gorm:"comment:External user ID from campus system"`
+	User                *User          `json:"-" gorm:"foreignKey:ExternalUserID;references:UserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	LastSync            time.Time      `json:"last_sync" gorm:"autoCreateTime"`
 	CreatedAt           time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt           time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
