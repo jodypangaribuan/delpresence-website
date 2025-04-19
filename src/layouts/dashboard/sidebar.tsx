@@ -26,11 +26,15 @@ import {
   CalendarDays,
   BarChart4,
   Microscope,
+  ScanFace,
   UserCheck,
   MessageSquare,
+  Smartphone,
+  FileCheck,
 } from "lucide-react";
 import { getUserRole, UserRole } from "@/app/dashboard/page";
 import { useEffect, useState } from "react";
+import LoadingLink from "@/components/ui/LoadingLink";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -41,23 +45,51 @@ export function Sidebar() {
   }, []);
 
   const isLinkActive = (path: string) => {
-    if (
-      path === "/dashboard" &&
-      (pathname === "/" || pathname === "/dashboard")
-    ) {
-      return true;
+    if (path === "/dashboard") {
+      // Only consider dashboard active if we're exactly at /dashboard or /
+      return pathname === "/dashboard" || pathname === "/";
     }
-    return pathname === path || pathname.startsWith(`${path}/`);
+    // For all other paths, check if the current pathname starts with the path
+    return pathname.startsWith(`${path}`);
   };
 
   const isDashboardActive = () => {
+    // Only return true for exact matches to avoid double selection
     return pathname === "/dashboard" || pathname === "/";
   };
 
+  // Helper function to create menu links with loading animation
+  const MenuLink = ({ href, icon, children }: { href: string; icon: React.ReactNode; children: React.ReactNode }) => {
+    const active = isLinkActive(href);
+    
+    return (
+      <li>
+        <LoadingLink
+          href={href}
+          className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
+            active
+              ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
+              : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
+          }`}
+          isActive={active}
+        >
+          <div className={`mr-3 h-5 w-5 ${
+            active
+              ? "text-[#0687C9]"
+              : "text-neutral-600 group-hover:text-[#0687C9]"
+          }`}>
+            {icon}
+          </div>
+          {children}
+        </LoadingLink>
+      </li>
+    );
+  };
+
   return (
-    <aside className="h-full w-[240px] bg-white border-r border-neutral-200 fixed left-0 top-0 z-20 overflow-y-auto" data-pathname={pathname}>
+    <aside className="h-full w-[260px] bg-white border-r border-neutral-200 fixed left-0 top-0 z-20 overflow-y-auto" data-pathname={pathname}>
       <div className="flex h-16 items-center justify-center bg-white">
-        <Link href="/dashboard" className="hover:opacity-80 transition-opacity">
+        <LoadingLink href="/dashboard" className="hover:opacity-80 transition-opacity">
           <Image
             src="/images/logo.png"
             alt="Logo"
@@ -65,7 +97,7 @@ export function Sidebar() {
             height={10}
             className="object-contain"
           />
-        </Link>
+        </LoadingLink>
       </div>
 
       <nav className="px-3 py-4">
@@ -76,92 +108,45 @@ export function Sidebar() {
           </p>
         </div>
         <ul className="space-y-1 mb-6">
-          <li>
-            <Link
-              href="/dashboard"
-              className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                isDashboardActive()
-                  ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                  : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-              }`}
-            >
-              <LayoutDashboard
-                className={`mr-3 h-5 w-5 ${
-                  isDashboardActive()
-                    ? "text-[#0687C9]"
-                    : "text-neutral-600 group-hover:text-[#0687C9]"
-                }`}
-              />
-              Dashboard
-            </Link>
-          </li>
+          <MenuLink 
+            href="/dashboard"
+            icon={<LayoutDashboard />}
+          >
+            Dashboard
+          </MenuLink>
         </ul>
 
-        {/* Academic Management */}
-        <div className="mb-2">
-          <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-            Manajemen Akademik
-          </p>
-        </div>
-        <ul className="space-y-1 mb-6">
-          <li>
-            <Link
-              href="/dashboard/courses"
-              className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                isLinkActive("/dashboard/courses")
-                  ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                  : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-              }`}
-            >
-              <BookOpen
-                className={`mr-3 h-5 w-5 ${
-                  isLinkActive("/dashboard/courses")
-                    ? "text-[#0687C9]"
-                    : "text-neutral-600 group-hover:text-[#0687C9]"
-                }`}
-              />
-              Mata Kuliah
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/dashboard/schedules"
-              className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                isLinkActive("/dashboard/schedules")
-                  ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                  : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-              }`}
-            >
-              <Calendar
-                className={`mr-3 h-5 w-5 ${
-                  isLinkActive("/dashboard/schedules")
-                    ? "text-[#0687C9]"
-                    : "text-neutral-600 group-hover:text-[#0687C9]"
-                }`}
-              />
-              Jadwal
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/dashboard/attendance"
-              className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                isLinkActive("/dashboard/attendance")
-                  ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                  : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-              }`}
-            >
-              <ClipboardList
-                className={`mr-3 h-5 w-5 ${
-                  isLinkActive("/dashboard/attendance")
-                    ? "text-[#0687C9]"
-                    : "text-neutral-600 group-hover:text-[#0687C9]"
-                }`}
-              />
-              Kehadiran
-            </Link>
-          </li>
-        </ul>
+        {/* Only show the general Academic Management section if NOT an admin */}
+        {userRole !== UserRole.ADMIN && userRole !== UserRole.LECTURER && userRole !== UserRole.ASSISTANT && (
+          <>
+            {/* Academic Management */}
+            <div className="mb-2">
+              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
+                Manajemen Akademik
+              </p>
+            </div>
+            <ul className="space-y-1 mb-6">
+              <MenuLink
+                href="/dashboard/courses"
+                icon={<BookOpen />}
+              >
+                Mata Kuliah
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/schedules"
+                icon={<Calendar />}
+              >
+                Jadwal
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/attendance"
+                icon={<ClipboardList />}
+              >
+                Kehadiran
+              </MenuLink>
+            </ul>
+          </>
+        )}
 
         {/* Admin-specific menu items */}
         {userRole === UserRole.ADMIN && (
@@ -173,120 +158,69 @@ export function Sidebar() {
               </p>
             </div>
             <ul className="space-y-1 mb-6">
-              <li>
-                <Link
-                  href="/dashboard/academic/departments"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/academic/departments")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <School
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/academic/departments")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Program Studi
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/academic/buildings"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/academic/buildings")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Building
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/academic/buildings")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Gedung
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/academic/semesters"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/academic/semesters")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Calendar
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/academic/semesters")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Tahun Akademik
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/academic/curriculum"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/academic/curriculum")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <BookCopy
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/academic/curriculum")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Kurikulum
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/courses/groups"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/courses/groups")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Layers
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/courses/groups")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Kelompok Matakuliah
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/rooms"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/rooms")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <LibrarySquare
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/rooms")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Ruangan
-                </Link>
-              </li>
+              <MenuLink
+                href="/dashboard/academic/departments"
+                icon={<School />}
+              >
+                Program Studi
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/academic/faculty"
+                icon={<Building2 />}
+              >
+                Fakultas
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/academic/buildings"
+                icon={<Building />}
+              >
+                Gedung
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/academic/rooms"
+                icon={<LibrarySquare />}
+              >
+                Ruangan
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/academic/years"
+                icon={<Calendar />}
+              >
+                Tahun Akademik
+              </MenuLink>
+            </ul>
+
+            {/* Course Management */}
+            <div className="mb-2">
+              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
+                Manajemen Mata Kuliah
+              </p>
+            </div>
+            <ul className="space-y-1 mb-6">
+              <MenuLink
+                href="/dashboard/courses/manage"
+                icon={<BookOpen />}
+              >
+                Mata Kuliah
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/courses/groups"
+                icon={<Layers />}
+              >
+                Kelompok Mata Kuliah
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/courses/classes"
+                icon={<Users />}
+              >
+                Kelas Kuliah
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/courses/assignments"
+                icon={<UserCog />}
+              >
+                Penugasan Dosen
+              </MenuLink>
             </ul>
 
             {/* Schedule Management */}
@@ -296,129 +230,36 @@ export function Sidebar() {
               </p>
             </div>
             <ul className="space-y-1 mb-6">
-              <li>
-                <Link
-                  href="/dashboard/schedules/manage"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/schedules/manage")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Calendar
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/schedules/manage")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Jadwal Perkuliahan
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/schedules/import"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/schedules/import")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <FileSpreadsheet
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/schedules/import")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Import Excel
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/schedules/rooms"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/schedules/rooms")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Building
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/schedules/rooms")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Penjadwalan Ruangan
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/schedules/conflicts"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/schedules/conflicts")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <AlertTriangle
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/schedules/conflicts")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Pengecekan Konflik
-                </Link>
-              </li>
-            </ul>
-
-            {/* Attendance Management */}
-            <div className="mb-2">
-              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Manajemen Kehadiran
-              </p>
-            </div>
-            <ul className="space-y-1 mb-6">
-              <li>
-                <Link
-                  href="/dashboard/attendance/summary"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/attendance/summary")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <BarChart2
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/attendance/summary")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Rekap Kehadiran
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/attendance/reports"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/attendance/reports")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <FileOutput
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/attendance/reports")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Laporan Kehadiran
-                </Link>
-              </li>
+              <MenuLink
+                href="/dashboard/schedules/manage"
+                icon={<Calendar />}
+              >
+                Jadwal Perkuliahan
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/schedules/import"
+                icon={<FileSpreadsheet />}
+              >
+                Import Excel
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/schedules/export"
+                icon={<FileOutput />}
+              >
+                Export Excel
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/schedules/conflicts"
+                icon={<AlertTriangle />}
+              >
+                Pengecekan Konflik
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/schedules/reschedule-approval"
+                icon={<CalendarDays />}
+              >
+                Persetujuan Kelas Pengganti
+              </MenuLink>
             </ul>
 
             {/* User Management */}
@@ -428,63 +269,63 @@ export function Sidebar() {
               </p>
             </div>
             <ul className="space-y-1 mb-6">
-              <li>
-                <Link
-                  href="/dashboard/users/lecturers"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/users/lecturers")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Users
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/users/lecturers")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Daftar Dosen
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/users/assistants"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/users/assistants")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <UserCog
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/users/assistants")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Daftar Asisten Dosen
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/users/students"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/users/students")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <GraduationCap
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/users/students")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Daftar Mahasiswa
-                </Link>
-              </li>
+              <MenuLink
+                href="/dashboard/users/lecturers"
+                icon={<Users />}
+              >
+                Daftar Dosen
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/users/employees"
+                icon={<UserCog />}
+              >
+                Daftar Pegawai
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/users/students"
+                icon={<GraduationCap />}
+              >
+                Daftar Mahasiswa
+              </MenuLink>
+            </ul>
+
+            {/* Attendance Management */}
+            <div className="mb-2">
+              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
+                Manajemen Kehadiran
+              </p>
+            </div>
+            <ul className="space-y-1 mb-6">
+              <MenuLink
+                href="/dashboard/attendance/overview"
+                icon={<BarChart4 />}
+              >
+                Tinjauan Kehadiran
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/attendance/summary"
+                icon={<BarChart2 />}
+              >
+                Rekap Kehadiran
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/attendance/permissions"
+                icon={<FileCheck />}
+              >
+                Verifikasi Izin Mahasiswa
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/attendance/reports"
+                icon={<FileOutput />}
+              >
+                Laporan Kehadiran
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/attendance/face-recognition"
+                icon={<ScanFace />}
+              >
+                Manajemen Face Recognition
+              </MenuLink>
             </ul>
           </>
         )}
@@ -492,172 +333,100 @@ export function Sidebar() {
         {/* Lecturer-specific menu items */}
         {userRole === UserRole.LECTURER && (
           <>
+            {/* Course Management */}
             <div className="mb-2">
               <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Menu Dosen
+                Manajemen Mata Kuliah
               </p>
             </div>
             <ul className="space-y-1 mb-6">
-              <li>
-                <Link
-                  href="/dashboard/lecturer/schedules"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/lecturer/schedules")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Calendar
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/lecturer/schedules")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Jadwal Pribadi
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/lecturer/attendance"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/lecturer/attendance")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <ClipboardList
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/lecturer/attendance")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Daftar Hadir Mahasiswa
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/lecturer/manual-attendance"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/lecturer/manual-attendance")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <UserCheck
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/lecturer/manual-attendance")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Input Kehadiran Manual
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/lecturer/attendance-summary"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/lecturer/attendance-summary")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <BarChart2
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/lecturer/attendance-summary")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Rekap Kehadiran
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/lecturer/reschedule"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/lecturer/reschedule")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <CalendarDays
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/lecturer/reschedule")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Pengajuan Kelas Pengganti
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/lecturer/announcements"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/lecturer/announcements")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <MessageSquare
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/lecturer/announcements")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Pengumuman Kelas
-                </Link>
-              </li>
+              <MenuLink
+                href="/dashboard/lecturer/courses"
+                icon={<BookOpen />}
+              >
+                Mata Kuliah Saya
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/lecturer/classes"
+                icon={<Users />}
+              >
+                Kelas Saya
+              </MenuLink>
             </ul>
 
+            {/* Schedule Management */}
             <div className="mb-2">
               <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Tools Tambahan
+                Manajemen Jadwal
               </p>
             </div>
             <ul className="space-y-1 mb-6">
-              <li>
-                <Link
-                  href="/dashboard/lecturer/qr-generate"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/lecturer/qr-generate")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <QrCode
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/lecturer/qr-generate")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Generate QR Code
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/lecturer/export"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/lecturer/export")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <FileOutput
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/lecturer/export")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Export Kehadiran
-                </Link>
-              </li>
+              <MenuLink
+                href="/dashboard/lecturer/schedules"
+                icon={<Calendar />}
+              >
+                Jadwal Mengajar
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/lecturer/reschedule"
+                icon={<CalendarDays />}
+              >
+                Pengajuan Kelas Pengganti
+              </MenuLink>
+            </ul>
+
+            {/* Attendance Management */}
+            <div className="mb-2">
+              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
+                Manajemen Kehadiran
+              </p>
+            </div>
+            <ul className="space-y-1 mb-6">
+              <MenuLink
+                href="/dashboard/lecturer/attendance/manage"
+                icon={<ClipboardList />}
+              >
+                Kelola Presensi
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/lecturer/attendance/qr"
+                icon={<QrCode />}
+              >
+                Generate QR Presensi
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/lecturer/attendance/face"
+                icon={<ScanFace />}
+              >
+                Aktivasi Face Recognition
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/lecturer/attendance/summary"
+                icon={<BarChart2 />}
+              >
+                Rekap Kehadiran
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/lecturer/attendance/permissions"
+                icon={<FileCheck />}
+              >
+                Izin Mahasiswa
+              </MenuLink>
+            </ul>
+
+            {/* Communication */}
+            <div className="mb-2">
+              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
+                Komunikasi
+              </p>
+            </div>
+            <ul className="space-y-1 mb-6">
+              <MenuLink
+                href="/dashboard/lecturer/announcements"
+                icon={<MessageSquare />}
+              >
+                Pengumuman Kelas
+              </MenuLink>
             </ul>
           </>
         )}
@@ -665,134 +434,67 @@ export function Sidebar() {
         {/* Assistant-specific menu items */}
         {userRole === UserRole.ASSISTANT && (
           <>
+            {/* Course Management */}
             <div className="mb-2">
               <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Menu Asisten
+                Manajemen Mata Kuliah
               </p>
             </div>
             <ul className="space-y-1 mb-6">
-              <li>
-                <Link
-                  href="/dashboard/assistant/schedules"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/assistant/schedules")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Calendar
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/assistant/schedules")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Jadwal Asistensi
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/assistant/attendance"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/assistant/attendance")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <ClipboardList
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/assistant/attendance")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Kehadiran Praktikum
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/assistant/attendance-summary"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/assistant/attendance-summary")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <BarChart2
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/assistant/attendance-summary")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Rekap Kehadiran
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/assistant/collaboration"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/assistant/collaboration")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <Users
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/assistant/collaboration")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Kolaborasi Dosen
-                </Link>
-              </li>
+              <MenuLink
+                href="/dashboard/assistant/courses"
+                icon={<BookOpen />}
+              >
+                Mata Kuliah Asisten
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/assistant/classes"
+                icon={<Users />}
+              >
+                Kelas Asisten
+              </MenuLink>
             </ul>
 
+            {/* Schedule Management */}
             <div className="mb-2">
               <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Tools Tambahan
+                Manajemen Jadwal
               </p>
             </div>
             <ul className="space-y-1 mb-6">
-              <li>
-                <Link
-                  href="/dashboard/assistant/qr-generate"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/assistant/qr-generate")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <QrCode
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/assistant/qr-generate")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Generate QR Code
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/assistant/export"
-                  className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-                    isLinkActive("/dashboard/assistant/export")
-                      ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-                      : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                  }`}
-                >
-                  <FileOutput
-                    className={`mr-3 h-5 w-5 ${
-                      isLinkActive("/dashboard/assistant/export")
-                        ? "text-[#0687C9]"
-                        : "text-neutral-600 group-hover:text-[#0687C9]"
-                    }`}
-                  />
-                  Export Kehadiran
-                </Link>
-              </li>
+              <MenuLink
+                href="/dashboard/assistant/schedules"
+                icon={<Calendar />}
+              >
+                Jadwal Asistensi
+              </MenuLink>
+            </ul>
+
+            {/* Attendance Management */}
+            <div className="mb-2">
+              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
+                Manajemen Kehadiran
+              </p>
+            </div>
+            <ul className="space-y-1 mb-6">
+              <MenuLink
+                href="/dashboard/assistant/attendance/manage"
+                icon={<ClipboardList />}
+              >
+                Kelola Presensi
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/assistant/attendance/qr"
+                icon={<QrCode />}
+              >
+                Generate QR Presensi
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/assistant/attendance/summary"
+                icon={<BarChart2 />}
+              >
+                Rekap Kehadiran
+              </MenuLink>
             </ul>
           </>
         )}

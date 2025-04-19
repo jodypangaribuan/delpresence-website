@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Header } from "./header";
 import { Sidebar } from "./sidebar";
+import LoadingBar from "@/components/ui/LoadingBar";
 
 export default function DashboardLayout({
   children,
@@ -17,6 +18,8 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F5F7FA]">
+      <LoadingBar />
+      
       {/* Sidebar for desktop */}
       <div className="hidden md:block">
         <Sidebar />
@@ -31,7 +34,7 @@ export default function DashboardLayout({
         }`}
       >
         <div className="relative h-full">
-          <div className="h-full w-[240px]">
+          <div className="h-full w-[260px]">
             <Sidebar />
           </div>
           <div
@@ -42,9 +45,11 @@ export default function DashboardLayout({
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col md:pl-[240px]">
+      <div className="flex flex-1 flex-col md:pl-[260px]">
         <Header onMenuClick={toggleSidebar} />
-        <main className="flex-1 overflow-auto p-6 relative">{children}</main>
+        <main className="flex-1 overflow-auto p-6 relative">
+          {children}
+        </main>
       </div>
     </div>
   );
