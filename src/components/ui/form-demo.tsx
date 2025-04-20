@@ -55,7 +55,7 @@ export function FormDemo() {
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    toast.success("Form submitted successfully", {
+    toast.success("Formulir berhasil dikirim", {
       description: (
         <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
           <code className="text-white">{JSON.stringify(values, null, 2)}</code>

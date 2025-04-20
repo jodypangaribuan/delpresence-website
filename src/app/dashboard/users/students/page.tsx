@@ -124,7 +124,7 @@ export default function StudentsPage() {
         setEnrollmentYears(sortedYears as number[]);
       } else {
         console.error("API returned error status:", data);
-        toast.error(`Failed to load students: ${data.message || 'Unknown error'}`);
+        toast.error(`Gagal memuat data mahasiswa: ${data.message || 'Kesalahan tidak diketahui'}`);
       }
     } catch (err: any) {
       console.error("Error fetching students:", err);
@@ -140,7 +140,7 @@ export default function StudentsPage() {
           description: "Gagal terhubung ke server. Coba muat ulang halaman ini.",
         });
       } else {
-        toast.error("Failed to load students", {
+        toast.error("Gagal memuat data mahasiswa", {
           description: err.message || "Terjadi kesalahan saat memuat data mahasiswa"
         });
       }
@@ -440,8 +440,8 @@ export default function StudentsPage() {
             <div>
               {/* Total count display */}
               <div className="flex justify-end mb-2">
-                <div className="text-sm font-medium text-[#0687C9]">
-                  Total: <span className="font-bold">{filteredStudents.length}</span> mahasiswa
+                <div className="text-sm font-medium text-gray-800">
+                  Total: <span>{filteredStudents.length}</span> mahasiswa
                 </div>
               </div>
               

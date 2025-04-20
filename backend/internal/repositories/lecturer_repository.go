@@ -54,7 +54,7 @@ func (r *LecturerRepository) FindByLecturerID(lecturerID int) (*models.Lecturer,
 // FindAll finds all lecturers
 func (r *LecturerRepository) FindAll() ([]models.Lecturer, error) {
 	var lecturers []models.Lecturer
-	err := r.db.Find(&lecturers).Error
+	err := r.db.Preload("StudyProgram").Find(&lecturers).Error
 	if err != nil {
 		return nil, err
 	}
@@ -110,4 +110,25 @@ func (r *LecturerRepository) UpsertMany(lecturers []models.Lecturer) error {
 
 	// Commit the transaction
 	return tx.Commit().Error
+}
+
+// Search finds lecturers by name, NIDN, or other criteria
+func (r *LecturerRepository) Search(query string) ([]models.Lecturer, error) {
+	var lecturers []models.Lecturer
+	
+	// Create the LIKE search pattern
+	searchPattern := "%" + query + "%"
+	
+	// Search for matching lecturers using the correct database column names
+	err := r.db.Where("full_name ILIKE ?", searchPattern).
+		Or("n_ip ILIKE ?", searchPattern).
+		Or("n_id_n ILIKE ?", searchPattern).
+		Limit(10). // Limit results to prevent performance issues
+		Find(&lecturers).Error
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return lecturers, nil
 } 

@@ -1,0 +1,55 @@
+import * as z from "zod";
+
+/**
+ * Schema validasi untuk Faculty
+ */
+export const facultySchema = z.object({
+  id: z.number().optional(),
+  uuid: z.string().optional(),
+  code: z.string()
+    .min(2, { message: "Kode fakultas harus minimal 2 karakter" })
+    .max(10, { message: "Kode fakultas maksimal 10 karakter" })
+    .regex(/^[a-zA-Z0-9\-]+$/, { 
+      message: "Kode fakultas hanya boleh berisi huruf, angka, dan tanda hubung" 
+    }),
+  name: z.string()
+    .min(3, { message: "Nama fakultas harus minimal 3 karakter" })
+    .max(100, { message: "Nama fakultas maksimal 100 karakter" }),
+  dean: z.string()
+    .min(3, { message: "Nama dekan harus minimal 3 karakter" })
+    .max(100, { message: "Nama dekan maksimal 100 karakter" })
+    .optional(),
+  establishment_year: z.coerce.number()
+    .min(1900, { message: "Tahun pendirian tidak valid" })
+    .max(new Date().getFullYear(), { message: "Tahun pendirian tidak boleh lebih dari tahun sekarang" })
+    .int({ message: "Tahun pendirian harus berupa bilangan bulat" })
+    .optional(),
+  lecturer_count: z.coerce.number()
+    .min(0, { message: "Jumlah dosen minimal 0" })
+    .max(1000, { message: "Jumlah dosen maksimal 1000" })
+    .int({ message: "Jumlah dosen harus berupa bilangan bulat" })
+    .optional(),
+});
+
+export type FacultyValues = z.infer<typeof facultySchema>;
+
+/**
+ * Schema validasi untuk Faculty pada form
+ */
+export const facultyFormSchema = facultySchema.extend({
+  // Field yang mungkin dikirmkan sebagai string dari form
+  establishment_year: z.union([
+    z.string().refine(val => val === "" || !isNaN(parseInt(val)), {
+      message: "Tahun pendirian harus berupa angka"
+    }).transform(val => val === "" ? undefined : parseInt(val)),
+    z.number().int().min(1900).max(new Date().getFullYear()),
+    z.undefined()
+  ]).optional(),
+  lecturer_count: z.union([
+    z.string().transform(val => val === "" ? undefined : parseInt(val)),
+    z.number().min(0).int(),
+    z.undefined()
+  ]).optional(),
+});
+
+export type FacultyFormValues = z.infer<typeof facultyFormSchema>; 

@@ -73,7 +73,18 @@ export default function RootLayout({
           <LoadingProvider>
             <ClickSparkProvider>
               {children}
-              <Toaster position="bottom-right" />
+              <Toaster 
+                position="bottom-right"
+                expand={true}
+                richColors
+                closeButton
+                theme="light"
+                style={{
+                  fontSize: '14px',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                }}
+              />
             </ClickSparkProvider>
           </LoadingProvider>
         </AuthProvider>

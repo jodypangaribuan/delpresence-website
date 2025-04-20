@@ -13,15 +13,16 @@ type Lecturer struct {
 	UUID                string         `json:"uuid" gorm:"type:varchar(36);uniqueIndex;not null"`
 	EmployeeID          int            `json:"employee_id" gorm:"not null"`
 	LecturerID          int            `json:"lecturer_id" gorm:"not null"`
-	NIP                 string         `json:"nip" gorm:"type:varchar(20)"`
+	NIP                 string         `json:"nip" gorm:"column:n_ip;type:varchar(20)"`
 	FullName            string         `json:"full_name" gorm:"type:varchar(100);not null"`
 	Email               string         `json:"email" gorm:"type:varchar(255)"`
-	StudyProgramID      string         `json:"study_program_id" gorm:"type:varchar(20)"`
-	StudyProgram        string         `json:"study_program" gorm:"type:varchar(100)"`
+	StudyProgramID      uint           `json:"study_program_id" gorm:"type:uint"`
+	StudyProgram        *StudyProgram  `json:"study_program" gorm:"foreignKey:StudyProgramID"`
+	StudyProgramName    string         `json:"study_program_name" gorm:"type:varchar(100)"`
 	AcademicRank        string         `json:"academic_rank" gorm:"type:varchar(10)"`
 	AcademicRankDesc    string         `json:"academic_rank_desc" gorm:"type:varchar(50)"`
 	EducationLevel      string         `json:"education_level" gorm:"type:varchar(255)"`
-	NIDN                string         `json:"nidn" gorm:"type:varchar(20)"`
+	NIDN                string         `json:"nidn" gorm:"column:n_id_n;type:varchar(20)"`
 	UserID              int            `json:"user_id" gorm:"comment:External user ID from campus system"`
 	User                *User          `json:"-" gorm:"foreignKey:ExternalUserID;references:UserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	LastSync            time.Time      `json:"last_sync" gorm:"autoCreateTime"`

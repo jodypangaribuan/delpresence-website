@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/delpresence/backend/internal/services"
 	"github.com/gin-gonic/gin"
@@ -29,7 +30,57 @@ func (h *LecturerHandler) GetAllLecturers(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": lecturers})
+	// Transform the data to include the study program name as a string
+	type LecturerResponse struct {
+		ID               uint      `json:"id"`
+		UUID             string    `json:"uuid"`
+		EmployeeID       int       `json:"employee_id"`
+		LecturerID       int       `json:"lecturer_id"`
+		NIP              string    `json:"nip"`
+		FullName         string    `json:"full_name"`
+		Email            string    `json:"email"`
+		StudyProgramID   uint      `json:"study_program_id"`
+		StudyProgram     string    `json:"study_program"` // String field for frontend
+		AcademicRank     string    `json:"academic_rank"`
+		AcademicRankDesc string    `json:"academic_rank_desc"`
+		EducationLevel   string    `json:"education_level"`
+		NIDN             string    `json:"nidn"`
+		UserID           int       `json:"user_id"`
+		LastSync         time.Time `json:"last_sync"`
+		CreatedAt        time.Time `json:"created_at"`
+		UpdatedAt        time.Time `json:"updated_at"`
+	}
+
+	// Map the lecturers to the response structure
+	response := make([]LecturerResponse, len(lecturers))
+	for i, lecturer := range lecturers {
+		response[i] = LecturerResponse{
+			ID:               lecturer.ID,
+			UUID:             lecturer.UUID,
+			EmployeeID:       lecturer.EmployeeID,
+			LecturerID:       lecturer.LecturerID,
+			NIP:              lecturer.NIP,
+			FullName:         lecturer.FullName,
+			Email:            lecturer.Email,
+			StudyProgramID:   lecturer.StudyProgramID,
+			StudyProgram:     lecturer.StudyProgramName, // Use the direct field
+			AcademicRank:     lecturer.AcademicRank,
+			AcademicRankDesc: lecturer.AcademicRankDesc,
+			EducationLevel:   lecturer.EducationLevel,
+			NIDN:             lecturer.NIDN,
+			UserID:           lecturer.UserID,
+			LastSync:         lecturer.LastSync,
+			CreatedAt:        lecturer.CreatedAt,
+			UpdatedAt:        lecturer.UpdatedAt,
+		}
+		
+		// If StudyProgramName is empty but we have a study program object, use its name as fallback
+		if response[i].StudyProgram == "" && lecturer.StudyProgram != nil {
+			response[i].StudyProgram = lecturer.StudyProgram.Name
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": response})
 }
 
 // GetLecturerByID returns a lecturer by ID
@@ -86,5 +137,58 @@ func (h *LecturerHandler) SyncLecturers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Lecturers synced successfully",
 		"count":   count,
+	})
+}
+
+// SearchLecturers searches for lecturers by name, nidn, or other criteria
+func (h *LecturerHandler) SearchLecturers(c *gin.Context) {
+	// Get query parameter for search
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": "error", 
+			"error": "Search query is required",
+			"data": nil,
+		})
+		return
+	}
+
+	// Search lecturers
+	lecturers, err := h.service.SearchLecturers(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status": "error",
+			"error": "Failed to search lecturers: " + err.Error(),
+			"data": nil,
+		})
+		return
+	}
+
+	// Transform the results to a simplified format for the dropdown
+	type LecturerOption struct {
+		ID       uint   `json:"id"`
+		UUID     string `json:"uuid"`
+		FullName string `json:"full_name"`
+		NIP      string `json:"nip"`      // Include NIP which is mapped to n_ip in DB
+		NIDN     string `json:"nidn"`     // NIDN is mapped to n_id_n in DB
+		Program  string `json:"program"`
+	}
+
+	options := make([]LecturerOption, len(lecturers))
+	for i, lecturer := range lecturers {
+		options[i] = LecturerOption{
+			ID:       lecturer.ID,
+			UUID:     lecturer.UUID,
+			FullName: lecturer.FullName,
+			NIP:      lecturer.NIP,       // Include NIP for frontend
+			NIDN:     lecturer.NIDN,
+			Program:  lecturer.StudyProgramName,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"error": "",
+		"data": options,
 	})
 } 

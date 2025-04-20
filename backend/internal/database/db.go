@@ -74,6 +74,20 @@ func Initialize() {
 	}
 	log.Println("User table migrated successfully")
 	
+	// Then migrate the Faculty model
+	err = DB.AutoMigrate(&models.Faculty{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Faculty model: %v\n", err)
+	}
+	log.Println("Faculty table migrated successfully")
+	
+	// Then migrate the StudyProgram model (depends on Faculty)
+	err = DB.AutoMigrate(&models.StudyProgram{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating StudyProgram model: %v\n", err)
+	}
+	log.Println("StudyProgram table migrated successfully")
+	
 	// Then migrate the Student model
 	err = DB.AutoMigrate(&models.Student{})
 	if err != nil {
@@ -81,7 +95,7 @@ func Initialize() {
 	}
 	log.Println("Student table migrated successfully")
 	
-	// Then migrate the Lecturer model
+	// Then migrate the Lecturer model (depends on StudyProgram)
 	err = DB.AutoMigrate(&models.Lecturer{})
 	if err != nil {
 		log.Fatalf("Error auto-migrating Lecturer model: %v\n", err)
@@ -101,6 +115,20 @@ func Initialize() {
 		log.Fatalf("Error auto-migrating Admin model: %v\n", err)
 	}
 	log.Println("Admin table migrated successfully")
+	
+	// Then migrate the Building model
+	err = DB.AutoMigrate(&models.Building{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Building model: %v\n", err)
+	}
+	log.Println("Building table migrated successfully")
+	
+	// Finally migrate the Room model (depends on Building)
+	err = DB.AutoMigrate(&models.Room{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Room model: %v\n", err)
+	}
+	log.Println("Room table migrated successfully")
 	
 	log.Println("Database schema migrated successfully")
 }

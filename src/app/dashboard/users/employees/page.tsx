@@ -67,7 +67,7 @@ export default function EmployeesPage() {
       const data = await response.json();
       setEmployees(data.data || []);
     } catch (err: any) {
-      toast.error("Error", {
+      toast.error("Kesalahan", {
         description: err.message || "Terjadi kesalahan saat memuat data pegawai",
       });
       console.error("Error fetching employees:", err);
@@ -131,7 +131,7 @@ export default function EmployeesPage() {
           description: "Layanan API kampus sedang tidak tersedia. Silakan coba lagi nanti.",
         });
       } else {
-        toast.error("Error", {
+        toast.error("Kesalahan", {
           description: err.message || "Terjadi kesalahan saat sinkronisasi data pegawai",
         });
       }
@@ -278,8 +278,8 @@ export default function EmployeesPage() {
         <CardContent>
           {/* Total count display */}
           <div className="flex justify-end mb-2">
-            <div className="text-sm font-medium text-[#0687C9]">
-              Total: <span className="font-bold">{filteredEmployees.length}</span> pegawai
+            <div className="text-sm font-medium text-gray-800">
+              Total: <span>{filteredEmployees.length}</span> pegawai
             </div>
           </div>
           

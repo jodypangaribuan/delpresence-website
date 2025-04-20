@@ -264,7 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const root = createRoot(container);
     
     // Render the elegant loading screen
-    root.render(<LoadingScreen message="Logging out..." />);
+    root.render(<LoadingScreen message="Keluar" />);
   };
 
   // Check if user has one of the specified roles

@@ -66,7 +66,7 @@ export default function LecturersPage() {
       const data = await response.json();
       setLecturers(data.data || []);
     } catch (err: any) {
-      toast.error("Error", {
+      toast.error("Kesalahan", {
         description: err.message || "Terjadi kesalahan saat memuat data dosen",
       });
       console.error("Error fetching lecturers:", err);
@@ -110,7 +110,7 @@ export default function LecturersPage() {
       // Reload data dosen setelah sinkronisasi
       await fetchLecturers();
     } catch (err: any) {
-      toast.error("Error", {
+      toast.error("Kesalahan", {
         description: err.message || "Terjadi kesalahan saat sinkronisasi data dosen",
       });
       console.error("Error syncing lecturers:", err);
@@ -314,8 +314,8 @@ export default function LecturersPage() {
             <div>
               {/* Total count display */}
               <div className="flex justify-end mb-2">
-                <div className="text-sm font-medium text-[#0687C9]">
-                  Total: <span className="font-bold">{filteredLecturers.length}</span> dosen
+                <div className="text-sm font-medium text-gray-800">
+                  Total: <span>{filteredLecturers.length}</span> dosen
                 </div>
               </div>
               

@@ -197,13 +197,13 @@ export function Sidebar() {
             </div>
             <ul className="space-y-1 mb-6">
               <MenuLink
-                href="/dashboard/academic/departments"
+                href="/dashboard/academic/study-programs"
                 icon={<SidebarIcons.School />}
               >
                 Program Studi
               </MenuLink>
               <MenuLink
-                href="/dashboard/academic/faculty"
+                href="/dashboard/academic/faculties"
                 icon={<SidebarIcons.Building2 />}
               >
                 Fakultas
@@ -221,7 +221,7 @@ export function Sidebar() {
                 Ruangan
               </MenuLink>
               <MenuLink
-                href="/dashboard/academic/years"
+                href="/dashboard/academic/academic-years"
                 icon={<SidebarIcons.Calendar />}
               >
                 Tahun Akademik

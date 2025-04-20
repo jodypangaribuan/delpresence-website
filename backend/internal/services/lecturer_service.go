@@ -23,6 +23,7 @@ const (
 type LecturerService struct {
 	repository   *repositories.LecturerRepository
 	campusAuth   *CampusAuthService
+	studyProgramRepository *repositories.StudyProgramRepository
 }
 
 // NewLecturerService creates a new LecturerService
@@ -30,6 +31,7 @@ func NewLecturerService() *LecturerService {
 	return &LecturerService{
 		repository: repositories.NewLecturerRepository(),
 		campusAuth: NewCampusAuthService(),
+		studyProgramRepository: repositories.NewStudyProgramRepository(),
 	}
 }
 
@@ -103,23 +105,20 @@ func (s *LecturerService) SyncLecturers() (int, error) {
 			}
 		}
 		
-		// Convert ProdiID to string regardless of its original type
-		var prodiIDStr string
+		// Convert ProdiID to uint for StudyProgramID
+		var studyProgramID uint = 0
 		switch v := cl.ProdiID.(type) {
-		case string:
-			prodiIDStr = v
 		case int:
-			prodiIDStr = fmt.Sprintf("%d", v)
+			studyProgramID = uint(v)
 		case float64:
-			prodiIDStr = fmt.Sprintf("%.0f", v)
-		default:
-			// If it's some other type, convert to JSON and then to string
-			if cl.ProdiID != nil {
-				prodiIDBytes, _ := json.Marshal(cl.ProdiID)
-				prodiIDStr = string(prodiIDBytes)
-				// Remove quotes if it's a JSON string
-				prodiIDStr = strings.Trim(prodiIDStr, "\"")
+			studyProgramID = uint(v)
+		case string:
+			if id, err := strconv.ParseUint(v, 10, 32); err == nil {
+				studyProgramID = uint(id)
 			}
+		default:
+			// Fallback to 0 if we can't determine a valid ID
+			studyProgramID = 0
 		}
 
 		lecturer := models.Lecturer{
@@ -128,8 +127,9 @@ func (s *LecturerService) SyncLecturers() (int, error) {
 			NIP:              cl.NIP,
 			FullName:         cl.Nama,
 			Email:            email,
-			StudyProgramID:   prodiIDStr,
-			StudyProgram:     cl.Prodi,
+			StudyProgramID:   studyProgramID,
+			StudyProgram:     nil, // Initially set to nil, we'll attempt to look it up later
+			StudyProgramName: cl.Prodi, // Store the program name directly from campus API
 			AcademicRank:     cl.JabatanAkademik,
 			AcademicRankDesc: cl.JabatanAkademikDesc,
 			EducationLevel:   cl.JenjangPendidikan,
@@ -137,6 +137,35 @@ func (s *LecturerService) SyncLecturers() (int, error) {
 			UserID:           convertToInt(cl.UserID),
 			LastSync:         time.Now(),
 		}
+		
+		// If we have a valid StudyProgramID, try to look up the associated StudyProgram
+		if studyProgramID > 0 {
+			program, err := s.studyProgramRepository.FindByID(studyProgramID)
+			if err == nil && program != nil {
+				lecturer.StudyProgram = program
+				// Update the name with the one from our database if it exists
+				lecturer.StudyProgramName = program.Name
+			} else {
+				// If we can't find the study program by ID but we have a name from the campus API,
+				// try to find or create the study program by name
+				if cl.Prodi != "" {
+					// First try to find by name
+					existingPrograms, err := s.studyProgramRepository.FindAll()
+					if err == nil {
+						// Search for matching program by name
+						for _, p := range existingPrograms {
+							if strings.EqualFold(p.Name, cl.Prodi) {
+								lecturer.StudyProgramID = p.ID
+								lecturer.StudyProgram = &p
+								lecturer.StudyProgramName = p.Name
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		
 		lecturers = append(lecturers, lecturer)
 	}
 
@@ -226,4 +255,14 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// GetStudyProgramByID returns a study program by ID
+func (s *LecturerService) GetStudyProgramByID(id uint) (*models.StudyProgram, error) {
+	return s.studyProgramRepository.FindByID(id)
+}
+
+// SearchLecturers searches for lecturers by name, NIDN, or other criteria
+func (s *LecturerService) SearchLecturers(query string) ([]models.Lecturer, error) {
+	return s.repository.Search(query)
 } 

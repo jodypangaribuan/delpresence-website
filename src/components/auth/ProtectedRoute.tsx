@@ -73,7 +73,7 @@ export default function ProtectedRoute({
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-[#0687C9]" />
-        <span className="ml-2 text-[#0687C9] font-medium">Verifying access...</span>
+        <span className="ml-2 text-[#0687C9] font-medium">Memeriksa akses...</span>
       </div>
     );
   }
@@ -82,15 +82,15 @@ export default function ProtectedRoute({
   if (!isLoading && isAuthenticated && requiredRoles.length > 0 && !checkRole(requiredRoles)) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center text-center">
-        <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+        <h1 className="text-2xl font-bold text-red-600 mb-4">Akses Ditolak</h1>
         <p className="mb-6 text-gray-600">
-          You don't have permission to access this page.
+          Anda tidak memiliki izin untuk mengakses halaman ini.
         </p>
         <button 
           onClick={() => window.location.href = '/dashboard'}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
-          Return to Dashboard
+          Kembali ke Dashboard
         </button>
       </div>
     );

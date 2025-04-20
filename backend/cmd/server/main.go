@@ -63,6 +63,10 @@ func main() {
 	lecturerHandler := handlers.NewLecturerHandler()
 	studentHandler := handlers.NewStudentHandler()
 	employeeHandler := handlers.NewEmployeeHandler()
+	facultyHandler := handlers.NewFacultyHandler()
+	studyProgramHandler := handlers.NewStudyProgramHandler()
+	buildingHandler := handlers.NewBuildingHandler()
+	roomHandler := handlers.NewRoomHandler()
 
 	// Protected routes
 	authRequired := router.Group("/api")
@@ -81,6 +85,7 @@ func main() {
 			
 			// Admin access to lecturer data
 			adminRoutes.GET("/lecturers", lecturerHandler.GetAllLecturers)
+			adminRoutes.GET("/lecturers/search", lecturerHandler.SearchLecturers)
 			adminRoutes.GET("/lecturers/:id", lecturerHandler.GetLecturerByID)
 			adminRoutes.POST("/lecturers/sync", lecturerHandler.SyncLecturers)
 
@@ -93,6 +98,34 @@ func main() {
 			adminRoutes.GET("/students", studentHandler.GetAllStudents)
 			adminRoutes.GET("/students/:id", studentHandler.GetStudentByID)
 			adminRoutes.POST("/students/sync", studentHandler.SyncStudents)
+			
+			// Admin access to faculty data
+			adminRoutes.GET("/faculties", facultyHandler.GetAllFaculties)
+			adminRoutes.GET("/faculties/:id", facultyHandler.GetFacultyByID)
+			adminRoutes.POST("/faculties", facultyHandler.CreateFaculty)
+			adminRoutes.PUT("/faculties/:id", facultyHandler.UpdateFaculty)
+			adminRoutes.DELETE("/faculties/:id", facultyHandler.DeleteFaculty)
+			
+			// Admin access to study program data
+			adminRoutes.GET("/study-programs", studyProgramHandler.GetAllStudyPrograms)
+			adminRoutes.GET("/study-programs/:id", studyProgramHandler.GetStudyProgramByID)
+			adminRoutes.POST("/study-programs", studyProgramHandler.CreateStudyProgram)
+			adminRoutes.PUT("/study-programs/:id", studyProgramHandler.UpdateStudyProgram)
+			adminRoutes.DELETE("/study-programs/:id", studyProgramHandler.DeleteStudyProgram)
+			
+			// Admin access to building data
+			adminRoutes.GET("/buildings", buildingHandler.GetAllBuildings)
+			adminRoutes.GET("/buildings/:id", buildingHandler.GetBuildingByID)
+			adminRoutes.POST("/buildings", buildingHandler.CreateBuilding)
+			adminRoutes.PUT("/buildings/:id", buildingHandler.UpdateBuilding)
+			adminRoutes.DELETE("/buildings/:id", buildingHandler.DeleteBuilding)
+			
+			// Admin access to room data
+			adminRoutes.GET("/rooms", roomHandler.GetAllRooms)
+			adminRoutes.GET("/rooms/:id", roomHandler.GetRoomByID)
+			adminRoutes.POST("/rooms", roomHandler.CreateRoom)
+			adminRoutes.PUT("/rooms/:id", roomHandler.UpdateRoom)
+			adminRoutes.DELETE("/rooms/:id", roomHandler.DeleteRoom)
 		}
 		
 		// Lecturer routes

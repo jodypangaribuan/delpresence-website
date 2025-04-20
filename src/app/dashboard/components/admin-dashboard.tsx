@@ -305,10 +305,10 @@ export default function AdminDashboard() {
           <CommonTaskCard 
             title="Akademik"
             tasks={[
-              { name: "Program Studi", icon: <School className="h-4 w-4" />, href: "/dashboard/academic/departments" },
+              { name: "Program Studi", icon: <School className="h-4 w-4" />, href: "/dashboard/academic/study-programs" },
               { name: "Kurikulum", icon: <BookCopy className="h-4 w-4" />, href: "/dashboard/academic/curriculum" },
-              { name: "Fakultas", icon: <Building className="h-4 w-4" />, href: "/dashboard/academic/faculty" },
-              { name: "Tahun Akademik", icon: <Calendar className="h-4 w-4" />, href: "/dashboard/academic/years" },
+              { name: "Fakultas", icon: <Building className="h-4 w-4" />, href: "/dashboard/academic/faculties" },
+              { name: "Tahun Akademik", icon: <Calendar className="h-4 w-4" />, href: "/dashboard/academic/academic-years" },
             ]}
           />
           
