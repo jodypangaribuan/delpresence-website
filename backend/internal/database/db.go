@@ -123,12 +123,61 @@ func Initialize() {
 	}
 	log.Println("Building table migrated successfully")
 	
-	// Finally migrate the Room model (depends on Building)
+	// Then migrate the Room model (depends on Building)
 	err = DB.AutoMigrate(&models.Room{})
 	if err != nil {
 		log.Fatalf("Error auto-migrating Room model: %v\n", err)
 	}
 	log.Println("Room table migrated successfully")
+	
+	// Then migrate the AcademicYear model
+	err = DB.AutoMigrate(&models.AcademicYear{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating AcademicYear model: %v\n", err)
+	}
+	log.Println("AcademicYear table migrated successfully")
+	
+	// Then migrate the Course model (depends on Department, Faculty, and AcademicYear)
+	err = DB.AutoMigrate(&models.Course{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Course model: %v\n", err)
+	}
+	log.Println("Course table migrated successfully")
+	
+	// Then migrate the CourseGroup model (depends on Department, Faculty, and Course)
+	err = DB.AutoMigrate(&models.CourseGroup{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating CourseGroup model: %v\n", err)
+	}
+	log.Println("CourseGroup table migrated successfully")
+	
+	// Then migrate the CourseToGroup join table
+	err = DB.AutoMigrate(&models.CourseToGroup{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating CourseToGroup model: %v\n", err)
+	}
+	log.Println("CourseToGroup table migrated successfully")
+	
+	// Then migrate the StudentGroup model
+	err = DB.AutoMigrate(&models.StudentGroup{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating StudentGroup model: %v\n", err)
+	}
+	log.Println("StudentGroup table migrated successfully")
+	
+	// Then migrate the StudentToGroup join table
+	err = DB.AutoMigrate(&models.StudentToGroup{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating StudentToGroup model: %v\n", err)
+	}
+	log.Println("StudentToGroup table migrated successfully")
+	
+	// Then migrate the LecturerAssignment model
+	err = DB.AutoMigrate(&models.LecturerAssignment{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating LecturerAssignment model: %v\n", err)
+	}
+	log.Println("LecturerAssignment table migrated successfully")
 	
 	log.Println("Database schema migrated successfully")
 }

@@ -61,7 +61,13 @@ export default function ProtectedRoute({
         // For role-based protection
         console.log("[ProtectedRoute] Insufficient permissions for", pathname);
         sessionStorage.setItem('lastAuthRedirect', currentTime.toString());
-        window.location.href = '/dashboard';
+        
+        // Clear any path-specific session state to prevent path persistence between different user roles
+        sessionStorage.removeItem('lastPath');
+        sessionStorage.removeItem('previousPath');
+        
+        // Use replace instead of href to clear the history entry
+        window.location.replace('/dashboard');
       }
     };
     
@@ -80,18 +86,16 @@ export default function ProtectedRoute({
 
   // Show forbidden message if not authorized
   if (!isLoading && isAuthenticated && requiredRoles.length > 0 && !checkRole(requiredRoles)) {
+    // Immediately redirect to dashboard if not authorized
+    if (typeof window !== 'undefined') {
+      window.location.replace('/dashboard');
+    }
+    
+    // In the meantime, show a loading indicator instead of the unauthorized content
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center text-center">
-        <h1 className="text-2xl font-bold text-red-600 mb-4">Akses Ditolak</h1>
-        <p className="mb-6 text-gray-600">
-          Anda tidak memiliki izin untuk mengakses halaman ini.
-        </p>
-        <button 
-          onClick={() => window.location.href = '/dashboard'}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Kembali ke Dashboard
-        </button>
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-[#0687C9]" />
+        <span className="ml-2 text-[#0687C9] font-medium">Memeriksa akses...</span>
       </div>
     );
   }

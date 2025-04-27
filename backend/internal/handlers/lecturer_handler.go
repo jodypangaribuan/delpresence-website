@@ -167,22 +167,26 @@ func (h *LecturerHandler) SearchLecturers(c *gin.Context) {
 	// Transform the results to a simplified format for the dropdown
 	type LecturerOption struct {
 		ID       uint   `json:"id"`
+		UserID   int    `json:"user_id"` // Include UserID from lecturer table
 		UUID     string `json:"uuid"`
 		FullName string `json:"full_name"`
 		NIP      string `json:"nip"`      // Include NIP which is mapped to n_ip in DB
 		NIDN     string `json:"nidn"`     // NIDN is mapped to n_id_n in DB
 		Program  string `json:"program"`
+		Email    string `json:"email,omitempty"` // Include email if available
 	}
 
 	options := make([]LecturerOption, len(lecturers))
 	for i, lecturer := range lecturers {
 		options[i] = LecturerOption{
 			ID:       lecturer.ID,
+			UserID:   lecturer.UserID, // Include UserID in the response
 			UUID:     lecturer.UUID,
 			FullName: lecturer.FullName,
-			NIP:      lecturer.NIP,       // Include NIP for frontend
+			NIP:      lecturer.NIP,
 			NIDN:     lecturer.NIDN,
 			Program:  lecturer.StudyProgramName,
+			Email:    lecturer.Email,
 		}
 	}
 

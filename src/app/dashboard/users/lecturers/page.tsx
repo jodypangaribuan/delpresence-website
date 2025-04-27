@@ -268,41 +268,40 @@ export default function LecturersPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-        <h1 className="text-2xl font-bold text-[#002A5C] flex items-center gap-2">
-          <GraduationCap className="h-6 w-6" /> 
-          Daftar Dosen
-        </h1>
-        
-        <Button 
-          onClick={syncLecturers} 
-          disabled={isSyncing}
-          variant="default"
-          className="bg-[#0687C9] hover:bg-[#0078B5]"
-        >
-          {isSyncing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Sinkronisasi...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Sinkronisasi Data Dosen
-            </>
-          )}
-        </Button>
-      </div>
-      
-      <Card className="shadow-sm border-neutral-200 overflow-hidden">
-        <div className="w-full bg-gradient-to-r from-[#E6F2FF] to-white p-4">
-          <CardTitle className="text-[#0687C9]">Data Dosen</CardTitle>
-          <CardDescription>
-            Daftar dosen Institut Teknologi Del yang tersinkronisasi dengan sistem akademik kampus.
-          </CardDescription>
-        </div>
-        <CardContent>
+    <div className="container p-4 mx-auto">
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <CardTitle className="text-2xl font-bold flex items-center">
+                <GraduationCap className="mr-2 h-6 w-6 text-[#0687C9]" /> 
+                Daftar Dosen
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Daftar dosen Institut Teknologi Del yang tersinkronisasi dengan sistem akademik kampus.
+              </CardDescription>
+            </div>
+            
+            <Button 
+              onClick={syncLecturers} 
+              disabled={isSyncing}
+              variant="default"
+              className="bg-[#0687C9] hover:bg-[#0078B5]"
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sinkronisasi...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sinkronisasi Data Dosen
+                </>
+              )}
+            </Button>
+          </div>
+          
           {isLoading ? (
             <div className="flex justify-center items-center py-16">
               <div className="text-center">

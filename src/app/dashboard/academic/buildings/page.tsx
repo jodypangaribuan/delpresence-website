@@ -312,6 +312,7 @@ export default function BuildingsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px] font-bold text-black">No</TableHead>
                   <TableHead className="w-[80px] font-bold text-black">Kode</TableHead>
                   <TableHead className="font-bold text-black">Nama Gedung</TableHead>
                   <TableHead className="text-center font-bold text-black">Lantai</TableHead>
@@ -322,7 +323,7 @@ export default function BuildingsPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10">
+                    <TableCell colSpan={6} className="text-center py-10">
                       <div className="flex justify-center">
                         <div className="animate-spin h-6 w-6 border-2 border-[#0687C9] border-opacity-50 border-t-[#0687C9] rounded-full"></div>
                       </div>
@@ -330,8 +331,9 @@ export default function BuildingsPage() {
                     </TableCell>
                   </TableRow>
                 ) : filteredBuildings.length > 0 ? (
-                  filteredBuildings.map((building) => (
+                  filteredBuildings.map((building, index) => (
                     <TableRow key={building.building.id}>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium">{building.building.code}</TableCell>
                       <TableCell>
                         <div className="font-medium">{building.building.name}</div>
@@ -367,7 +369,7 @@ export default function BuildingsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-4 text-gray-500">
+                    <TableCell colSpan={6} className="text-center py-4 text-gray-500">
                       Tidak ada gedung yang sesuai dengan filter
                     </TableCell>
                   </TableRow>

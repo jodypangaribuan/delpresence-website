@@ -74,11 +74,14 @@ func (r *StudentRepository) UpsertMany(students []models.Student) error {
 	}()
 
 	for _, student := range students {
-		// Try to find existing student by NIM
+		// Try to find existing student by DimID (from external system)
 		var existingStudent models.Student
 		result := tx.Where("dim_id = ?", student.DimID).First(&existingStudent)
 		
 		if result.Error == nil {
+			// Check if the student ID is going to change
+			oldID := existingStudent.ID
+
 			// Update existing student
 			student.ID = existingStudent.ID
 			student.UUID = existingStudent.UUID
@@ -87,6 +90,18 @@ func (r *StudentRepository) UpsertMany(students []models.Student) error {
 			if err := tx.Save(&student).Error; err != nil {
 				tx.Rollback()
 				return err
+			}
+
+			// Update student_to_groups rows if the student ID changed but UserID remains the same
+			// This maintains group membership connections when student IDs change
+			if oldID != student.ID && existingStudent.UserID == student.UserID {
+				if err := tx.Exec(
+					"UPDATE student_to_groups SET student_id = ? WHERE student_id = ? AND user_id = ?",
+					student.ID, oldID, student.UserID,
+				).Error; err != nil {
+					tx.Rollback()
+					return err
+				}
 			}
 		} else {
 			// Create new student

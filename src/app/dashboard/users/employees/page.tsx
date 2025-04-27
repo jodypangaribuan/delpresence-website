@@ -239,43 +239,40 @@ export default function EmployeesPage() {
   ], []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-        <h1 className="text-2xl font-bold text-[#002A5C] flex items-center gap-2">
-          <Users className="h-6 w-6" />
-          Daftar Pegawai
-        </h1>
-
-        <div className="flex gap-2">
-          <Button
-            onClick={syncEmployees}
-            disabled={isSyncing}
-            variant="default"
-            className="bg-[#0687C9] hover:bg-[#0078B5]"
-          >
-            {isSyncing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sinkronisasi...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Sinkronisasi Data Pegawai
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      <Card className="shadow-sm border-neutral-200 overflow-hidden">
-        <div className="w-full bg-gradient-to-r from-[#E6F2FF] to-white p-4">
-          <CardTitle className="text-[#0687C9]">Data Pegawai</CardTitle>
-          <CardDescription>
-            Daftar pegawai Institut Teknologi Del yang tersinkronisasi dengan sistem kepegawaian kampus.
-          </CardDescription>
-        </div>
-        <CardContent>
+    <div className="container p-4 mx-auto">
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <CardTitle className="text-2xl font-bold flex items-center">
+                <Users className="mr-2 h-6 w-6 text-[#0687C9]" />
+                Daftar Pegawai
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Daftar pegawai Institut Teknologi Del yang tersinkronisasi dengan sistem kepegawaian kampus.
+              </CardDescription>
+            </div>
+            
+            <Button
+              onClick={syncEmployees}
+              disabled={isSyncing}
+              variant="default"
+              className="bg-[#0687C9] hover:bg-[#0078B5]"
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sinkronisasi...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sinkronisasi Data Pegawai
+                </>
+              )}
+            </Button>
+          </div>
+          
           {/* Total count display */}
           <div className="flex justify-end mb-2">
             <div className="text-sm font-medium text-gray-800">

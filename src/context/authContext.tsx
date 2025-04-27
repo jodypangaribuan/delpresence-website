@@ -109,8 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('token_expiry');
     localStorage.removeItem('user');
     
-    // Clear cookie
+    // Clear cookies
     document.cookie = 'auth_token=; Max-Age=0; path=/; SameSite=Strict';
+    document.cookie = 'user=; Max-Age=0; path=/; SameSite=Strict';
     
     // Reset state
     setUser(null);
@@ -223,6 +224,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set HTTP-only secure cookie for backend API requests
     document.cookie = `auth_token=${token}; max-age=${60*60*12}; path=/; SameSite=Strict`;
     
+    // Also save user data in a cookie (URL-encoded) for middleware access
+    document.cookie = `user=${encodeURIComponent(JSON.stringify(userData))}; max-age=${60*60*12}; path=/; SameSite=Strict`;
+    
     // Update state
     setUser(userData);
     setIsAuthenticated(true);
@@ -245,8 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionStorage.removeItem('lastAuthRedirect');
       sessionStorage.removeItem('lastLoginRedirect');
       
-      // Use window.location instead of router.push to ensure a full page reload
-      window.location.href = '/login';
+      // Force a new navigation to login to clear any preserved path
+      // This replaces the history entry instead of adding to it
+      window.location.replace('/login');
     }, 500);
   };
   

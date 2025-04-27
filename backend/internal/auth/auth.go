@@ -15,7 +15,7 @@ import (
 var (
 	// ErrInvalidCredentials is returned when credentials are invalid
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	
+
 	// ErrUserNotFound is returned when user is not found
 	ErrUserNotFound = errors.New("user not found")
 
@@ -206,4 +206,4 @@ func RefreshToken(refreshTokenString string) (*models.LoginResponse, error) {
 		RefreshToken: refreshToken,
 		User:         *user,
 	}, nil
-} 
+}

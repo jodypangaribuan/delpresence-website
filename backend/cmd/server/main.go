@@ -27,9 +27,8 @@ func main() {
 	// Initialize database connection
 	database.Initialize()
 
-	// Initialize auth service
+	// Initialize auth service (includes both user and student repositories)
 	auth.Initialize()
-	auth.InitializeStudentAuth()
 
 	// Create admin user
 	err = auth.CreateAdminUser()
@@ -45,18 +44,15 @@ func main() {
 	config.AllowOrigins = []string{utils.GetEnvWithDefault("CORS_ALLOWED_ORIGINS", "http://localhost:3000")}
 	config.AllowCredentials = true
 	config.AllowHeaders = append(config.AllowHeaders, "Authorization", "Content-Type")
-	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	router.Use(cors.New(config))
 
 	// Register authentication routes
 	router.POST("/api/auth/login", handlers.Login)
 	router.POST("/api/auth/refresh", handlers.RefreshToken)
-	
-	// Register campus authentication routes
+
+	// Register campus authentication route (works for all role types)
 	router.POST("/api/auth/campus/login", handlers.CampusLogin)
-	
-	// Register student authentication routes
-	router.POST("/api/auth/student/login", handlers.StudentLogin)
 
 	// Create handlers
 	campusAuthHandler := handlers.NewCampusAuthHandler()
@@ -67,6 +63,11 @@ func main() {
 	studyProgramHandler := handlers.NewStudyProgramHandler()
 	buildingHandler := handlers.NewBuildingHandler()
 	roomHandler := handlers.NewRoomHandler()
+	academicYearHandler := handlers.NewAcademicYearHandler()
+	courseHandler := handlers.NewCourseHandler()
+	courseGroupHandler := handlers.NewCourseGroupHandler()
+	studentGroupHandler := handlers.NewStudentGroupHandler()
+	lecturerAssignmentHandler := handlers.NewLecturerAssignmentHandler()
 
 	// Protected routes
 	authRequired := router.Group("/api")
@@ -82,7 +83,7 @@ func main() {
 			// Campus API token management (admin only)
 			adminRoutes.GET("/campus/token", campusAuthHandler.GetToken)
 			adminRoutes.POST("/campus/token/refresh", campusAuthHandler.RefreshToken)
-			
+
 			// Admin access to lecturer data
 			adminRoutes.GET("/lecturers", lecturerHandler.GetAllLecturers)
 			adminRoutes.GET("/lecturers/search", lecturerHandler.SearchLecturers)
@@ -98,36 +99,82 @@ func main() {
 			adminRoutes.GET("/students", studentHandler.GetAllStudents)
 			adminRoutes.GET("/students/:id", studentHandler.GetStudentByID)
 			adminRoutes.POST("/students/sync", studentHandler.SyncStudents)
-			
+
 			// Admin access to faculty data
 			adminRoutes.GET("/faculties", facultyHandler.GetAllFaculties)
 			adminRoutes.GET("/faculties/:id", facultyHandler.GetFacultyByID)
 			adminRoutes.POST("/faculties", facultyHandler.CreateFaculty)
 			adminRoutes.PUT("/faculties/:id", facultyHandler.UpdateFaculty)
 			adminRoutes.DELETE("/faculties/:id", facultyHandler.DeleteFaculty)
-			
+
 			// Admin access to study program data
 			adminRoutes.GET("/study-programs", studyProgramHandler.GetAllStudyPrograms)
 			adminRoutes.GET("/study-programs/:id", studyProgramHandler.GetStudyProgramByID)
 			adminRoutes.POST("/study-programs", studyProgramHandler.CreateStudyProgram)
 			adminRoutes.PUT("/study-programs/:id", studyProgramHandler.UpdateStudyProgram)
 			adminRoutes.DELETE("/study-programs/:id", studyProgramHandler.DeleteStudyProgram)
-			
+
 			// Admin access to building data
 			adminRoutes.GET("/buildings", buildingHandler.GetAllBuildings)
 			adminRoutes.GET("/buildings/:id", buildingHandler.GetBuildingByID)
 			adminRoutes.POST("/buildings", buildingHandler.CreateBuilding)
 			adminRoutes.PUT("/buildings/:id", buildingHandler.UpdateBuilding)
 			adminRoutes.DELETE("/buildings/:id", buildingHandler.DeleteBuilding)
-			
+
 			// Admin access to room data
 			adminRoutes.GET("/rooms", roomHandler.GetAllRooms)
 			adminRoutes.GET("/rooms/:id", roomHandler.GetRoomByID)
 			adminRoutes.POST("/rooms", roomHandler.CreateRoom)
 			adminRoutes.PUT("/rooms/:id", roomHandler.UpdateRoom)
 			adminRoutes.DELETE("/rooms/:id", roomHandler.DeleteRoom)
+			
+			// Admin access to academic year data
+			adminRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
+			adminRoutes.GET("/academic-years/active", academicYearHandler.GetActiveAcademicYear)
+			adminRoutes.GET("/academic-years/:id", academicYearHandler.GetAcademicYearByID)
+			adminRoutes.POST("/academic-years", academicYearHandler.CreateAcademicYear)
+			adminRoutes.PUT("/academic-years/:id", academicYearHandler.UpdateAcademicYear)
+			adminRoutes.DELETE("/academic-years/:id", academicYearHandler.DeleteAcademicYear)
+			adminRoutes.PATCH("/academic-years/:id/status", academicYearHandler.UpdateAcademicYearStatus)
+
+			// Admin access to course data
+			adminRoutes.GET("/courses", courseHandler.GetAllCourses)
+			adminRoutes.GET("/courses/:id", courseHandler.GetCourseByID)
+			adminRoutes.POST("/courses", courseHandler.CreateCourse)
+			adminRoutes.PUT("/courses/:id", courseHandler.UpdateCourse)
+			adminRoutes.DELETE("/courses/:id", courseHandler.DeleteCourse)
+			
+			// Admin access to course group data
+			adminRoutes.GET("/course-groups", courseGroupHandler.GetAllCourseGroups)
+			adminRoutes.GET("/course-groups/:id", courseGroupHandler.GetCourseGroupByID)
+			adminRoutes.POST("/course-groups", courseGroupHandler.CreateCourseGroup)
+			adminRoutes.PUT("/course-groups/:id", courseGroupHandler.UpdateCourseGroup)
+			adminRoutes.DELETE("/course-groups/:id", courseGroupHandler.DeleteCourseGroup)
+
+			// Admin access to student group data
+			adminRoutes.GET("/student-groups", studentGroupHandler.GetAllStudentGroups)
+			adminRoutes.GET("/student-groups/:id", studentGroupHandler.GetStudentGroupByID)
+			adminRoutes.POST("/student-groups", studentGroupHandler.CreateStudentGroup)
+			adminRoutes.PUT("/student-groups/:id", studentGroupHandler.UpdateStudentGroup)
+			adminRoutes.DELETE("/student-groups/:id", studentGroupHandler.DeleteStudentGroup)
+			adminRoutes.GET("/student-groups/:id/members", studentGroupHandler.GetGroupMembers)
+			adminRoutes.GET("/student-groups/:id/available-students", studentGroupHandler.GetAvailableStudents)
+			adminRoutes.POST("/student-groups/:id/members", studentGroupHandler.AddStudentToGroup)
+			adminRoutes.POST("/student-groups/:id/members/batch", studentGroupHandler.AddMultipleStudentsToGroup)
+			adminRoutes.DELETE("/student-groups/:id/members/:student_id", studentGroupHandler.RemoveStudentFromGroup)
+			adminRoutes.POST("/student-groups/:id/members/remove-batch", studentGroupHandler.RemoveMultipleStudentsFromGroup)
+			
+			// Admin access to lecturer assignments
+			adminRoutes.GET("/lecturer-assignments", lecturerAssignmentHandler.GetAllLecturerAssignments)
+			adminRoutes.GET("/lecturer-assignments/:id", lecturerAssignmentHandler.GetLecturerAssignmentByID)
+			adminRoutes.POST("/lecturer-assignments", lecturerAssignmentHandler.CreateLecturerAssignment)
+			adminRoutes.PUT("/lecturer-assignments/:id", lecturerAssignmentHandler.UpdateLecturerAssignment)
+			adminRoutes.DELETE("/lecturer-assignments/:id", lecturerAssignmentHandler.DeleteLecturerAssignment)
+			adminRoutes.GET("/lecturer-assignments/lecturer/:lecturer_id", lecturerAssignmentHandler.GetAssignmentsByLecturer)
+			adminRoutes.GET("/lecturer-assignments/course/:course_id", lecturerAssignmentHandler.GetAssignmentsByCourse)
+			adminRoutes.GET("/lecturer-assignments/course/:course_id/available-lecturers", lecturerAssignmentHandler.GetAvailableLecturers)
 		}
-		
+
 		// Lecturer routes
 		lecturerRoutes := authRequired.Group("/lecturer")
 		lecturerRoutes.Use(middleware.RoleMiddleware("Dosen"))
@@ -135,7 +182,7 @@ func main() {
 			// Lecturer profile
 			lecturerRoutes.GET("/profile", handlers.GetCurrentUser)
 		}
-		
+
 		// Employee routes (replacing assistant routes)
 		employeeRoutes := authRequired.Group("/employee")
 		employeeRoutes.Use(middleware.RoleMiddleware("Pegawai"))
@@ -143,7 +190,7 @@ func main() {
 			// Employee profile
 			employeeRoutes.GET("/profile", handlers.GetCurrentUser)
 		}
-		
+
 		// Student routes
 		studentRoutes := authRequired.Group("/student")
 		studentRoutes.Use(middleware.RoleMiddleware("Mahasiswa"))
@@ -161,4 +208,4 @@ func main() {
 		log.Fatalf("Error starting server: %v", err)
 		os.Exit(1)
 	}
-} 
+}

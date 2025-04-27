@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Card, 
   CardContent, 
   CardHeader, 
-  CardTitle 
+  CardTitle,
+  CardDescription 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,296 +35,717 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
-import { CalendarDays, Clock, Building, Users, Pencil, Trash, Plus, MoreHorizontal, Trash2 } from "lucide-react";
+import { 
+  PopoverContent, PopoverTrigger
+} from "@/components/ui/popover";
+import { Popover } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { format, addDays, startOfWeek, endOfWeek, isSameDay, parse, isWithinInterval } from "date-fns";
+import { id } from "date-fns/locale";
+import { useForm } from "react-hook-form";
+import axios from "axios";
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { 
+  CalendarDays, 
+  Clock, 
+  Building, 
+  Users, 
+  Pencil, 
+  Plus, 
+  MoreHorizontal, 
+  Trash2,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  CalendarIcon,
+  Filter,
+  RefreshCw,
+  MapPin
+} from "lucide-react";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+
+interface Course {
+  id: number;
+  code: string;
+  name: string;
+  credits: number;
+  semester: number;
+  department_name?: string;
+  department_id?: number;
+  department?: {
+    id: number;
+    name: string;
+  };
+}
+
+interface Room {
+  id: number;
+  name: string;
+  building_id: number;
+  capacity: number;
+  building?: {
+    id: number;
+    name: string;
+  };
+}
+
+interface Lecturer {
+  id: number;
+  name: string;
+  code?: string;
+  email?: string;
+  department_id?: number;
+  department?: {
+    id: number;
+    name: string;
+  };
+}
+
+interface StudentGroup {
+  id: number;
+  name: string;
+  department_id: number;
+  department?: {
+    id: number;
+    name: string;
+  };
+  semester: number;
+  student_count: number;
+}
+
+interface AcademicYear {
+  id: number;
+  name: string;
+  semester: "ganjil" | "genap";
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+}
 
 interface CourseSchedule {
-  id: string;
-  courseCode: string;
-  courseName: string;
+  id: number;
+  course_id: number;
+  course?: Course;
+  course_code?: string;
+  course_name?: string;
+  room_id: number;
+  room?: Room;
+  room_name?: string;
+  building_name?: string;
   day: string;
-  startTime: string;
-  endTime: string;
-  room: string;
-  building: string;
-  lecturer: string;
-  studentGroup: string;
-  semester: number;
-  academicYear: string;
+  start_time: string;
+  end_time: string;
+  lecturer_id: number;
+  lecturer?: Lecturer;
+  lecturer_name?: string;
+  student_group_id: number;
+  student_group?: StudentGroup;
+  student_group_name?: string;
+  academic_year_id: number;
+  academic_year?: AcademicYear;
+  academic_year_name?: string;
+  semester?: number;
   capacity: number;
   enrolled: number;
+  notes?: string;
+  is_active: boolean;
 }
 
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+const DAY_MAPPING: Record<string, number> = {
+  "Senin": 1,
+  "Selasa": 2, 
+  "Rabu": 3, 
+  "Kamis": 4, 
+  "Jumat": 5, 
+  "Sabtu": 6, 
+  "Minggu": 0
+};
 
+// Dummy data for now - will be replaced with API calls
 const SAMPLE_SCHEDULES: CourseSchedule[] = [
+  // Keep the existing data but update to match the new interface
   {
-    id: "SCH-001",
-    courseCode: "MK101",
-    courseName: "Pengantar Teknologi Informasi",
+    id: 1,
+    course_id: 101,
+    course_code: "MK101",
+    course_name: "Pengantar Teknologi Informasi",
+    room_id: 1,
+    room_name: "Ruang 101",
+    building_name: "Gedung Teknik",
     day: "Senin",
-    startTime: "08:00",
-    endTime: "10:30",
-    room: "Ruang 101",
-    building: "Gedung Teknik",
-    lecturer: "Dr. Ahmad Wijaya",
-    studentGroup: "Informatika 2023",
+    start_time: "08:00",
+    end_time: "10:30",
+    lecturer_id: 1,
+    lecturer_name: "Dr. Ahmad Wijaya",
+    student_group_id: 1,
+    student_group_name: "Informatika 2023",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 1,
-    academicYear: "2023/2024",
     capacity: 50,
-    enrolled: 45
+    enrolled: 45,
+    is_active: true
   },
+  // ... other sample schedules with the updated structure
   {
-    id: "SCH-002",
-    courseCode: "MK201",
-    courseName: "Struktur Data dan Algoritma",
+    id: 2,
+    course_id: 102,
+    course_code: "MK201",
+    course_name: "Struktur Data dan Algoritma",
+    room_id: 2,
+    room_name: "Ruang 203",
+    building_name: "Gedung Teknik",
     day: "Selasa",
-    startTime: "13:00",
-    endTime: "15:30",
-    room: "Ruang 203",
-    building: "Gedung Teknik",
-    lecturer: "Prof. Siti Rahayu",
-    studentGroup: "Informatika 2022",
+    start_time: "13:00",
+    end_time: "15:30",
+    lecturer_id: 2,
+    lecturer_name: "Prof. Siti Rahayu",
+    student_group_id: 2,
+    student_group_name: "Informatika 2022",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 3,
-    academicYear: "2023/2024",
     capacity: 40,
-    enrolled: 38
+    enrolled: 38,
+    is_active: true
   },
   {
-    id: "SCH-003",
-    courseCode: "MK301",
-    courseName: "Basis Data Lanjut",
+    id: 3,
+    course_id: 103,
+    course_code: "MK301",
+    course_name: "Basis Data Lanjut",
+    room_id: 3,
+    room_name: "Lab Database",
+    building_name: "Gedung Informatika",
     day: "Rabu",
-    startTime: "10:00",
-    endTime: "12:30",
-    room: "Lab Database",
-    building: "Gedung Informatika",
-    lecturer: "Dr. Budi Santoso",
-    studentGroup: "Sistem Informasi 2022",
+    start_time: "10:00",
+    end_time: "12:30",
+    lecturer_id: 3,
+    lecturer_name: "Dr. Budi Santoso",
+    student_group_id: 3,
+    student_group_name: "Sistem Informasi 2022",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 3,
-    academicYear: "2023/2024",
     capacity: 35,
-    enrolled: 35
+    enrolled: 35,
+    is_active: true
   },
   {
-    id: "SCH-004",
-    courseCode: "MK401",
-    courseName: "Kecerdasan Buatan dan Machine Learning",
+    id: 4,
+    course_id: 104,
+    course_code: "MK401",
+    course_name: "Kecerdasan Buatan dan Machine Learning",
+    room_id: 4,
+    room_name: "Lab AI",
+    building_name: "Gedung Riset",
     day: "Kamis",
-    startTime: "15:00",
-    endTime: "17:30",
-    room: "Lab AI",
-    building: "Gedung Riset",
-    lecturer: "Dr. Dewi Pratiwi",
-    studentGroup: "Informatika 2021",
+    start_time: "15:00",
+    end_time: "17:30",
+    lecturer_id: 4,
+    lecturer_name: "Dr. Dewi Pratiwi",
+    student_group_id: 4,
+    student_group_name: "Informatika 2021",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 5,
-    academicYear: "2023/2024",
     capacity: 30,
-    enrolled: 24
+    enrolled: 24,
+    is_active: true
   },
   {
-    id: "SCH-005",
-    courseCode: "MK501",
-    courseName: "Pengembangan Aplikasi Web",
+    id: 5,
+    course_id: 105,
+    course_code: "MK501",
+    course_name: "Pengembangan Aplikasi Web",
+    room_id: 5,
+    room_name: "Lab Komputer 3",
+    building_name: "Gedung Teknik",
     day: "Jumat",
-    startTime: "08:00",
-    endTime: "10:30",
-    room: "Lab Komputer 3",
-    building: "Gedung Teknik",
-    lecturer: "Prof. Rudi Hartono",
-    studentGroup: "Sistem Informasi 2021",
+    start_time: "08:00",
+    end_time: "10:30",
+    lecturer_id: 5,
+    lecturer_name: "Prof. Rudi Hartono",
+    student_group_id: 5,
+    student_group_name: "Sistem Informasi 2021",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 5,
-    academicYear: "2023/2024",
     capacity: 30,
-    enrolled: 28
+    enrolled: 28,
+    is_active: true
   },
   {
-    id: "SCH-006",
-    courseCode: "MK102",
-    courseName: "Matematika Diskrit",
+    id: 6,
+    course_id: 106,
+    course_code: "MK102",
+    course_name: "Matematika Diskrit",
+    room_id: 6,
+    room_name: "Ruang 105",
+    building_name: "Gedung MIPA",
     day: "Senin",
-    startTime: "13:00",
-    endTime: "15:30",
-    room: "Ruang 105",
-    building: "Gedung MIPA",
-    lecturer: "Dr. Hendra Gunawan",
-    studentGroup: "Informatika 2023",
+    start_time: "13:00",
+    end_time: "15:30",
+    lecturer_id: 6,
+    lecturer_name: "Dr. Hendra Gunawan",
+    student_group_id: 6,
+    student_group_name: "Informatika 2023",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 1,
-    academicYear: "2023/2024",
     capacity: 45,
-    enrolled: 42
+    enrolled: 42,
+    is_active: true
   },
   {
-    id: "SCH-007",
-    courseCode: "MK202",
-    courseName: "Jaringan Komputer",
+    id: 7,
+    course_id: 107,
+    course_code: "MK202",
+    course_name: "Jaringan Komputer",
+    room_id: 7,
+    room_name: "Lab Jaringan",
+    building_name: "Gedung Informatika",
     day: "Rabu",
-    startTime: "13:00",
-    endTime: "15:30",
-    room: "Lab Jaringan",
-    building: "Gedung Informatika",
-    lecturer: "Prof. Agus Setiawan",
-    studentGroup: "Informatika 2022",
+    start_time: "13:00",
+    end_time: "15:30",
+    lecturer_id: 7,
+    lecturer_name: "Prof. Agus Setiawan",
+    student_group_id: 7,
+    student_group_name: "Informatika 2022",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 3,
-    academicYear: "2023/2024",
     capacity: 35,
-    enrolled: 30
+    enrolled: 30,
+    is_active: true
   },
   {
-    id: "SCH-008",
-    courseCode: "MK302",
-    courseName: "Pemrograman Mobile",
+    id: 8,
+    course_id: 108,
+    course_code: "MK302",
+    course_name: "Pemrograman Mobile",
+    room_id: 8,
+    room_name: "Lab Mobile",
+    building_name: "Gedung Informatika",
     day: "Kamis",
-    startTime: "10:00",
-    endTime: "12:30",
-    room: "Lab Mobile",
-    building: "Gedung Informatika",
-    lecturer: "Dr. Maya Anggraini",
-    studentGroup: "Informatika 2021",
+    start_time: "10:00",
+    end_time: "12:30",
+    lecturer_id: 8,
+    lecturer_name: "Dr. Maya Anggraini",
+    student_group_id: 8,
+    student_group_name: "Informatika 2021",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 5,
-    academicYear: "2023/2024",
     capacity: 30,
-    enrolled: 29
+    enrolled: 29,
+    is_active: true
   },
   {
-    id: "SCH-009",
-    courseCode: "MK601",
-    courseName: "Praktikum Komputasi Awan",
+    id: 9,
+    course_id: 109,
+    course_code: "MK601",
+    course_name: "Praktikum Komputasi Awan",
+    room_id: 9,
+    room_name: "Lab Cloud",
+    building_name: "Gedung Riset",
     day: "Senin",
-    startTime: "08:00",
-    endTime: "11:30",
-    room: "Lab Cloud",
-    building: "Gedung Riset",
-    lecturer: "Dr. Rini Wulandari",
-    studentGroup: "Informatika 2021",
+    start_time: "08:00",
+    end_time: "11:30",
+    lecturer_id: 9,
+    lecturer_name: "Dr. Rini Wulandari",
+    student_group_id: 9,
+    student_group_name: "Informatika 2021",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 5,
-    academicYear: "2023/2024",
     capacity: 25,
-    enrolled: 20
+    enrolled: 20,
+    is_active: true
   },
   {
-    id: "SCH-010",
-    courseCode: "MK602",
-    courseName: "Workshop Internet of Things",
+    id: 10,
+    course_id: 110,
+    course_code: "MK602",
+    course_name: "Workshop Internet of Things",
+    room_id: 10,
+    room_name: "Lab IoT",
+    building_name: "Gedung Riset",
     day: "Senin",
-    startTime: "13:00",
-    endTime: "16:30",
-    room: "Lab IoT",
-    building: "Gedung Riset",
-    lecturer: "Prof. Bambang Supriyanto",
-    studentGroup: "Sistem Informasi 2021",
+    start_time: "13:00",
+    end_time: "16:30",
+    lecturer_id: 10,
+    lecturer_name: "Prof. Bambang Supriyanto",
+    student_group_id: 10,
+    student_group_name: "Sistem Informasi 2021",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 5,
-    academicYear: "2023/2024",
     capacity: 25,
-    enrolled: 23
+    enrolled: 23,
+    is_active: true
   },
   {
-    id: "SCH-011",
-    courseCode: "MK103",
-    courseName: "Praktikum Pemrograman Dasar",
+    id: 11,
+    course_id: 111,
+    course_code: "MK103",
+    course_name: "Praktikum Pemrograman Dasar",
+    room_id: 11,
+    room_name: "Lab Komputer 1",
+    building_name: "Gedung Teknik",
     day: "Sabtu",
-    startTime: "08:00",
-    endTime: "10:30",
-    room: "Lab Komputer 1",
-    building: "Gedung Teknik",
-    lecturer: "Dr. Anita Permatasari",
-    studentGroup: "Informatika 2023",
+    start_time: "08:00",
+    end_time: "10:30",
+    lecturer_id: 11,
+    lecturer_name: "Dr. Anita Permatasari",
+    student_group_id: 11,
+    student_group_name: "Informatika 2023",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 1,
-    academicYear: "2023/2024",
     capacity: 40,
-    enrolled: 40
+    enrolled: 40,
+    is_active: true
   },
   {
-    id: "SCH-012",
-    courseCode: "MK203",
-    courseName: "Workshop Desain UI/UX",
+    id: 12,
+    course_id: 112,
+    course_code: "MK203",
+    course_name: "Workshop Desain UI/UX",
+    room_id: 12,
+    room_name: "Studio Desain",
+    building_name: "Gedung Multimedia",
     day: "Sabtu",
-    startTime: "13:00",
-    endTime: "16:30",
-    room: "Studio Desain",
-    building: "Gedung Multimedia",
-    lecturer: "Dr. Ratna Kusuma",
-    studentGroup: "Sistem Informasi 2022",
+    start_time: "13:00",
+    end_time: "16:30",
+    lecturer_id: 12,
+    lecturer_name: "Dr. Ratna Kusuma",
+    student_group_id: 12,
+    student_group_name: "Sistem Informasi 2022",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 3,
-    academicYear: "2023/2024",
     capacity: 30,
-    enrolled: 28
+    enrolled: 28,
+    is_active: true
   },
   {
-    id: "SCH-013",
-    courseCode: "MK104",
-    courseName: "Bahasa Inggris untuk IT",
+    id: 13,
+    course_id: 113,
+    course_code: "MK104",
+    course_name: "Bahasa Inggris untuk IT",
+    room_id: 13,
+    room_name: "Ruang 201",
+    building_name: "Gedung Bahasa",
     day: "Sabtu",
-    startTime: "10:30",
-    endTime: "12:30",
-    room: "Ruang 201",
-    building: "Gedung Bahasa",
-    lecturer: "Dr. Sarah Johnson",
-    studentGroup: "Informatika 2023",
+    start_time: "10:30",
+    end_time: "12:30",
+    lecturer_id: 13,
+    lecturer_name: "Dr. Sarah Johnson",
+    student_group_id: 13,
+    student_group_name: "Informatika 2023",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 1,
-    academicYear: "2023/2024",
     capacity: 45,
-    enrolled: 40
+    enrolled: 40,
+    is_active: true
   },
   {
-    id: "SCH-014",
-    courseCode: "MK303",
-    courseName: "Seminar Teknologi Terkini",
+    id: 14,
+    course_id: 114,
+    course_code: "MK303",
+    course_name: "Seminar Teknologi Terkini",
+    room_id: 14,
+    room_name: "Auditorium",
+    building_name: "Gedung Multimedia",
     day: "Minggu",
-    startTime: "09:00",
-    endTime: "12:00",
-    room: "Auditorium",
-    building: "Gedung Multimedia",
-    lecturer: "Prof. Darmawan Pratama",
-    studentGroup: "Informatika 2022",
+    start_time: "09:00",
+    end_time: "12:00",
+    lecturer_id: 14,
+    lecturer_name: "Prof. Darmawan Pratama",
+    student_group_id: 14,
+    student_group_name: "Informatika 2022",
+    academic_year_id: 1,
+    academic_year_name: "2023/2024",
     semester: 3,
-    academicYear: "2023/2024",
     capacity: 60,
-    enrolled: 55
+    enrolled: 55,
+    is_active: true
   }
 ];
 
 export default function ScheduleManagePage() {
-  const [schedules, setSchedules] = useState<CourseSchedule[]>(SAMPLE_SCHEDULES);
+  // State management
+  const [schedules, setSchedules] = useState<CourseSchedule[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
+  const [studentGroups, setStudentGroups] = useState<StudentGroup[]>([]);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  
+  // For filtering
   const [searchQuery, setSearchQuery] = useState("");
   const [dayFilter, setDayFilter] = useState<string | null>(null);
   const [buildingFilter, setBuildingFilter] = useState<string | null>(null);
   const [semesterFilter, setSemesterFilter] = useState<number | null>(null);
+  const [lecturerFilter, setLecturerFilter] = useState<number | null>(null);
+  const [courseFilter, setCourseFilter] = useState<number | null>(null);
+  const [academicYearFilter, setAcademicYearFilter] = useState<number | null>(null);
+  
+  // For calendar view
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<'week' | 'day'>('week');
+  
+  // Modal states
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [currentSchedule, setCurrentSchedule] = useState<CourseSchedule | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const buildings = Array.from(new Set(schedules.map(s => s.building)));
-  const semesters = Array.from(new Set(schedules.map(s => s.semester))).sort((a, b) => a - b);
+  // Initialize with sample data (to be replaced with API call)
+  useEffect(() => {
+    setSchedules(SAMPLE_SCHEDULES);
+    
+    // Actual API calls would be here
+    // fetchSchedules();
+    // fetchCourses();
+    // fetchRooms();
+    // fetchLecturers();
+    // fetchStudentGroups();
+    // fetchAcademicYears();
+  }, []);
 
+  // Extract unique values for filters
+  const buildings = Array.from(new Set(schedules.map(s => s.building_name))).filter(Boolean) as string[];
+  const semesters = Array.from(new Set(schedules.map(s => s.semester))).filter(Boolean).sort((a, b) => a! - b!) as number[];
+  const uniqueLecturers = Array.from(new Set(schedules.map(s => s.lecturer_name))).filter(Boolean) as string[];
+  const uniqueCourses = Array.from(new Set(schedules.map(s => s.course_name))).filter(Boolean) as string[];
+
+  // API functions (to be implemented)
+  const fetchSchedules = async () => {
+    setLoading(true);
+    try {
+      // Simulating API call for now
+      setTimeout(() => {
+        setSchedules(SAMPLE_SCHEDULES);
+        setLoading(false);
+      }, 1000);
+      
+      // Actual API call would be:
+      /*
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/schedules`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
+        }
+      });
+      
+      if (response.data.status === "success") {
+        setSchedules(response.data.data);
+      } else {
+        toast.error("Gagal memuat jadwal", {
+          description: "Terjadi kesalahan saat memuat data jadwal perkuliahan"
+        });
+      }
+      */
+    } catch (error) {
+      console.error("Error fetching schedules:", error);
+      toast.error("Gagal memuat jadwal", {
+        description: "Terjadi kesalahan saat memuat data jadwal perkuliahan"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to handle adding a new schedule
+  const handleAddSchedule = async (data: any) => {
+    setIsSubmitting(true);
+    try {
+      // Simulating successful addition
+      toast.success("Jadwal berhasil ditambahkan", {
+        description: "Jadwal perkuliahan baru telah berhasil ditambahkan"
+      });
+      setShowAddDialog(false);
+      // In a real app, you would call the API and refresh the data
+    } catch (error) {
+      toast.error("Gagal menambahkan jadwal", {
+        description: "Terjadi kesalahan saat menambahkan jadwal baru"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Function to handle editing a schedule
+  const handleEditSchedule = async (data: any) => {
+    setIsSubmitting(true);
+    try {
+      // Simulating successful edit
+      toast.success("Jadwal berhasil diperbarui", {
+        description: "Jadwal perkuliahan telah berhasil diperbarui"
+      });
+      setShowEditDialog(false);
+      // In a real app, you would call the API and refresh the data
+    } catch (error) {
+      toast.error("Gagal memperbarui jadwal", {
+        description: "Terjadi kesalahan saat memperbarui jadwal"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Function to handle deleting a schedule
+  const handleDeleteSchedule = async () => {
+    setIsSubmitting(true);
+    try {
+      // Simulating successful deletion
+      toast.success("Jadwal berhasil dihapus", {
+        description: "Jadwal perkuliahan telah berhasil dihapus"
+      });
+      setShowDeleteDialog(false);
+      // In a real app, you would call the API and refresh the data
+    } catch (error) {
+      toast.error("Gagal menghapus jadwal", {
+        description: "Terjadi kesalahan saat menghapus jadwal"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Setup edit schedule
+  const setupEditSchedule = (schedule: CourseSchedule) => {
+    setCurrentSchedule(schedule);
+    setShowEditDialog(true);
+  };
+  
+  // Setup delete schedule
+  const setupDeleteSchedule = (schedule: CourseSchedule) => {
+    setCurrentSchedule(schedule);
+    setShowDeleteDialog(true);
+  };
+
+  // Calendar navigation functions
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const goToPreviousWeek = () => {
+    setCurrentDate(prev => addDays(prev, -7));
+  };
+
+  const goToNextWeek = () => {
+    setCurrentDate(prev => addDays(prev, 7));
+  };
+
+  // Get current week range for display
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday as week start
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+  const formattedWeekRange = `${format(weekStart, 'd MMMM')} - ${format(weekEnd, 'd MMMM yyyy')}`;
+
+  // Filter schedules based on user criteria
   const filteredSchedules = schedules.filter(schedule => {
     const matchesSearch = 
-      schedule.courseName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      schedule.courseCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      schedule.lecturer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      schedule.room.toLowerCase().includes(searchQuery.toLowerCase());
+      (schedule.course_name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
+      (schedule.course_code?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
+      (schedule.lecturer_name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
+      (schedule.room_name?.toLowerCase().includes(searchQuery.toLowerCase()) || false);
     
     const matchesDay = !dayFilter || dayFilter === "all" || schedule.day === dayFilter;
-    const matchesBuilding = !buildingFilter || buildingFilter === "all" || schedule.building === buildingFilter;
+    const matchesBuilding = !buildingFilter || buildingFilter === "all" || schedule.building_name === buildingFilter;
     const matchesSemester = !semesterFilter || schedule.semester === semesterFilter;
+    const matchesLecturer = !lecturerFilter || schedule.lecturer_id === lecturerFilter;
+    const matchesCourse = !courseFilter || schedule.course_id === courseFilter;
+    const matchesAcademicYear = !academicYearFilter || schedule.academic_year_id === academicYearFilter;
     
-    return matchesSearch && matchesDay && matchesBuilding && matchesSemester;
+    return matchesSearch && matchesDay && matchesBuilding && matchesSemester && 
+           matchesLecturer && matchesCourse && matchesAcademicYear;
+  });
+
+  // Group schedules by day for calendar view
+  const schedulesByDay = DAYS.reduce<Record<string, CourseSchedule[]>>((acc, day) => {
+    acc[day] = filteredSchedules.filter(schedule => schedule.day === day);
+    return acc;
+  }, {});
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchQuery("");
+    setDayFilter(null);
+    setBuildingFilter(null);
+    setSemesterFilter(null);
+    setLecturerFilter(null);
+    setCourseFilter(null);
+    setAcademicYearFilter(null);
+  };
+
+  // Forms for adding/editing schedules
+  const addForm = useForm({
+    defaultValues: {
+      course_id: "",
+      room_id: "",
+      day: "",
+      start_time: "",
+      end_time: "",
+      lecturer_id: "",
+      student_group_id: "",
+      academic_year_id: "",
+      notes: ""
+    }
+  });
+
+  const editForm = useForm({
+    defaultValues: {
+      course_id: "",
+      room_id: "",
+      day: "",
+      start_time: "",
+      end_time: "",
+      lecturer_id: "",
+      student_group_id: "",
+      academic_year_id: "",
+      notes: ""
+    }
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="container p-4 mx-auto space-y-6">
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Jadwal Perkuliahan</h2>
-          <p className="text-muted-foreground mt-1">
+              <CardTitle className="text-2xl font-bold flex items-center">
+            <CalendarDays className="mr-2 h-6 w-6 text-[#0687C9]" />
+            Jadwal Perkuliahan
+              </CardTitle>
+              <CardDescription className="mt-1">
             Kelola jadwal perkuliahan untuk semester aktif
-          </p>
+              </CardDescription>
         </div>
         
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -341,104 +763,279 @@ export default function ScheduleManagePage() {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="courseCode">Kode Mata Kuliah</Label>
-                <Input id="courseCode" placeholder="Contoh: CS101" />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="courseName">Nama Mata Kuliah</Label>
-                <Input id="courseName" placeholder="Masukkan nama mata kuliah" />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="day">Hari</Label>
-                <Select>
+                <Form {...addForm}>
+                  <form onSubmit={addForm.handleSubmit(handleAddSchedule)} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={addForm.control}
+                        name="course_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Mata Kuliah</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pilih mata kuliah" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {courses.length > 0 ? (
+                                  courses.map(course => (
+                                    <SelectItem key={course.id} value={course.id.toString()}>
+                                      {course.code} - {course.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="loading" disabled>
+                                    Memuat data mata kuliah...
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={addForm.control}
+                        name="day"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Hari</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih hari" />
                   </SelectTrigger>
+                              </FormControl>
                   <SelectContent>
-                    {DAYS.map((day) => (
-                      <SelectItem key={day} value={day}>{day}</SelectItem>
+                                {DAYS.map(day => (
+                                  <SelectItem key={day} value={day}>
+                                    {day}
+                                  </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">Jam Mulai</Label>
-                  <Input id="startTime" type="time" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">Jam Selesai</Label>
-                  <Input id="endTime" type="time" />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="building">Gedung</Label>
-                <Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={addForm.control}
+                        name="start_time"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Jam Mulai</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={addForm.control}
+                        name="end_time"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Jam Selesai</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={addForm.control}
+                        name="room_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Ruangan</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih gedung" />
+                                  <SelectValue placeholder="Pilih ruangan" />
                   </SelectTrigger>
+                              </FormControl>
                   <SelectContent>
-                    {buildings.map((building) => (
-                      <SelectItem key={building} value={building}>{building}</SelectItem>
-                    ))}
+                                {rooms.length > 0 ? (
+                                  rooms.map(room => (
+                                    <SelectItem key={room.id} value={room.id.toString()}>
+                                      {room.name}, {room.building?.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="loading" disabled>
+                                    Memuat data ruangan...
+                                  </SelectItem>
+                                )}
                   </SelectContent>
                 </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="room">Ruangan</Label>
-                <Input id="room" placeholder="Masukkan nama ruangan" />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="lecturer">Dosen</Label>
-                <Input id="lecturer" placeholder="Masukkan nama dosen" />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="studentGroup">Kelompok Mahasiswa</Label>
-                <Input id="studentGroup" placeholder="Masukkan kelompok mahasiswa" />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="semester">Semester</Label>
-                <Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={addForm.control}
+                        name="lecturer_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dosen</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pilih dosen" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {lecturers.length > 0 ? (
+                                  lecturers.map(lecturer => (
+                                    <SelectItem key={lecturer.id} value={lecturer.id.toString()}>
+                                      {lecturer.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="loading" disabled>
+                                    Memuat data dosen...
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={addForm.control}
+                        name="student_group_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Kelas/Kelompok</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Pilih kelompok mahasiswa" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {studentGroups.length > 0 ? (
+                                  studentGroups.map(group => (
+                                    <SelectItem key={group.id} value={group.id.toString()}>
+                                      {group.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="loading" disabled>
+                                    Memuat data kelompok...
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={addForm.control}
+                        name="academic_year_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tahun Akademik</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih semester" />
+                                  <SelectValue placeholder="Pilih tahun akademik" />
                   </SelectTrigger>
+                              </FormControl>
                   <SelectContent>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((semester) => (
-                      <SelectItem key={semester} value={semester.toString()}>Semester {semester}</SelectItem>
-                    ))}
+                                {academicYears.length > 0 ? (
+                                  academicYears.map(year => (
+                                    <SelectItem key={year.id} value={year.id.toString()}>
+                                      {year.name} ({year.semester})
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="loading" disabled>
+                                    Memuat data tahun akademik...
+                                  </SelectItem>
+                                )}
                   </SelectContent>
                 </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="academicYear">Tahun Akademik</Label>
-                <Input id="academicYear" placeholder="Contoh: 2023/2024" />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="capacity">Kapasitas</Label>
-                <Input id="capacity" type="number" min="1" placeholder="Masukkan kapasitas ruangan" />
-              </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={addForm.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem className="col-span-2">
+                            <FormLabel>Catatan</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Tambahkan catatan jika diperlukan" 
+                                className="resize-none"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
             </div>
             
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setShowAddDialog(false)}
+                      >
                 Batal
               </Button>
-              <Button className="bg-[#0687C9] hover:bg-[#0670a8]" onClick={() => setShowAddDialog(false)}>
-                Simpan Jadwal
+                      <Button 
+                        type="submit"
+                        className="bg-[#0687C9] hover:bg-[#0670a8]"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Menyimpan...
+                          </>
+                        ) : (
+                          "Simpan Jadwal"
+                        )}
               </Button>
             </DialogFooter>
+                  </form>
+                </Form>
           </DialogContent>
         </Dialog>
       </div>
@@ -451,28 +1048,25 @@ export default function ScheduleManagePage() {
         
         <TabsContent value="list" className="space-y-4">
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Filter Jadwal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
-                <div className="relative flex-1">
-                  <MagnifyingGlassIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+                    <div className="flex-1 relative">
+                      <MagnifyingGlassIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="search"
-                    placeholder="Cari jadwal..."
-                    className="pl-8"
+                        placeholder="Cari jadwal berdasarkan nama, kode, atau dosen..."
+                        className="pl-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <Select
                   value={dayFilter || "all"}
                   onValueChange={(value) => setDayFilter(value === "all" ? null : value)}
                 >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter Hari" />
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Hari" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Hari</SelectItem>
@@ -486,8 +1080,8 @@ export default function ScheduleManagePage() {
                   value={buildingFilter || "all"}
                   onValueChange={(value) => setBuildingFilter(value === "all" ? null : value)}
                 >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter Gedung" />
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Gedung" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Gedung</SelectItem>
@@ -499,55 +1093,66 @@ export default function ScheduleManagePage() {
                 
                 <Select
                   value={semesterFilter?.toString() || "all"}
-                  onValueChange={(value) => setSemesterFilter(value === "all" ? null : parseInt(value, 10))}
+                        onValueChange={(value) => setSemesterFilter(value === "all" ? null : Number(value))}
                 >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter Semester" />
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Semester" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Semester</SelectItem>
                     {semesters.map((semester) => (
-                      <SelectItem key={semester} value={semester.toString()}>Semester {semester}</SelectItem>
+                            <SelectItem key={semester} value={semester.toString()}>
+                              Semester {semester}
+                            </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
+                  </div>
+                  
+                  <div className="border rounded-lg overflow-hidden">
+                    {loading ? (
+                      <div className="flex flex-col items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#0687C9] mb-2" />
+                        <p className="text-muted-foreground">Memuat data jadwal perkuliahan...</p>
+                      </div>
+                    ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px]">Kode</TableHead>
-                    <TableHead>Mata Kuliah</TableHead>
-                    <TableHead>Jadwal</TableHead>
-                    <TableHead>Ruangan</TableHead>
-                    <TableHead>Dosen</TableHead>
-                    <TableHead>Kelas</TableHead>
-                    <TableHead>Kapasitas</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className="w-[50px] font-bold text-black">No</TableHead>
+                    <TableHead className="w-[100px] font-bold text-black">Kode</TableHead>
+                    <TableHead className="font-bold text-black">Mata Kuliah</TableHead>
+                    <TableHead className="font-bold text-black">Jadwal</TableHead>
+                    <TableHead className="font-bold text-black">Ruangan</TableHead>
+                    <TableHead className="font-bold text-black">Dosen</TableHead>
+                    <TableHead className="font-bold text-black">Kelas</TableHead>
+                    <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredSchedules.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        Tidak ada jadwal yang ditemukan
+                              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                                {searchQuery || dayFilter || buildingFilter || semesterFilter ? (
+                                  "Tidak ada jadwal yang sesuai dengan filter"
+                                ) : (
+                                  "Belum ada jadwal perkuliahan yang ditambahkan"
+                                )}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredSchedules.map((schedule) => (
+                    filteredSchedules.map((schedule, index) => (
                       <TableRow key={schedule.id}>
+                        <TableCell>{index + 1}</TableCell>
                         <TableCell className="font-medium">
-                          {schedule.courseCode}
+                                  {schedule.course_code}
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p>{schedule.courseName}</p>
+                                    <p>{schedule.course_name}</p>
                             <p className="text-xs text-muted-foreground">
-                              Semester {schedule.semester} - {schedule.academicYear}
+                                      Semester {schedule.semester} - {schedule.academic_year_name}
                             </p>
                           </div>
                         </TableCell>
@@ -559,7 +1164,7 @@ export default function ScheduleManagePage() {
                             </div>
                             <div className="flex items-center">
                               <Clock className="mr-1 h-4 w-4 text-muted-foreground" />
-                              <span>{schedule.startTime} - {schedule.endTime}</span>
+                                      <span>{schedule.start_time} - {schedule.end_time}</span>
                             </div>
                           </div>
                         </TableCell>
@@ -567,24 +1172,19 @@ export default function ScheduleManagePage() {
                           <div className="flex flex-col">
                             <div className="flex items-center">
                               <Building className="mr-1 h-4 w-4 text-muted-foreground" />
-                              <span>{schedule.building}</span>
+                                      <span>{schedule.building_name}</span>
                             </div>
                             <span className="text-xs text-muted-foreground">
-                              {schedule.room}
+                                      {schedule.room_name}
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>{schedule.lecturer}</TableCell>
+                                <TableCell>{schedule.lecturer_name}</TableCell>
                         <TableCell>
                           <div className="flex items-center">
                             <Users className="mr-1 h-4 w-4 text-muted-foreground" />
-                            <span>{schedule.studentGroup}</span>
+                                    <span>{schedule.student_group_name}</span>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={schedule.enrolled >= schedule.capacity ? "destructive" : "default"}>
-                            {schedule.enrolled}/{schedule.capacity}
-                          </Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-2">
                           <DropdownMenu>
@@ -596,12 +1196,14 @@ export default function ScheduleManagePage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 className="cursor-pointer"
+                                        onClick={() => setupEditSchedule(schedule)}
                               >
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="cursor-pointer text-red-600"
+                                        onClick={() => setupDeleteSchedule(schedule)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Hapus
@@ -614,25 +1216,53 @@ export default function ScheduleManagePage() {
                   )}
                 </TableBody>
               </Table>
+                    )}
+                  </div>
             </CardContent>
           </Card>
         </TabsContent>
         
         <TabsContent value="calendar">
-          <Card>
-            <CardHeader>
-              <CardTitle>Jadwal Dalam Tampilan Kalender</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col space-y-4">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex space-x-2">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-4 border-b bg-white">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-3">
+                <div className="flex flex-wrap gap-2 flex-grow max-w-3xl">
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      type="search"
+                      placeholder="Cari jadwal..."
+                      className="pl-9 w-full md:w-64 bg-white text-sm h-9 shadow-sm border-gray-200 focus-visible:ring-[#0687C9]"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 text-xs font-normal shadow-sm flex gap-1.5 bg-white border-gray-200">
+                        <Filter className="h-3.5 w-3.5 text-gray-500" />
+                        Filter
+                        {(buildingFilter || semesterFilter || lecturerFilter || academicYearFilter) && (
+                          <Badge className="ml-1 h-5 bg-[#0687C9]">{
+                            [buildingFilter, semesterFilter, lecturerFilter, academicYearFilter]
+                              .filter(Boolean).length
+                          }</Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-4">
+                      <div className="grid gap-4">
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-sm">Filter Jadwal</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label htmlFor="building" className="text-xs">Gedung</Label>
                     <Select
                       value={buildingFilter || "all"}
                       onValueChange={(value) => setBuildingFilter(value === "all" ? null : value)}
                     >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Filter Gedung" />
+                                <SelectTrigger id="building" className="bg-white h-8 text-xs">
+                                  <SelectValue placeholder="Semua Gedung" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Semua Gedung</SelectItem>
@@ -641,102 +1271,927 @@ export default function ScheduleManagePage() {
                         ))}
                       </SelectContent>
                     </Select>
-                    
+                            </div>
+                            <div>
+                              <Label htmlFor="semester" className="text-xs">Semester</Label>
                     <Select
                       value={semesterFilter?.toString() || "all"}
-                      onValueChange={(value) => setSemesterFilter(value === "all" ? null : parseInt(value, 10))}
+                                onValueChange={(value) => setSemesterFilter(value === "all" ? null : Number(value))}
                     >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Filter Semester" />
+                                <SelectTrigger id="semester" className="bg-white h-8 text-xs">
+                                  <SelectValue placeholder="Semua Semester" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Semua Semester</SelectItem>
                         {semesters.map((semester) => (
-                          <SelectItem key={semester} value={semester.toString()}>Semester {semester}</SelectItem>
+                                    <SelectItem key={semester} value={semester.toString()}>
+                                      Semester {semester}
+                                    </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                            </div>
+                            <div>
+                              <Label htmlFor="lecturer" className="text-xs">Dosen</Label>
+                              <Select
+                                value={lecturerFilter?.toString() || "all"}
+                                onValueChange={(value) => setLecturerFilter(value === "all" ? null : Number(value))}
+                              >
+                                <SelectTrigger id="lecturer" className="bg-white h-8 text-xs">
+                                  <SelectValue placeholder="Semua Dosen" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">Semua Dosen</SelectItem>
+                                  {schedules.map(s => s.lecturer_id)
+                                    .filter((id, index, self) => self.indexOf(id) === index)
+                                    .map(id => {
+                                      const lecturer = schedules.find(s => s.lecturer_id === id);
+                                      return lecturer ? (
+                                        <SelectItem key={id} value={id.toString()}>
+                                          {lecturer.lecturer_name}
+                                        </SelectItem>
+                                      ) : null;
+                                    })
+                                  }
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label htmlFor="academic-year" className="text-xs">Tahun Akademik</Label>
+                              <Select
+                                value={academicYearFilter?.toString() || "all"}
+                                onValueChange={(value) => setAcademicYearFilter(value === "all" ? null : Number(value))}
+                              >
+                                <SelectTrigger id="academic-year" className="bg-white h-8 text-xs">
+                                  <SelectValue placeholder="Semua T.A." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">Semua Tahun Akademik</SelectItem>
+                                  {schedules.map(s => s.academic_year_id)
+                                    .filter((id, index, self) => self.indexOf(id) === index)
+                                    .map(id => {
+                                      const academicYear = schedules.find(s => s.academic_year_id === id);
+                                      return academicYear ? (
+                                        <SelectItem key={id} value={id.toString()}>
+                                          {academicYear.academic_year_name}
+                                        </SelectItem>
+                                      ) : null;
+                                    })
+                                  }
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between">
+                          <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-8">
+                            Reset Filter
+                          </Button>
+                          <Button size="sm" className="text-xs h-8 bg-[#0687C9] hover:bg-[#0670a8]">
+                            Terapkan
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   </div>
                   
-                  <div className="flex items-center space-x-4">
-                    <Button variant="outline" size="sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center rounded-md border bg-white p-1 shadow-sm">
+                    <Button 
+                      variant={calendarView === 'week' ? 'default' : 'ghost'} 
+                      size="sm"
+                      onClick={() => setCalendarView('week')}
+                      className={`text-xs rounded-sm ${calendarView === 'week' ? 'bg-[#0687C9] text-white' : 'text-gray-700'}`}
+                    >
+                      <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
+                      Minggu
+                    </Button>
+                    <Button 
+                      variant={calendarView === 'day' ? 'default' : 'ghost'} 
+                      size="sm"
+                      onClick={() => setCalendarView('day')}
+                      className={`text-xs rounded-sm ${calendarView === 'day' ? 'bg-[#0687C9] text-white' : 'text-gray-700'}`}
+                    >
+                      <Clock className="h-3.5 w-3.5 mr-1.5" />
+                      Hari
+                    </Button>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={goToToday}
+                    className="text-xs h-8 shadow-sm hover:bg-[#0687C9]/10"
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
                       Hari Ini
                     </Button>
-                    <div className="flex items-center space-x-1">
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m15 18-6-6 6-6"></path></svg>
+                  <div className="flex items-center">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
+                      onClick={goToPreviousWeek}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m9 18 6-6-6-6"></path></svg>
+                    <div className="px-3 py-1.5 text-sm font-medium bg-white border rounded-md shadow-sm">
+                      {formattedWeekRange}
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
+                      onClick={goToNextWeek}
+                    >
+                      <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="text-sm font-medium">
-                      30 Oktober - 5 November 2023
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="p-4 bg-gradient-to-b from-gray-50 to-white border-b">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <div className="w-3 h-3 rounded-sm bg-[#0687C9]"></div>
+                    <span>Teknik Informatika</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <div className="w-3 h-3 rounded-sm bg-purple-500"></div>
+                    <span>Sistem Informasi</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <div className="w-3 h-3 rounded-sm bg-amber-500"></div>
+                    <span>T. Elektro</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <div className="w-3 h-3 rounded-sm bg-emerald-500"></div>
+                    <span>Manajemen</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <div className="w-3 h-3 rounded-sm bg-rose-500"></div>
+                    <span>Akuntansi</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <div className="w-3 h-3 rounded-sm bg-gray-500"></div>
+                    <span>Lainnya</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-7 gap-4">
-                  {DAYS.map((day, index) => (
-                    <div 
-                      key={day} 
-                      className={`text-center p-2 font-medium rounded-t-md ${index === 0 ? 'bg-[#0687C9]/10 text-[#0687C9]' : 'bg-gray-100'}`}
-                    >
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-24">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#0687C9] mb-2" />
+                  <p className="text-muted-foreground">Memuat data jadwal perkuliahan...</p>
+                </div>
+              ) : (
+                <div className="min-h-[700px]">
+                  {calendarView === 'week' ? (
+                    <>
+                      {/* Week View */}
+                      {/* Day headers */}
+                      <div className="grid grid-cols-7 border-b">
+                        {DAYS.map((day, index) => {
+                          const isToday = day === format(new Date(), 'EEEE', { locale: id }).charAt(0).toUpperCase() + 
+                            format(new Date(), 'EEEE', { locale: id }).slice(1);
+                          const currentDay = addDays(weekStart, index);
+                          
+                          return (
+                            <div key={day} className={`py-3 text-center ${index < 6 ? 'border-r' : ''} ${isToday ? 'bg-blue-50' : ''}`}>
+                              <div className={`text-sm font-bold ${isToday ? 'text-[#0687C9]' : 'text-gray-700'}`}>
                       {day}
                     </div>
-                  ))}
+                              <div className={`text-xs mt-1 ${isToday ? 'text-[#0687C9] font-medium' : 'text-gray-500'}`}>
+                                {format(currentDay, 'd MMM')}
+                              </div>
+                            </div>
+                          );
+                        })}
                 </div>
                 
-                <div className="grid grid-cols-7 gap-4 h-[650px]">
-                  {DAYS.map((day, index) => (
-                    <div 
-                      key={`schedule-${day}`} 
-                      className={`border rounded-md p-2 ${index === 0 ? 'bg-[#0687C9]/5 border-[#0687C9]/30' : 'bg-white'} overflow-y-auto relative`}
-                    >
-                      <div className="absolute inset-0 overflow-y-auto p-2">
+                      {/* Calendar grid */}
+                      <div className="grid grid-cols-7 min-h-[650px]">
+                        {DAYS.map((day, i) => {
+                          const isToday = day === format(new Date(), 'EEEE', { locale: id }).charAt(0).toUpperCase() + 
+                            format(new Date(), 'EEEE', { locale: id }).slice(1);
+                          const daySchedules = schedulesByDay[day] || [];
+                          const sortedSchedules = daySchedules.sort((a, b) => 
+                            a.start_time.localeCompare(b.start_time)
+                          );
+                          
+                          // Group schedules by time blocks for better visualization
+                          const timeBlocks: Record<string, CourseSchedule[]> = {};
+                          sortedSchedules.forEach(schedule => {
+                            const timeKey = `${schedule.start_time}-${schedule.end_time}`;
+                            if (!timeBlocks[timeKey]) {
+                              timeBlocks[timeKey] = [];
+                            }
+                            timeBlocks[timeKey].push(schedule);
+                          });
+                          
+                          return (
+                            <div 
+                              key={`day-column-${day}`} 
+                              className={`relative border-r border-b min-h-full ${
+                                isToday ? 'bg-blue-50/40' : ''
+                              }`}
+                            >
+                              {/* Time blocks for this day */}
+                              <div className="absolute inset-0 p-1 overflow-y-auto pb-16">
+                                {Object.entries(timeBlocks).length > 0 ? (
+                                  Object.entries(timeBlocks).map(([timeKey, schedules], blockIndex) => (
+                                    <div 
+                                      key={`time-block-${day}-${timeKey}`} 
+                                      className="mb-3 px-1"
+                                    >
+                                      <div className="text-xs text-gray-500 font-medium mb-1.5 flex items-center bg-gray-50/80 py-1 px-1.5 rounded">
+                                        <Clock className="h-3 w-3 mr-1.5 text-[#0687C9]" />
+                                        {schedules[0].start_time} - {schedules[0].end_time}
+                                      </div>
                         <div className="space-y-2">
-                          {filteredSchedules
-                            .filter(schedule => schedule.day === day)
-                            .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                            .map((schedule) => (
-                              <div 
-                                key={schedule.id}
-                                className="p-2 rounded-md border-l-4 border-[#0687C9] bg-white shadow-sm hover:shadow transition-shadow cursor-pointer"
-                              >
-                                <div className="flex justify-between items-start mb-1">
-                                  <span className="text-xs font-semibold">{schedule.startTime} - {schedule.endTime}</span>
-                                  <Badge variant={schedule.enrolled >= schedule.capacity ? "destructive" : "default"} className="text-xs">
-                                    {schedule.enrolled}/{schedule.capacity}
-                                  </Badge>
+                                        {schedules.map((schedule, idx) => {
+                                          // Determine class color based on department or course type
+                                          let borderColor = 'border-[#0687C9]';
+                                          let hoverColor = 'hover:bg-blue-50';
+                                          let bgColor = 'bg-white';
+                                          let textColor = 'text-[#0687C9]';
+                                          
+                                          if (schedule.course_name?.includes('Informatika') || schedule.student_group_name?.includes('Informatika')) {
+                                            borderColor = 'border-[#0687C9]';
+                                            hoverColor = 'hover:bg-blue-50';
+                                            textColor = 'text-[#0687C9]';
+                                          } else if (schedule.course_name?.includes('Sistem') || schedule.student_group_name?.includes('Sistem Informasi')) {
+                                            borderColor = 'border-purple-500';
+                                            hoverColor = 'hover:bg-purple-50';
+                                            textColor = 'text-purple-500';
+                                          } else if (schedule.course_name?.includes('Elektro') || schedule.student_group_name?.includes('Elektro')) {
+                                            borderColor = 'border-amber-500';
+                                            hoverColor = 'hover:bg-amber-50';
+                                            textColor = 'text-amber-500';
+                                          } else if (schedule.course_name?.includes('Manajemen') || schedule.student_group_name?.includes('Manajemen')) {
+                                            borderColor = 'border-emerald-500';
+                                            hoverColor = 'hover:bg-emerald-50';
+                                            textColor = 'text-emerald-500';
+                                          } else if (schedule.course_name?.includes('Akuntansi') || schedule.student_group_name?.includes('Akuntansi')) {
+                                            borderColor = 'border-rose-500';
+                                            hoverColor = 'hover:bg-rose-50';
+                                            textColor = 'text-rose-500';
+                                          } else {
+                                            // Fallback to modulo-based coloring
+                                            if (schedule.course_id % 5 === 0) {
+                                              borderColor = 'border-purple-500';
+                                              hoverColor = 'hover:bg-purple-50';
+                                              textColor = 'text-purple-500';
+                                            } else if (schedule.course_id % 4 === 0) {
+                                              borderColor = 'border-amber-500';
+                                              hoverColor = 'hover:bg-amber-50';
+                                              textColor = 'text-amber-500';
+                                            } else if (schedule.course_id % 3 === 0) {
+                                              borderColor = 'border-emerald-500';
+                                              hoverColor = 'hover:bg-emerald-50';
+                                              textColor = 'text-emerald-500';
+                                            } else if (schedule.course_id % 2 === 0) {
+                                              borderColor = 'border-rose-500';
+                                              hoverColor = 'hover:bg-rose-50';
+                                              textColor = 'text-rose-500';
+                                            } else {
+                                              borderColor = 'border-[#0687C9]';
+                                              hoverColor = 'hover:bg-blue-50';
+                                              textColor = 'text-[#0687C9]';
+                                            }
+                                          }
+                                          
+                                          return (
+                                            <div
+                                              key={`schedule-${schedule.id}`}
+                                              onClick={() => setupEditSchedule(schedule)}
+                                              className={`p-2 rounded-md ${bgColor} border-l-4 shadow-sm ${hoverColor} transition-all cursor-pointer ${borderColor} group`}
+                                            >
+                                              <div className="flex flex-col">
+                                                <div className="font-semibold text-sm truncate mb-1 group-hover:text-gray-900">
+                                                  {schedule.course_name}
                                 </div>
-                                <div className="font-medium text-sm mb-1 truncate">{schedule.courseName}</div>
-                                <div className="text-xs text-muted-foreground mb-1 truncate">{schedule.courseCode}</div>
-                                <div className="flex items-center text-xs text-muted-foreground">
-                                  <Users className="h-3 w-3 mr-1" /> 
-                                  <span className="truncate">{schedule.lecturer}</span>
+                                                <div className={`text-xs font-medium mb-1 ${textColor}`}>
+                                                  {schedule.course_code}
                                 </div>
-                                <div className="flex items-center text-xs text-muted-foreground">
-                                  <Building className="h-3 w-3 mr-1" /> 
-                                  <span className="truncate">{schedule.room}, {schedule.building}</span>
+                                                
+                                                <div className="flex flex-col space-y-1.5 mt-1">
+                                                  <div className="flex items-center text-xs text-gray-600">
+                                                    <Users className="h-3 w-3 mr-1 text-gray-400" />
+                                                    <span className="truncate max-w-[120px]">{schedule.lecturer_name}</span>
                                 </div>
+                                                  <div className="flex items-center text-xs text-gray-600">
+                                                    <MapPin className="h-3 w-3 mr-1 text-gray-400" />
+                                                    <span className="truncate max-w-[150px]">{schedule.room_name}</span>
                               </div>
-                            ))}
-                            
-                          {filteredSchedules.filter(schedule => schedule.day === day).length === 0 && (
-                            <div className="flex items-center justify-center h-20 border border-dashed rounded-md text-sm text-neutral-400">
+                                                  <div className="flex items-center text-xs text-gray-600">
+                                                    <BookOpen className="h-3 w-3 mr-1 text-gray-400" />
+                                                    <span className="truncate max-w-[150px]">{schedule.student_group_name}</span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="flex items-center justify-center h-full">
+                                    <div className="text-xs text-gray-400 italic border border-dashed p-4 rounded-md w-full text-center">
                               Tidak ada jadwal
+                                    </div>
                             </div>
                           )}
                         </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    // Day View
+                    <div className="p-4 pb-6">
+                      <div className="mb-6 flex justify-between items-center">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 rounded-full bg-[#0687C9]/10 flex items-center justify-center mr-4">
+                            <CalendarDays className="h-5 w-5 text-[#0687C9]" />
+                          </div>
+                          <div>
+                            <div className="text-xl font-semibold text-gray-800">
+                              {format(currentDate, 'EEEE', { locale: id })}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {format(currentDate, 'd MMMM yyyy', { locale: id })}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8"
+                            onClick={() => {
+                              setCurrentDate(addDays(currentDate, -1));
+                            }}
+                          >
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Prev
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8"
+                            onClick={() => {
+                              setCurrentDate(addDays(currentDate, 1));
+                            }}
+                          >
+                            Next
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {(() => {
+                          const dayName = format(currentDate, 'EEEE', { locale: id });
+                          const capitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                          const daySchedules = schedulesByDay[capitalized] || [];
+                          
+                          if (daySchedules.length === 0) {
+                            return (
+                              <div className="flex flex-col items-center justify-center py-20 bg-gradient-to-b from-blue-50/50 to-white rounded-lg border border-dashed">
+                                <CalendarDays className="h-16 w-16 text-gray-300 mb-3" />
+                                <p className="text-gray-600 font-medium">Tidak ada jadwal untuk hari ini</p>
+                                <p className="text-xs text-gray-500 mt-1">Pilih hari lain atau tambahkan jadwal baru</p>
+                                
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="mt-4 bg-white"
+                                  onClick={() => setShowAddDialog(true)}
+                                >
+                                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                  Tambah Jadwal Baru
+                                </Button>
+                              </div>
+                            );
+                          }
+                          
+                          // Group by hour blocks for day view
+                          const hourBlocks: {[key: string]: CourseSchedule[]} = {};
+                          const timeSlots = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", 
+                                             "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
+                          
+                          timeSlots.forEach(timeSlot => {
+                            hourBlocks[timeSlot] = daySchedules.filter(schedule => {
+                              const start = schedule.start_time;
+                              return start.startsWith(timeSlot.slice(0, 2));
+                            });
+                          });
+                          
+                          return (
+                            <div className="relative border rounded-lg shadow-sm overflow-hidden">
+                              {/* Time guide */}
+                              <div className="absolute top-0 left-0 bottom-0 w-20 bg-gray-50 border-r z-10">
+                                {timeSlots.map((timeSlot, index) => (
+                                  <div key={`time-label-${timeSlot}`} className="relative">
+                                    <div className="h-16 flex items-center justify-center border-b last:border-b-0">
+                                      <div className="text-xs font-medium text-gray-500">{timeSlot}</div>
                       </div>
                     </div>
                   ))}
                 </div>
+                              
+                              {/* Main schedule content */}
+                              <div className="ml-20">
+                                {timeSlots.map((timeSlot, index) => {
+                                  const schedules = hourBlocks[timeSlot];
+                                  const hasSchedules = schedules.length > 0;
+                                  
+                                  return (
+                                    <div key={`hour-${timeSlot}`} className="relative">
+                                      <div className="h-16 border-b last:border-b-0 group flex">
+                                        {/* Hour background with grid lines */}
+                                        <div className="absolute inset-0 border-l border-dashed border-gray-100 grid grid-cols-4 w-full pointer-events-none">
+                                          <div className="border-r border-dashed border-gray-100"></div>
+                                          <div className="border-r border-dashed border-gray-100"></div>
+                                          <div className="border-r border-dashed border-gray-100"></div>
+                                          <div></div>
               </div>
+                                        
+                                        {/* Schedule content */}
+                                        <div className={`w-full px-4 py-2 ${hasSchedules ? 'flex items-center' : ''}`}>
+                                          {schedules.length > 0 && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full">
+                                              {schedules.map(schedule => {
+                                                // Determine class color based on department or course type
+                                                let borderColor = 'border-l-[#0687C9]';
+                                                let bgColor = 'bg-blue-50/50';
+                                                let hoverBg = 'hover:bg-blue-50';
+                                                let textColor = 'text-[#0687C9]';
+                                                
+                                                if (schedule.course_name?.includes('Informatika') || schedule.student_group_name?.includes('Informatika')) {
+                                                  borderColor = 'border-l-[#0687C9]';
+                                                  bgColor = 'bg-blue-50/50';
+                                                  hoverBg = 'hover:bg-blue-100/70';
+                                                  textColor = 'text-[#0687C9]';
+                                                } else if (schedule.course_name?.includes('Sistem') || schedule.student_group_name?.includes('Sistem Informasi')) {
+                                                  borderColor = 'border-l-purple-500';
+                                                  bgColor = 'bg-purple-50/50';
+                                                  hoverBg = 'hover:bg-purple-100/70';
+                                                  textColor = 'text-purple-600';
+                                                } else if (schedule.course_name?.includes('Elektro') || schedule.student_group_name?.includes('Elektro')) {
+                                                  borderColor = 'border-l-amber-500';
+                                                  bgColor = 'bg-amber-50/50';
+                                                  hoverBg = 'hover:bg-amber-100/70';
+                                                  textColor = 'text-amber-600';
+                                                } else if (schedule.course_name?.includes('Manajemen') || schedule.student_group_name?.includes('Manajemen')) {
+                                                  borderColor = 'border-l-emerald-500';
+                                                  bgColor = 'bg-emerald-50/50';
+                                                  hoverBg = 'hover:bg-emerald-100/70';
+                                                  textColor = 'text-emerald-600';
+                                                } else if (schedule.course_name?.includes('Akuntansi') || schedule.student_group_name?.includes('Akuntansi')) {
+                                                  borderColor = 'border-l-rose-500';
+                                                  bgColor = 'bg-rose-50/50';
+                                                  hoverBg = 'hover:bg-rose-100/70';
+                                                  textColor = 'text-rose-600';
+                                                } else {
+                                                  // Fallback to modulo-based coloring
+                                                  if (schedule.course_id % 5 === 0) {
+                                                    borderColor = 'border-l-purple-500';
+                                                    bgColor = 'bg-purple-50/50';
+                                                    hoverBg = 'hover:bg-purple-100/70';
+                                                    textColor = 'text-purple-600';
+                                                  } else if (schedule.course_id % 4 === 0) {
+                                                    borderColor = 'border-l-amber-500';
+                                                    bgColor = 'bg-amber-50/50';
+                                                    hoverBg = 'hover:bg-amber-100/70';
+                                                    textColor = 'text-amber-600';
+                                                  } else if (schedule.course_id % 3 === 0) {
+                                                    borderColor = 'border-l-emerald-500';
+                                                    bgColor = 'bg-emerald-50/50';
+                                                    hoverBg = 'hover:bg-emerald-100/70';
+                                                    textColor = 'text-emerald-600';
+                                                  } else if (schedule.course_id % 2 === 0) {
+                                                    borderColor = 'border-l-rose-500';
+                                                    bgColor = 'bg-rose-50/50';
+                                                    hoverBg = 'hover:bg-rose-100/70';
+                                                    textColor = 'text-rose-600';
+                                                  } else {
+                                                    borderColor = 'border-l-[#0687C9]';
+                                                    bgColor = 'bg-blue-50/50';
+                                                    hoverBg = 'hover:bg-blue-100/70';
+                                                    textColor = 'text-[#0687C9]';
+                                                  }
+                                                }
+                                                
+                                                return (
+                                                  <div 
+                                                    key={`day-item-${schedule.id}`} 
+                                                    onClick={() => setupEditSchedule(schedule)}
+                                                    className={`p-2 rounded border ${bgColor} ${borderColor} border-l-4 ${hoverBg} transition-all cursor-pointer shadow-sm hover:shadow flex items-center gap-2 h-full`}
+                                                  >
+                                                    <div className="flex-grow min-w-0">
+                                                      <div className="flex items-center justify-between">
+                                                        <div className={`text-sm font-medium truncate ${textColor}`}>
+                                                          {schedule.course_code}
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-500 whitespace-nowrap ml-1">
+                                                          {schedule.start_time} - {schedule.end_time}
+                                                        </div>
+                                                      </div>
+                                                      <div className="text-xs font-medium text-gray-800 truncate">
+                                                        {schedule.course_name}
+                                                      </div>
+                                                      <div className="flex flex-wrap gap-x-2 mt-1 text-[10px] text-gray-500">
+                                                        <div className="flex items-center">
+                                                          <Users className="h-2.5 w-2.5 mr-0.5" />
+                                                          <span className="truncate">{schedule.lecturer_name?.split(' ')[0]}</span>
+                                                        </div>
+                                                        <div className="flex items-center">
+                                                          <MapPin className="h-2.5 w-2.5 mr-0.5" />
+                                                          <span className="truncate">{schedule.room_name}</span>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+        </CardContent>
+      </Card>
+      
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit Jadwal Perkuliahan</DialogTitle>
+            <DialogDescription>
+              Ubah detail jadwal perkuliahan yang sudah ada.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {currentSchedule && (
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(handleEditSchedule)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="course_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mata Kuliah</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          defaultValue={currentSchedule.course_id.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih mata kuliah" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {courses.length > 0 ? (
+                              courses.map(course => (
+                                <SelectItem key={course.id} value={course.id.toString()}>
+                                  {course.code} - {course.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value={currentSchedule.course_id.toString()}>
+                                {currentSchedule.course_code} - {currentSchedule.course_name}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="day"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Hari</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          defaultValue={currentSchedule.day}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih hari" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {DAYS.map(day => (
+                              <SelectItem key={day} value={day}>
+                                {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="start_time"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Jam Mulai</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="time" 
+                            {...field} 
+                            defaultValue={currentSchedule.start_time}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="end_time"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Jam Selesai</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="time" 
+                            {...field}
+                            defaultValue={currentSchedule.end_time}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="room_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ruangan</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          defaultValue={currentSchedule.room_id.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih ruangan" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {rooms.length > 0 ? (
+                              rooms.map(room => (
+                                <SelectItem key={room.id} value={room.id.toString()}>
+                                  {room.name}, {room.building?.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value={currentSchedule.room_id.toString()}>
+                                {currentSchedule.room_name}, {currentSchedule.building_name}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="lecturer_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dosen</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          defaultValue={currentSchedule.lecturer_id.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih dosen" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {lecturers.length > 0 ? (
+                              lecturers.map(lecturer => (
+                                <SelectItem key={lecturer.id} value={lecturer.id.toString()}>
+                                  {lecturer.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value={currentSchedule.lecturer_id.toString()}>
+                                {currentSchedule.lecturer_name}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="student_group_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Kelas/Kelompok</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          defaultValue={currentSchedule.student_group_id.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih kelompok mahasiswa" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {studentGroups.length > 0 ? (
+                              studentGroups.map(group => (
+                                <SelectItem key={group.id} value={group.id.toString()}>
+                                  {group.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value={currentSchedule.student_group_id.toString()}>
+                                {currentSchedule.student_group_name}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="academic_year_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tahun Akademik</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          defaultValue={currentSchedule.academic_year_id.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pilih tahun akademik" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {academicYears.length > 0 ? (
+                              academicYears.map(year => (
+                                <SelectItem key={year.id} value={year.id.toString()}>
+                                  {year.name} ({year.semester})
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value={currentSchedule.academic_year_id.toString()}>
+                                {currentSchedule.academic_year_name}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Catatan</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Tambahkan catatan jika diperlukan" 
+                            className="resize-none"
+                            {...field}
+                            defaultValue={currentSchedule.notes}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <DialogFooter>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowEditDialog(false)}
+                  >
+                    Batal
+                  </Button>
+                  <Button 
+                    type="submit"
+                    className="bg-[#0687C9] hover:bg-[#0670a8]"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Menyimpan...
+                      </>
+                    ) : (
+                      "Simpan Perubahan"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Jadwal Perkuliahan</DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menghapus jadwal perkuliahan ini?
+            </DialogDescription>
+          </DialogHeader>
+          
+          {currentSchedule && (
+            <div className="space-y-2 my-4">
+              <p><strong>Mata Kuliah:</strong> {currentSchedule.course_code} - {currentSchedule.course_name}</p>
+              <p><strong>Jadwal:</strong> {currentSchedule.day}, {currentSchedule.start_time} - {currentSchedule.end_time}</p>
+              <p><strong>Ruangan:</strong> {currentSchedule.room_name}, {currentSchedule.building_name}</p>
+              <p><strong>Dosen:</strong> {currentSchedule.lecturer_name}</p>
+              <p><strong>Kelas:</strong> {currentSchedule.student_group_name}</p>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setShowDeleteDialog(false)}
+            >
+              Batal
+            </Button>
+            <Button 
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteSchedule}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Menghapus...
+                </>
+              ) : (
+                "Hapus Jadwal"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

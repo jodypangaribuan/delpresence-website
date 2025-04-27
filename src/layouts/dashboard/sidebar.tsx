@@ -32,7 +32,8 @@ import {
   MessageSquare,
   Smartphone,
   FileCheck,
-  LucideProps
+  LucideProps,
+  DoorClosed
 } from "lucide-react";
 import { getUserRole, UserRole } from "@/app/dashboard/page";
 import { useEffect, useState } from "react";
@@ -72,15 +73,24 @@ const SidebarIcons = {
   MessageSquare: createSidebarIcon(MessageSquare),
   Smartphone: createSidebarIcon(Smartphone),
   FileCheck: createSidebarIcon(FileCheck),
+  DoorClosed: createSidebarIcon(DoorClosed),
 };
 
 export function Sidebar() {
   const pathname = usePathname();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
 
+  // Add dependency on pathname to re-validate role when pathname changes
   useEffect(() => {
-    setUserRole(getUserRole());
-  }, []);
+    const fetchUserRole = () => {
+      const role = getUserRole();
+      setUserRole(role);
+      console.log("[Sidebar] Current user role:", role);
+    };
+    
+    // Re-fetch user role on pathname changes to ensure fresh data
+    fetchUserRole();
+  }, [pathname]);
 
   const isLinkActive = (path: string) => {
     if (path === "/dashboard") {
@@ -216,7 +226,7 @@ export function Sidebar() {
               </MenuLink>
               <MenuLink
                 href="/dashboard/academic/rooms"
-                icon={<SidebarIcons.LibrarySquare />}
+                icon={<SidebarIcons.DoorClosed />}
               >
                 Ruangan
               </MenuLink>
@@ -246,12 +256,6 @@ export function Sidebar() {
                 icon={<SidebarIcons.Layers />}
               >
                 Kelompok Mata Kuliah
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/courses/classes"
-                icon={<SidebarIcons.Users />}
-              >
-                Kelas Kuliah
               </MenuLink>
               <MenuLink
                 href="/dashboard/courses/assignments"
@@ -286,18 +290,6 @@ export function Sidebar() {
               >
                 Export Excel
               </MenuLink>
-              <MenuLink
-                href="/dashboard/schedules/conflicts"
-                icon={<SidebarIcons.AlertTriangle />}
-              >
-                Pengecekan Konflik
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/schedules/reschedule-approval"
-                icon={<SidebarIcons.CalendarDays />}
-              >
-                Persetujuan Kelas Pengganti
-              </MenuLink>
             </ul>
 
             {/* User Management */}
@@ -325,44 +317,11 @@ export function Sidebar() {
               >
                 Daftar Mahasiswa
               </MenuLink>
-            </ul>
-
-            {/* Attendance Management */}
-            <div className="mb-2">
-              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Manajemen Kehadiran
-              </p>
-            </div>
-            <ul className="space-y-1 mb-6">
               <MenuLink
-                href="/dashboard/attendance/overview"
-                icon={<SidebarIcons.BarChart4 />}
+                href="/dashboard/users/student-groups"
+                icon={<SidebarIcons.Users />}
               >
-                Tinjauan Kehadiran
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/attendance/summary"
-                icon={<SidebarIcons.BarChart2 />}
-              >
-                Rekap Kehadiran
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/attendance/permissions"
-                icon={<SidebarIcons.FileCheck />}
-              >
-                Verifikasi Izin Mahasiswa
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/attendance/reports"
-                icon={<SidebarIcons.FileOutput />}
-              >
-                Laporan Kehadiran
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/attendance/face-recognition"
-                icon={<SidebarIcons.ScanFace />}
-              >
-                Manajemen Face Recognition
+                Kelompok Mahasiswa
               </MenuLink>
             </ul>
           </>
