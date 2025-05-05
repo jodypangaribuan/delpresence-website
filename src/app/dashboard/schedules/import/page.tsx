@@ -68,6 +68,7 @@ export default function ImportSchedulePage() {
   const [semester, setSemester] = useState<string>("");
   const [academicYear, setAcademicYear] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,6 +76,40 @@ export default function ImportSchedulePage() {
       setSelectedFile(file);
       // Simulate parsing file
       simulateParseExcel(file);
+    }
+  };
+
+  // Handle drag events
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      // Check if the file is an Excel file
+      if (file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || 
+          file.type === "application/vnd.ms-excel" ||
+          file.name.endsWith('.xlsx') || 
+          file.name.endsWith('.xls')) {
+        setSelectedFile(file);
+        simulateParseExcel(file);
+      } else {
+        toast.error("Hanya file Excel (.xlsx, .xls) yang diperbolehkan");
+      }
     }
   };
 
@@ -389,17 +424,29 @@ export default function ImportSchedulePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="bg-[#0687C9]/5 border-2 border-dashed border-[#0687C9]/20 rounded-lg p-8 mb-6 flex flex-col items-center justify-center transition-all hover:bg-[#0687C9]/10 cursor-pointer">
+                <div 
+                  className={`border-2 border-dashed rounded-lg p-8 mb-6 flex flex-col items-center justify-center transition-all cursor-pointer ${
+                    isDragging 
+                      ? "bg-[#0687C9]/15 border-[#0687C9]/50" 
+                      : "bg-[#0687C9]/5 border-[#0687C9]/20 hover:bg-[#0687C9]/10"
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
                   {!selectedFile ? (
                     <>
                       <div className="bg-[#0687C9]/10 rounded-full p-3 mb-4">
                         <FileSpreadsheet className="h-10 w-10 text-[#0687C9]" />
                       </div>
                       <h3 className="text-lg font-semibold mb-2">
-                        Drag & Drop File Excel
+                        {isDragging ? "Lepaskan File di Sini" : "Drag & Drop File Excel"}
                       </h3>
                       <p className="text-center text-muted-foreground mb-6 max-w-md">
-                        Tarik file Excel dan letakkan di sini, atau klik tombol di bawah untuk memilih file
+                        {isDragging 
+                          ? "Lepaskan file untuk memulai upload" 
+                          : "Tarik file Excel dan letakkan di sini, atau klik tombol di bawah untuk memilih file"
+                        }
                       </p>
                     </>
                   ) : (

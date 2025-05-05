@@ -11,13 +11,13 @@ interface LoadingScreenProps {
 
 export default function LoadingScreen({
   message = "Loading...",
-  bgColor = "rgba(255, 255, 255, 0.95)",
+  bgColor = "#FFFFFF",
   textColor = "#0687C9",
   spinnerColor = "#0687C9"
 }: LoadingScreenProps) {
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-center z-[9999]"
+      className="fixed inset-0 flex flex-col items-center justify-center z-[9999] animate-fadeIn"
       style={{ backgroundColor: bgColor }}
     >
       <div className="text-center">
@@ -45,6 +45,15 @@ export default function LoadingScreen({
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+          }
+          
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          
+          .animate-fadeIn {
+            animation: fadeIn 0.3s ease-in-out;
           }
         `}</style>
       </div>

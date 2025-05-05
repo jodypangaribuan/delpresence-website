@@ -840,6 +840,13 @@ export default function ScheduleManagePage() {
       
       if (response.status === "success") {
         setCourses(response.data);
+        
+        // Show warning if no courses are available
+        if (response.data.length === 0) {
+          toast.warning("Tidak ada mata kuliah tersedia", {
+            description: "Silakan tambahkan mata kuliah terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data mata kuliah");
       }
@@ -858,6 +865,13 @@ export default function ScheduleManagePage() {
       
       if (response.status === "success") {
         setRooms(response.data);
+        
+        // Show warning if no rooms are available
+        if (response.data.length === 0) {
+          toast.warning("Tidak ada ruangan tersedia", {
+            description: "Silakan tambahkan ruangan terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data ruangan");
       }
@@ -889,6 +903,13 @@ export default function ScheduleManagePage() {
         }));
         
         setLecturers(formattedLecturers);
+        
+        // Show warning if no lecturers are available
+        if (formattedLecturers.length === 0) {
+          toast.warning("Tidak ada dosen tersedia", {
+            description: "Silakan tambahkan dosen terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data dosen");
       }
@@ -907,6 +928,13 @@ export default function ScheduleManagePage() {
       
       if (response.status === "success") {
         setStudentGroups(response.data);
+        
+        // Show warning if no student groups are available
+        if (response.data.length === 0) {
+          toast.warning("Tidak ada kelompok mahasiswa tersedia", {
+            description: "Silakan tambahkan kelompok mahasiswa terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data kelompok mahasiswa");
       }
@@ -925,6 +953,13 @@ export default function ScheduleManagePage() {
       
       if (response.status === "success") {
         setAcademicYears(response.data);
+        
+        // Show warning if no academic years are available
+        if (response.data.length === 0) {
+          toast.warning("Tidak ada tahun akademik tersedia", {
+            description: "Silakan tambahkan tahun akademik terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data tahun akademik");
       }

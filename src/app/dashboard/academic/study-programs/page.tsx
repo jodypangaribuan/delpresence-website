@@ -217,6 +217,13 @@ export default function DepartmentsPage() {
           };
         });
         setFaculties(facultiesData);
+        
+        // Check if faculties are available and show notification if empty
+        if (facultiesData.length === 0) {
+          toast.warning("Tidak ada fakultas tersedia", {
+            description: "Silakan tambahkan fakultas terlebih dahulu sebelum membuat program studi"
+          });
+        }
       } else {
         toast.error("Gagal memuat fakultas");
       }

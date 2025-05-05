@@ -75,7 +75,6 @@ interface AcademicYear {
   uuid: string;
   name: string;         // e.g. "2023/2024"
   semester: string;     // "Ganjil" or "Genap"
-  is_active: boolean;
   start_date: string;
   end_date: string;
 }
@@ -114,12 +113,12 @@ export default function LecturerAssignmentsPage() {
   
   const [courses, setCourses] = useState<Course[]>([]);
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
-  const [activeAcademicYear, setActiveAcademicYear] = useState<AcademicYear | null>(null);
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string>("");
   
   const [searchQuery, setSearchQuery] = useState("");
   const [semesterFilter, setSemesterFilter] = useState<string | null>("all");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true); // Separate state for initial loading
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -139,23 +138,37 @@ export default function LecturerAssignmentsPage() {
   
   // Load data on initial render
   useEffect(() => {
-    // First fetch academic years, which will trigger fetching assignments with the right ID
-    fetchAcademicYears();
-    // Still fetch courses
-    fetchCourses();
+    fetchInitialData();
   }, []);
+  
+  // Fetch all initial data
+  const fetchInitialData = async () => {
+    setIsInitialLoading(true);
+    // Fetch courses in parallel with academic years
+    fetchCourses();
+    await fetchAcademicYears();
+    setIsInitialLoading(false);
+  };
   
   // Fetch assignments from API
   const fetchAssignments = async (specificAcademicYearId?: string) => {
-    setIsLoading(true);
+    // Don't set loading state if we're in initial loading
+    if (!isInitialLoading) {
+      setIsLoading(true);
+    }
+    
+    // If no academic year ID is provided, set empty assignments and return early
+    if (!specificAcademicYearId) {
+      setAssignments([]);
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
       
-      // Use specificAcademicYearId or current active year
-      const academicYearParam = specificAcademicYearId ? 
-        `?academic_year_id=${specificAcademicYearId}` : '';
-      
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturer-assignments${academicYearParam}`;
+      // Always use academic year parameter
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturer-assignments?academic_year_id=${specificAcademicYearId}`;
       
       const response = await axios.get(apiUrl, {
         headers: {
@@ -168,19 +181,23 @@ export default function LecturerAssignmentsPage() {
         setAssignments(assignmentsData);
       } else {
         toast.error("Gagal memuat data penugasan");
+        setAssignments([]);
       }
     } catch (error: any) {
       console.error("Error fetching assignments:", error);
-      // If 404 or no active academic year, set empty assignments
-      if (error.response?.status === 404 || 
-          error.response?.data?.error === "No active academic year found") {
-        setAssignments([]);
-        toast.warning("Tidak ada tahun akademik aktif");
+      // Set empty assignments for any error
+      setAssignments([]);
+      
+      if (error.response?.status === 404) {
+        toast.warning("Tidak ada data penugasan untuk tahun akademik yang dipilih");
       } else {
         toast.error("Gagal memuat data penugasan");
       }
     } finally {
-      setIsLoading(false);
+      // Only set isLoading to false if we're not in initial loading
+      if (!isInitialLoading) {
+        setIsLoading(false);
+      }
     }
   };
   
@@ -210,32 +227,7 @@ export default function LecturerAssignmentsPage() {
     try {
       const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
       
-      try {
-        const activeResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years/active`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (activeResponse.data.status === "success") {
-          const activeYear = activeResponse.data.data;
-          setActiveAcademicYear(activeYear);
-          setFormAcademicYearId(activeYear.id.toString());
-          // Set the selected academic year to the active one
-          setSelectedAcademicYearId(activeYear.id.toString());
-          
-          // Fetch assignments specifically for this academic year
-          console.log("Fetching assignments for active academic year:", activeYear.id);
-          fetchAssignments(activeYear.id.toString());
-        }
-      } catch (error: any) {
-        // If 404 or no active academic year, don't show error toast
-        if (error.response?.status !== 404 && 
-            error.response?.data?.error !== "No active academic year found") {
-          toast.error("Gagal memuat data tahun akademik aktif");
-        }
-      }
-      
+      // Get all academic years first
       const allResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -243,17 +235,22 @@ export default function LecturerAssignmentsPage() {
       });
       
       if (allResponse.data.status === "success") {
-        setAcademicYears(allResponse.data.data);
+        const academicYearsData = allResponse.data.data;
+        setAcademicYears(academicYearsData);
         
-        // If no active academic year found, use the first one in the list
-        if (!activeAcademicYear && allResponse.data.data.length > 0) {
-          const firstYear = allResponse.data.data[0];
+        // If we have academic years available, use the first one
+        if (academicYearsData && academicYearsData.length > 0) {
+          const firstYear = academicYearsData[0];
           setFormAcademicYearId(firstYear.id.toString());
           setSelectedAcademicYearId(firstYear.id.toString());
           
-          // Fetch assignments for this academic year since there's no active one
-          console.log("No active year, fetching assignments for first academic year:", firstYear.id);
-          fetchAssignments(firstYear.id.toString());
+          // Fetch assignments for this academic year
+          await fetchAssignments(firstYear.id.toString());
+        } else {
+          toast.warning("Tidak ada tahun akademik tersedia", {
+            description: "Silakan tambahkan tahun akademik terlebih dahulu"
+          });
+          setAssignments([]);
         }
       } else {
         toast.error("Gagal memuat data tahun akademik");
@@ -398,7 +395,10 @@ export default function LecturerAssignmentsPage() {
         try {
           // Short delay before fetching to ensure database is updated
           await new Promise(resolve => setTimeout(resolve, 500));
-          await fetchAssignments(academicYearId.toString());
+          // Make sure we fetch assignments with the academic year ID we just used
+          // and update the selected academic year ID to match
+          setSelectedAcademicYearId(formAcademicYearId);
+          await fetchAssignments(formAcademicYearId);
         } catch (refreshError) {
           console.error("Error refreshing assignments:", refreshError);
         }
@@ -466,7 +466,12 @@ export default function LecturerAssignmentsPage() {
       
       if (response.data.status === "success") {
         toast.success("Penugasan dosen berhasil diperbarui");
+        
+        // Make sure we fetch assignments with the updated academic year ID
+        // and update the selected academic year to match
+        setSelectedAcademicYearId(formAcademicYearId);
         fetchAssignments(formAcademicYearId);
+        
         setShowEditDialog(false);
         resetForm();
       } else {
@@ -508,7 +513,16 @@ export default function LecturerAssignmentsPage() {
       
       if (response.data.status === "success") {
         toast.success("Penugasan dosen berhasil dihapus");
-        fetchAssignments(selectedAcademicYearId);
+        
+        // Make sure we have a valid academic year ID to fetch assignments with
+        if (selectedAcademicYearId) {
+          fetchAssignments(selectedAcademicYearId);
+        } else if (academicYears.length > 0) {
+          const firstYearId = academicYears[0].id.toString();
+          setSelectedAcademicYearId(firstYearId);
+          fetchAssignments(firstYearId);
+        }
+        
         setShowDeleteModal(false);
         setAssignmentToDelete(null);
       } else {
@@ -530,11 +544,14 @@ export default function LecturerAssignmentsPage() {
     setFormLecturerName("");
     setSearchedLecturers([]);
     setSelectedLecturer(null);
-    if (activeAcademicYear) {
-      setFormAcademicYearId(activeAcademicYear.id.toString());
+    
+    // Use the first academic year from the list if available
+    if (academicYears.length > 0) {
+      setFormAcademicYearId(academicYears[0].id.toString());
     } else {
       setFormAcademicYearId("");
     }
+    
     setCurrentAssignment(null);
   };
 
@@ -616,8 +633,13 @@ export default function LecturerAssignmentsPage() {
             <div className="w-full md:w-72">
               <Select 
                 onValueChange={(value) => {
-                  setSelectedAcademicYearId(value);
-                  fetchAssignments(value);
+                  if (value) {
+                    setSelectedAcademicYearId(value);
+                    fetchAssignments(value);
+                  } else {
+                    setSelectedAcademicYearId("");
+                    setAssignments([]);
+                  }
                 }}
                 value={selectedAcademicYearId}
               >
@@ -627,7 +649,7 @@ export default function LecturerAssignmentsPage() {
                 <SelectContent>
                   {academicYears.map((year) => (
                     <SelectItem key={year.id} value={year.id.toString()}>
-                      {year.name} - {year.semester} {year.is_active && '(Aktif)'}
+                      {year.name} - {year.semester}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -649,12 +671,21 @@ export default function LecturerAssignmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isInitialLoading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="flex justify-center items-center">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent mr-2"></div>
-                        <span>Memuat data...</span>
+                        <span>Memuat data awal...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex justify-center items-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent mr-2"></div>
+                        <span>Memperbarui data...</span>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -707,7 +738,9 @@ export default function LecturerAssignmentsPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-4 text-gray-500">
-                      Tidak ada penugasan dosen yang sesuai dengan filter
+                      {!selectedAcademicYearId ? 
+                        "Silakan pilih tahun akademik" : 
+                        "Tidak ada penugasan dosen yang sesuai dengan filter"}
                     </TableCell>
                   </TableRow>
                 )}
@@ -812,7 +845,7 @@ export default function LecturerAssignmentsPage() {
                   <SelectContent>
                     {academicYears.map((year) => (
                       <SelectItem key={year.id} value={year.id.toString()}>
-                        {year.name} - {year.semester} {year.is_active && '(Aktif)'}
+                        {year.name} - {year.semester}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -939,7 +972,7 @@ export default function LecturerAssignmentsPage() {
                     <SelectContent>
                       {academicYears.map((year) => (
                         <SelectItem key={year.id} value={year.id.toString()}>
-                          {year.name} - {year.semester} {year.is_active && '(Aktif)'}
+                          {year.name} - {year.semester}
                         </SelectItem>
                       ))}
                     </SelectContent>

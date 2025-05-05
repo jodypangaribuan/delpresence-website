@@ -184,6 +184,13 @@ export default function RoomsPage() {
           };
         });
         setBuildings(buildingsData);
+        
+        // Check if buildings are available and show notification if empty
+        if (buildingsData.length === 0) {
+          toast.warning("Tidak ada gedung tersedia", {
+            description: "Silakan tambahkan gedung terlebih dahulu sebelum membuat ruangan"
+          });
+        }
       } else {
         toast.error("Gagal memuat gedung");
       }

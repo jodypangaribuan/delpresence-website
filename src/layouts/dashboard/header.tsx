@@ -158,13 +158,6 @@ const ProfileMenu = memo(function ProfileMenu() {
               <p className="text-sm font-medium text-neutral-800">{getFullName()}</p>
               <p className="text-xs text-neutral-600">{getRoleText()}</p>
             </div>
-            <Link
-              href="/dashboard/settings/profile"
-              className="px-4 py-2 text-sm text-neutral-700 hover:bg-[#E6F3FB] w-full text-left flex items-center block"
-            >
-              <Settings className="mr-2 h-4 w-4 text-neutral-500" />
-              Pengaturan Akun
-            </Link>
             <button
               onClick={handleLogout}
               className="px-4 py-2 text-sm text-neutral-700 hover:bg-[#E6F3FB] w-full text-left flex items-center"

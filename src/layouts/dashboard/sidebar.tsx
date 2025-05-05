@@ -282,13 +282,13 @@ export function Sidebar() {
                 href="/dashboard/schedules/import"
                 icon={<SidebarIcons.FileSpreadsheet />}
               >
-                Import Excel
+                Import Jadwal
               </MenuLink>
               <MenuLink
                 href="/dashboard/schedules/export"
                 icon={<SidebarIcons.FileOutput />}
               >
-                Export Excel
+                Export Jadwal
               </MenuLink>
             </ul>
 

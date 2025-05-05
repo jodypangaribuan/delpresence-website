@@ -225,70 +225,48 @@ export default function CoursesManagePage() {
       });
       
       if (response.data.status === "success") {
-        console.log("Courses data:", response.data.data);
-        if (response.data.data.length > 0) {
-          const sampleCourse = response.data.data[0];
-          console.log("Sample course:", sampleCourse);
-          console.log("Sample course structure:", {
-            id: sampleCourse.id,
-            code: sampleCourse.code,
-            name: sampleCourse.name,
-            department: sampleCourse.department,
-            department_id: sampleCourse.department_id,
-            department_name: sampleCourse.department_name
-          });
+        const coursesData = response.data.data || [];
+        setCourses(coursesData);
+        
+        // Extract unique values for filters
+        if (coursesData.length > 0) {
+          // Extract and set unique semesters
+          const semesters = [...new Set(coursesData.map((course: Course) => course.semester))] as number[];
+          setUniqueSemesters(semesters.sort((a, b) => a - b));
           
-          // Additional logging for department structure
-          console.log("Department data check:");
-          response.data.data.forEach((course: Course, index: number) => {
-            if (index < 5) { // Just log the first 5 courses to avoid flooding the console
-              console.log(`Course ${index} (${course.name}):`);
-              console.log("- department:", course.department);
-              console.log("- department_id:", course.department_id);
-              console.log("- department_name:", course.department_name);
-            }
-          });
+          // Extract and set unique academic years
+          const years = [...new Set(coursesData
+            .filter((course: Course) => course.academic_year?.name)
+            .map((course: Course) => course.academic_year?.name))]
+            .filter(Boolean) as string[];
+          setUniqueAcademicYears(years.sort());
           
-          // Check if any courses have department data
-          const coursesWithDept = response.data.data.filter((course: Course) => 
-            course.department && course.department.id && course.department.name
-          );
-          console.log(`Courses with department data: ${coursesWithDept.length} out of ${response.data.data.length}`);
+          // Extract and set unique semester types
+          const types = [...new Set(coursesData
+            .filter((course: Course) => course.semester_type)
+            .map((course: Course) => course.semester_type))] as string[];
+          setUniqueSemesterTypes(types);
         }
-        
-        setCourses(response.data.data);
-        
-        // Extract unique semesters and sort them
-        const semesters = [...new Set(response.data.data.map((course: Course) => course.semester))].filter(
-          (semester): semester is number => typeof semester === 'number'
-        );
-        setUniqueSemesters(semesters.sort((a, b) => a - b));
-
-        // Extract unique academic years
-        const academicYears = [...new Set(response.data.data
-          .filter((course: Course) => course.academic_year?.name)
-          .map((course: Course) => course.academic_year?.name))].filter(
-            (year): year is string => typeof year === 'string'
-          );
-        setUniqueAcademicYears(academicYears);
-
-        // Extract unique semester types
-        const semesterTypes = [...new Set(response.data.data
-          .filter((course: Course) => course.semester_type)
-          .map((course: Course) => course.semester_type))].filter(
-            (type): type is string => typeof type === 'string'
-          );
-        setUniqueSemesterTypes(semesterTypes);
       } else {
-        toast.error("Gagal memuat mata kuliah", {
+        toast.error("Gagal memuat data mata kuliah", {
           description: "Terjadi kesalahan saat memuat data mata kuliah"
         });
+        setCourses([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching courses:", error);
-      toast.error("Gagal memuat mata kuliah", {
-        description: "Terjadi kesalahan saat memuat data mata kuliah"
-      });
+      setCourses([]);
+      
+      // Tampilkan pesan yang lebih spesifik berdasarkan error
+      if (error.response?.status === 404) {
+        toast.warning("Tidak ada data mata kuliah yang tersedia", {
+          description: "Silakan tambahkan mata kuliah baru"
+        });
+      } else {
+        toast.error("Gagal memuat data mata kuliah", {
+          description: error.response?.data?.message || "Terjadi kesalahan saat memuat data mata kuliah"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -309,6 +287,13 @@ export default function CoursesManagePage() {
           console.log("First study program:", response.data.data[0]);
         }
         setDepartments(response.data.data);
+        
+        // Tampilkan peringatan jika tidak ada program studi tersedia
+        if (response.data.data.length === 0) {
+          toast.warning("Tidak ada program studi tersedia", {
+            description: "Silakan tambahkan program studi terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data program studi", {
           description: "Terjadi kesalahan saat memuat data program studi"
@@ -332,7 +317,15 @@ export default function CoursesManagePage() {
       });
       
       if (response.data.status === "success") {
-        setAcademicYears(response.data.data || []);
+        const academicYearsData = response.data.data || [];
+        setAcademicYears(academicYearsData);
+        
+        // Tampilkan peringatan jika tidak ada tahun akademik tersedia
+        if (academicYearsData.length === 0) {
+          toast.warning("Tidak ada tahun akademik tersedia", {
+            description: "Silakan tambahkan tahun akademik terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data tahun akademik", {
           description: "Terjadi kesalahan saat memuat data tahun akademik"

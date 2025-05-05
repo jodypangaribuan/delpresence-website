@@ -256,10 +256,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionStorage.removeItem('lastAuthRedirect');
       sessionStorage.removeItem('lastLoginRedirect');
       
+      // Reset body style
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+      
       // Force a new navigation to login to clear any preserved path
       // This replaces the history entry instead of adding to it
       window.location.replace('/login');
-    }, 500);
+    }, 800);
   };
   
   // Function to show a clean logout screen with spinner
@@ -271,6 +276,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const container = document.createElement('div');
     container.id = 'logout-loading-container';
     document.body.appendChild(container);
+    
+    // Temporarily disable scrolling and hide content behind the loading screen
+    document.body.style.overflow = 'hidden';
     
     // Create loading UI with React
     const root = createRoot(container);

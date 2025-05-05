@@ -206,6 +206,13 @@ export default function StudentGroupsPage() {
       
       if (response.data.status === "success") {
         setDepartments(response.data.data);
+        
+        // Show warning if no departments are available
+        if (response.data.data.length === 0) {
+          toast.warning("Tidak ada program studi tersedia", {
+            description: "Silakan tambahkan program studi terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data program studi");
       }
@@ -228,6 +235,13 @@ export default function StudentGroupsPage() {
       
       if (response.data.status === "success") {
         setAcademicYears(response.data.data);
+        
+        // Show warning if no academic years are available
+        if (response.data.data.length === 0) {
+          toast.warning("Tidak ada tahun akademik tersedia", {
+            description: "Silakan tambahkan tahun akademik terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data tahun akademik");
       }
