@@ -22,10 +22,10 @@ export const studyProgramSchema = z.object({
     name: z.string(),
     code: z.string(),
   }).optional(),
-  degree: z.enum(["D3", "D4", "S1", "S2", "S3"], {
+  degree: z.enum(["D3", "D4", "S1"], {
     errorMap: () => ({ message: "Jenjang pendidikan tidak valid" })
   }),
-  accreditation: z.enum(["Unggul", "A", "B", "C", "Baik", "Baik Sekali"], {
+  accreditation: z.enum(["Unggul", "Baik Sekali", "Baik", "Tidak Terakreditasi"], {
     errorMap: () => ({ message: "Akreditasi tidak valid" })
   }),
   head_of_department: z.string()

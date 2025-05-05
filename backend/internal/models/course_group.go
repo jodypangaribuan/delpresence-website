@@ -15,7 +15,7 @@ type CourseGroup struct {
 	Department    Department     `gorm:"foreignKey:DepartmentID" json:"department"`
 	FacultyID     uint           `json:"faculty_id"`
 	Faculty       Faculty        `gorm:"foreignKey:FacultyID" json:"faculty"`
-	Courses       []*Course      `gorm:"many2many:course_to_groups;" json:"courses,omitempty"`
+	Courses       []*Course      `gorm:"many2many:course_to_groups" json:"courses,omitempty"`
 	CourseCount   int            `gorm:"-" json:"course_count"`
 	TotalCredits  int            `gorm:"-" json:"total_credits"`
 	SemesterRange string         `gorm:"-" json:"semester_range"`

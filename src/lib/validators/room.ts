@@ -29,12 +29,6 @@ export const roomSchema = z.object({
     .min(0, { message: "Kapasitas minimal 0" })
     .max(1000, { message: "Kapasitas maksimal 1000" })
     .int({ message: "Kapasitas harus berupa bilangan bulat" }),
-  has_ac: z.boolean().default(false),
-  has_projector: z.boolean().default(false),
-  has_internet: z.boolean().default(false),
-  description: z.string()
-    .max(500, { message: "Deskripsi maksimal 500 karakter" })
-    .optional(),
 });
 
 export type RoomValues = z.infer<typeof roomSchema>;

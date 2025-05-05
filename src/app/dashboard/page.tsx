@@ -82,8 +82,16 @@ const AdminDashboard = dynamic(() => import("./components/admin-dashboard"), {
   loading: () => <Loader />,
 });
 
+const LecturerDashboard = dynamic(() => import("./components/lecturer-dashboard"), {
+  loading: () => <Loader />,
+});
+
+const AssistantDashboard = dynamic(() => import("./components/assistant-dashboard"), {
+  loading: () => <Loader />,
+});
+
 // Loader component
-function Loader() {
+function Loader() { 
   return (
     <div className="flex h-full w-full items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-[#0687C9]" />
@@ -94,6 +102,7 @@ function Loader() {
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   
   useEffect(() => {
     // Check if user is authenticated
@@ -102,20 +111,25 @@ export default function DashboardPage() {
       return;
     }
     
+    const role = getUserRole();
+    setUserRole(role);
     setLoading(false);
     
     // Log user info for debugging
     console.log("User info:", getUser());
+    console.log("User role:", role);
   }, [router]);
   
   if (loading) {
     return <Loader />;
   }
   
-  // Always show the admin dashboard
+  // Show dashboard based on user role
   return (
     <Suspense fallback={<Loader />}>
-      <AdminDashboard />
+      {userRole === UserRole.ADMIN && <AdminDashboard />}
+      {userRole === UserRole.LECTURER && <LecturerDashboard />}
+      {userRole === UserRole.ASSISTANT && <AssistantDashboard />}
     </Suspense>
   );
 } 

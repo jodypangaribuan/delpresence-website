@@ -224,3 +224,16 @@ link[rel="apple-touch-icon"] {
 .animate-pulse-slow {
   animation: pulse-slow 2s infinite;
 }
+
+/* Add cursor styles for Stack component */
+.stack-container,
+.card-rotate,
+.card {
+  cursor: grab !important;
+}
+
+.stack-container:active,
+.card-rotate:active,
+.card:active {
+  cursor: grabbing !important;
+}

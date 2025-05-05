@@ -122,7 +122,7 @@ export default function DepartmentsPage() {
     name: string;
     faculty_id: string;
     degree: "D3" | "D4" | "S1";
-    accreditation: "Unggul" | "A" | "B" | "C" | "Baik" | "Baik Sekali";
+    accreditation: "Unggul" | "Baik Sekali" | "Baik" | "Tidak Terakreditasi";
     head_of_department: string;
     establishment_year?: number;
     lecturer_count?: number;
@@ -137,7 +137,7 @@ export default function DepartmentsPage() {
     name: "",
       faculty_id: "",  // Use string initially since Select returns string
     degree: "S1",
-    accreditation: "A",
+    accreditation: "Unggul",
     head_of_department: "",
       establishment_year: undefined,
       lecturer_count: undefined,
@@ -153,7 +153,7 @@ export default function DepartmentsPage() {
       name: "",
       faculty_id: "",  // Use string initially since Select returns string
       degree: "S1",
-      accreditation: "A",
+      accreditation: "Unggul",
       head_of_department: "",
       establishment_year: undefined,
       lecturer_count: undefined,
@@ -478,12 +478,12 @@ export default function DepartmentsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="w-full md:w-72">
+            <div className="w-full md:w-48">
               <Select 
                 onValueChange={(value) => setFacultyFilter(value)}
                 value={facultyFilter || "all"}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Filter berdasarkan fakultas" />
                 </SelectTrigger>
                 <SelectContent>
@@ -542,9 +542,9 @@ export default function DepartmentsPage() {
                       <TableCell>{program.study_program.degree}</TableCell>
                       <TableCell>
                         <Badge className={`
-                          ${program.study_program.accreditation === 'A' ? 'bg-green-100 text-green-800' : 
-                            program.study_program.accreditation === 'B' ? 'bg-blue-100 text-blue-800' :
-                            program.study_program.accreditation === 'C' ? 'bg-orange-100 text-orange-800' :
+                          ${program.study_program.accreditation === 'Unggul' ? 'bg-green-100 text-green-800' : 
+                            program.study_program.accreditation === 'Baik Sekali' ? 'bg-blue-100 text-blue-800' :
+                            program.study_program.accreditation === 'Baik' ? 'bg-orange-100 text-orange-800' :
                             'bg-gray-100 text-gray-800'
                           }
                         `}>
@@ -608,7 +608,7 @@ export default function DepartmentsPage() {
           </DialogHeader>
           
           <Form {...addForm}>
-            <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
+            <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-3 py-2">
               <FormField
                 control={addForm.control}
                 name="code"
@@ -722,11 +722,9 @@ export default function DepartmentsPage() {
                   </SelectTrigger>
                   <SelectContent>
                             <SelectItem value="Unggul">Unggul</SelectItem>
-                    <SelectItem value="A">A</SelectItem>
-                    <SelectItem value="B">B</SelectItem>
-                    <SelectItem value="C">C</SelectItem>
-                            <SelectItem value="Baik">Baik</SelectItem>
-                            <SelectItem value="Baik Sekali">Baik Sekali</SelectItem>
+                    <SelectItem value="Baik Sekali">Baik Sekali</SelectItem>
+                    <SelectItem value="Baik">Baik</SelectItem>
+                    <SelectItem value="Tidak Terakreditasi">Tidak Terakreditasi</SelectItem>
                   </SelectContent>
                 </Select>
                       </FormControl>
@@ -741,7 +739,7 @@ export default function DepartmentsPage() {
                   name="head_of_department"
                 render={({ field }) => (
                   <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <FormLabel className="text-right">Ketua Prodi</FormLabel>
+                    <FormLabel className="text-right text-nowrap">Ketua Prodi</FormLabel>
                     <div className="col-span-3">
                       <FormControl>
                         <div className="relative">
@@ -808,7 +806,7 @@ export default function DepartmentsPage() {
                 name="establishment_year"
                 render={({ field }) => (
                   <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <FormLabel className="text-right">Tahun Pendirian</FormLabel>
+                    <FormLabel className="text-right text-nowrap">Tahun Pendirian</FormLabel>
                     <div className="col-span-3">
                       <FormControl>
               <Input
@@ -832,7 +830,7 @@ export default function DepartmentsPage() {
                 name="lecturer_count"
                 render={({ field }) => (
                   <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <FormLabel className="text-right">Jumlah Dosen</FormLabel>
+                    <FormLabel className="text-right text-nowrap">Jumlah Dosen</FormLabel>
                     <div className="col-span-3">
                       <FormControl>
                         <Input 
@@ -852,7 +850,7 @@ export default function DepartmentsPage() {
                         />
                       </FormControl>
                       <FormMessage />
-            </div>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -862,7 +860,7 @@ export default function DepartmentsPage() {
                 name="student_count"
                 render={({ field }) => (
                   <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <FormLabel className="text-right">Jumlah Mahasiswa</FormLabel>
+                    <FormLabel className="text-right text-nowrap">Jumlah Mahasiswa</FormLabel>
                     <div className="col-span-3">
                       <FormControl>
                         <Input 
@@ -918,7 +916,7 @@ export default function DepartmentsPage() {
           
           {currentProgram && (
             <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-2">
+              <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-3 py-2">
                 <FormField
                   control={editForm.control}
                 name="code"
@@ -1032,11 +1030,9 @@ export default function DepartmentsPage() {
                   </SelectTrigger>
                   <SelectContent>
                               <SelectItem value="Unggul">Unggul</SelectItem>
-                    <SelectItem value="A">A</SelectItem>
-                    <SelectItem value="B">B</SelectItem>
-                    <SelectItem value="C">C</SelectItem>
-                              <SelectItem value="Baik">Baik</SelectItem>
-                              <SelectItem value="Baik Sekali">Baik Sekali</SelectItem>
+                    <SelectItem value="Baik Sekali">Baik Sekali</SelectItem>
+                    <SelectItem value="Baik">Baik</SelectItem>
+                    <SelectItem value="Tidak Terakreditasi">Tidak Terakreditasi</SelectItem>
                   </SelectContent>
                 </Select>
                         </FormControl>
@@ -1051,7 +1047,7 @@ export default function DepartmentsPage() {
                   name="head_of_department"
                   render={({ field }) => (
                     <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Ketua Prodi</FormLabel>
+                      <FormLabel className="text-right text-nowrap">Ketua Prodi</FormLabel>
                       <div className="col-span-3">
                         <FormControl>
                           <div className="relative">
@@ -1118,7 +1114,7 @@ export default function DepartmentsPage() {
                   name="establishment_year"
                   render={({ field }) => (
                     <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Tahun Pendirian</FormLabel>
+                      <FormLabel className="text-right text-nowrap">Tahun Pendirian</FormLabel>
                       <div className="col-span-3">
                         <FormControl>
               <Input
@@ -1142,7 +1138,7 @@ export default function DepartmentsPage() {
                 name="lecturer_count"
                   render={({ field }) => (
                     <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Jumlah Dosen</FormLabel>
+                      <FormLabel className="text-right text-nowrap">Jumlah Dosen</FormLabel>
                       <div className="col-span-3">
                         <FormControl>
                           <Input 
@@ -1162,7 +1158,7 @@ export default function DepartmentsPage() {
                           />
                         </FormControl>
                         <FormMessage />
-            </div>
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -1172,7 +1168,7 @@ export default function DepartmentsPage() {
                 name="student_count"
                   render={({ field }) => (
                     <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Jumlah Mahasiswa</FormLabel>
+                      <FormLabel className="text-right text-nowrap">Jumlah Mahasiswa</FormLabel>
                       <div className="col-span-3">
                         <FormControl>
                           <Input 
@@ -1193,9 +1189,9 @@ export default function DepartmentsPage() {
                         </FormControl>
                         <FormMessage />
             </div>
-                    </FormItem>
-                  )}
-                />
+                  </FormItem>
+                )}
+              />
                 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => {

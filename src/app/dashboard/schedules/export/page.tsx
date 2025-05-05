@@ -323,8 +323,8 @@ export default function ExportSchedulePage() {
                           <TableHead>Hari</TableHead>
                           <TableHead>Jam</TableHead>
                           <TableHead>Ruangan</TableHead>
-                          <TableHead>Dosen</TableHead>
-                          <TableHead>Kelas</TableHead>
+                          <TableHead className="text-left">Dosen</TableHead>
+                          <TableHead className="text-left">Kelompok Mahasiswa</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

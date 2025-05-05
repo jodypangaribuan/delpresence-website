@@ -83,6 +83,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { api } from "@/utils/api";
 
 interface Course {
   id: number;
@@ -497,16 +498,35 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
 ];
 
 export default function ScheduleManagePage() {
-  // State management
+  // State for schedules data
   const [schedules, setSchedules] = useState<CourseSchedule[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // State for related data
   const [courses, setCourses] = useState<Course[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [studentGroups, setStudentGroups] = useState<StudentGroup[]>([]);
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [loadingRelatedData, setLoadingRelatedData] = useState(true);
   
-  // For filtering
+  // State for lecturer search
+  const [lecturerSearchTerm, setLecturerSearchTerm] = useState("");
+  const [searchedLecturers, setSearchedLecturers] = useState<any[]>([]);
+  const [showLecturerResults, setShowLecturerResults] = useState(false);
+  const [searchingLecturers, setSearchingLecturers] = useState(false);
+  const [selectedLecturer, setSelectedLecturer] = useState<any | null>(null);
+  
+  // State for current date and dialog visibility
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<'week' | 'day'>('week');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [currentSchedule, setCurrentSchedule] = useState<CourseSchedule | null>(null);
+  
+  // State for filters
   const [searchQuery, setSearchQuery] = useState("");
   const [dayFilter, setDayFilter] = useState<string | null>(null);
   const [buildingFilter, setBuildingFilter] = useState<string | null>(null);
@@ -515,62 +535,27 @@ export default function ScheduleManagePage() {
   const [courseFilter, setCourseFilter] = useState<number | null>(null);
   const [academicYearFilter, setAcademicYearFilter] = useState<number | null>(null);
   
-  // For calendar view
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [calendarView, setCalendarView] = useState<'week' | 'day'>('week');
-  
-  // Modal states
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [currentSchedule, setCurrentSchedule] = useState<CourseSchedule | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Initialize with sample data (to be replaced with API call)
-  useEffect(() => {
-    setSchedules(SAMPLE_SCHEDULES);
-    
-    // Actual API calls would be here
-    // fetchSchedules();
-    // fetchCourses();
-    // fetchRooms();
-    // fetchLecturers();
-    // fetchStudentGroups();
-    // fetchAcademicYears();
-  }, []);
-
   // Extract unique values for filters
-  const buildings = Array.from(new Set(schedules.map(s => s.building_name))).filter(Boolean) as string[];
-  const semesters = Array.from(new Set(schedules.map(s => s.semester))).filter(Boolean).sort((a, b) => a! - b!) as number[];
+  const uniqueBuildings = Array.from(new Set(schedules.map(s => s.building_name))).filter(Boolean) as string[];
+  const uniqueSemesters = Array.from(new Set(schedules.map(s => s.semester))).filter(Boolean) as number[];
   const uniqueLecturers = Array.from(new Set(schedules.map(s => s.lecturer_name))).filter(Boolean) as string[];
   const uniqueCourses = Array.from(new Set(schedules.map(s => s.course_name))).filter(Boolean) as string[];
 
-  // API functions (to be implemented)
+  // API functions
   const fetchSchedules = async () => {
     setLoading(true);
     try {
-      // Simulating API call for now
-      setTimeout(() => {
-        setSchedules(SAMPLE_SCHEDULES);
-        setLoading(false);
-      }, 1000);
-      
-      // Actual API call would be:
-      /*
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/schedules`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
-        }
+      const response = await api('/admin/schedules', {
+        method: 'GET',
       });
       
-      if (response.data.status === "success") {
-        setSchedules(response.data.data);
+      if (response.status === "success") {
+        setSchedules(response.data);
       } else {
         toast.error("Gagal memuat jadwal", {
           description: "Terjadi kesalahan saat memuat data jadwal perkuliahan"
         });
       }
-      */
     } catch (error) {
       console.error("Error fetching schedules:", error);
       toast.error("Gagal memuat jadwal", {
@@ -581,19 +566,191 @@ export default function ScheduleManagePage() {
     }
   };
 
+  // Function to fetch schedules with filters applied via query parameters
+  const fetchFilteredSchedules = async () => {
+    setLoading(true);
+    try {
+      // Build query parameters based on filters
+      const params = new URLSearchParams();
+      
+      if (academicYearFilter) {
+        params.append('academic_year_id', academicYearFilter.toString());
+      }
+      
+      if (lecturerFilter) {
+        params.append('lecturer_id', lecturerFilter.toString());
+      }
+      
+      if (dayFilter) {
+        params.append('day', dayFilter);
+      }
+      
+      if (buildingFilter) {
+        params.append('building_id', buildingFilter);
+      }
+      
+      if (courseFilter) {
+        params.append('course_id', courseFilter.toString());
+      }
+      
+      // Construct URL with query parameters
+      const url = `/admin/schedules${params.toString() ? `?${params.toString()}` : ''}`;
+      
+      const response = await api(url, {
+        method: 'GET',
+      });
+      
+      if (response.status === "success") {
+        setSchedules(response.data);
+      } else {
+        toast.error("Gagal memuat jadwal", {
+          description: "Terjadi kesalahan saat memuat jadwal dengan filter"
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching filtered schedules:", error);
+      toast.error("Gagal memuat jadwal", {
+        description: "Terjadi kesalahan saat memuat jadwal dengan filter"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to search lecturers by search term
+  const searchLecturers = async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setSearchedLecturers([]);
+      setShowLecturerResults(false);
+      return;
+    }
+    
+    setShowLecturerResults(true);
+    setSearchingLecturers(true);
+    
+    try {
+      const response = await api(`/admin/lecturers/search?q=${encodeURIComponent(searchTerm)}`, {
+        method: 'GET'
+      });
+      
+      if (response.status === "success") {
+        setSearchedLecturers(response.data);
+      } else {
+        console.error("Failed to search lecturers:", response);
+        setSearchedLecturers([]);
+      }
+    } catch (error) {
+      console.error("Error searching lecturers:", error);
+      setSearchedLecturers([]);
+    } finally {
+      setSearchingLecturers(false);
+    }
+  };
+  
+  // Function to select lecturer from search results
+  const selectLecturer = (lecturer: any) => {
+    setSelectedLecturer(lecturer);
+    
+    // If we're in add form
+    if (showAddDialog) {
+      addForm.setValue("lecturer_id", lecturer.id.toString());
+    }
+    
+    // If we're in edit form
+    if (showEditDialog) {
+      editForm.setValue("lecturer_id", lecturer.id.toString());
+    }
+    
+    setLecturerSearchTerm(lecturer.full_name || lecturer.name);
+    setShowLecturerResults(false);
+  };
+
+  // Function to check schedule conflicts before saving
+  const checkScheduleConflicts = async (scheduleData: any, scheduleId?: number) => {
+    try {
+      const endpoint = '/admin/schedules/check-conflicts';
+      const body = {
+        ...scheduleData,
+        schedule_id: scheduleId
+      };
+      
+      const response = await api(endpoint, {
+        method: 'POST',
+        body
+      });
+      
+      if (response.status === "success") {
+        const conflicts = response.data;
+        
+        // Check if any conflicts exist
+        const hasConflicts = Object.values(conflicts).some(value => !!value);
+        
+        if (hasConflicts) {
+          let conflictMessage = "Konflik jadwal terdeteksi:";
+          
+          if (conflicts.room) {
+            conflictMessage += "\n- Ruangan sudah digunakan pada waktu tersebut";
+          }
+          
+          if (conflicts.lecturer) {
+            conflictMessage += "\n- Dosen sudah dijadwalkan pada waktu tersebut";
+          }
+          
+          if (conflicts.student_group) {
+            conflictMessage += "\n- Kelompok mahasiswa sudah memiliki jadwal pada waktu tersebut";
+          }
+          
+          toast.error("Konflik jadwal", {
+            description: conflictMessage
+          });
+          
+          return true; // Has conflicts
+        }
+        
+        return false; // No conflicts
+      } else {
+        toast.error("Gagal memeriksa konflik jadwal");
+        return true; // Treat as conflict to prevent save
+      }
+    } catch (error) {
+      console.error("Error checking schedule conflicts:", error);
+      toast.error("Gagal memeriksa konflik jadwal");
+      return true; // Treat as conflict to prevent save
+    }
+  };
+
   // Function to handle adding a new schedule
   const handleAddSchedule = async (data: any) => {
     setIsSubmitting(true);
     try {
-      // Simulating successful addition
-      toast.success("Jadwal berhasil ditambahkan", {
-        description: "Jadwal perkuliahan baru telah berhasil ditambahkan"
+      // First check for conflicts
+      const hasConflicts = await checkScheduleConflicts(data);
+      
+      if (hasConflicts) {
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const response = await api('/admin/schedules', {
+        method: 'POST',
+        body: data,
       });
-      setShowAddDialog(false);
-      // In a real app, you would call the API and refresh the data
-    } catch (error) {
+      
+      if (response.status === "success") {
+        toast.success("Jadwal berhasil ditambahkan", {
+          description: "Jadwal perkuliahan baru telah berhasil ditambahkan"
+        });
+        setShowAddDialog(false);
+        fetchSchedules(); // Refresh the schedule list
+      } else {
+        toast.error("Gagal menambahkan jadwal", {
+          description: response.message || "Terjadi kesalahan saat menambahkan jadwal baru"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error adding schedule:", error);
       toast.error("Gagal menambahkan jadwal", {
-        description: "Terjadi kesalahan saat menambahkan jadwal baru"
+        description: error.message || "Terjadi kesalahan saat menambahkan jadwal baru"
       });
     } finally {
       setIsSubmitting(false);
@@ -604,15 +761,34 @@ export default function ScheduleManagePage() {
   const handleEditSchedule = async (data: any) => {
     setIsSubmitting(true);
     try {
-      // Simulating successful edit
-      toast.success("Jadwal berhasil diperbarui", {
-        description: "Jadwal perkuliahan telah berhasil diperbarui"
+      // First check for conflicts
+      const hasConflicts = await checkScheduleConflicts(data, currentSchedule?.id);
+      
+      if (hasConflicts) {
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const response = await api(`/admin/schedules/${currentSchedule?.id}`, {
+        method: 'PUT',
+        body: data,
       });
-      setShowEditDialog(false);
-      // In a real app, you would call the API and refresh the data
-    } catch (error) {
+      
+      if (response.status === "success") {
+        toast.success("Jadwal berhasil diperbarui", {
+          description: "Jadwal perkuliahan telah berhasil diperbarui"
+        });
+        setShowEditDialog(false);
+        fetchSchedules(); // Refresh the schedule list
+      } else {
+        toast.error("Gagal memperbarui jadwal", {
+          description: response.message || "Terjadi kesalahan saat memperbarui jadwal"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error updating schedule:", error);
       toast.error("Gagal memperbarui jadwal", {
-        description: "Terjadi kesalahan saat memperbarui jadwal"
+        description: error.message || "Terjadi kesalahan saat memperbarui jadwal"
       });
     } finally {
       setIsSubmitting(false);
@@ -621,27 +797,173 @@ export default function ScheduleManagePage() {
 
   // Function to handle deleting a schedule
   const handleDeleteSchedule = async () => {
+    if (!currentSchedule) {
+      toast.error("Tidak dapat menghapus jadwal", {
+        description: "Data jadwal tidak valid"
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
-      // Simulating successful deletion
-      toast.success("Jadwal berhasil dihapus", {
-        description: "Jadwal perkuliahan telah berhasil dihapus"
+      const response = await api(`/admin/schedules/${currentSchedule.id}`, {
+        method: 'DELETE',
       });
-      setShowDeleteDialog(false);
-      // In a real app, you would call the API and refresh the data
-    } catch (error) {
+      
+      if (response.status === "success") {
+        toast.success("Jadwal berhasil dihapus", {
+          description: "Jadwal perkuliahan telah berhasil dihapus"
+        });
+        setShowDeleteDialog(false);
+        fetchSchedules(); // Refresh the schedule list
+      } else {
+        toast.error("Gagal menghapus jadwal", {
+          description: response.message || "Terjadi kesalahan saat menghapus jadwal"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error deleting schedule:", error);
       toast.error("Gagal menghapus jadwal", {
-        description: "Terjadi kesalahan saat menghapus jadwal"
+        description: error.message || "Terjadi kesalahan saat menghapus jadwal"
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Function to fetch courses
+  const fetchCourses = async () => {
+    try {
+      const response = await api('/admin/courses', {
+        method: 'GET',
+      });
+      
+      if (response.status === "success") {
+        setCourses(response.data);
+      } else {
+        toast.error("Gagal memuat data mata kuliah");
+      }
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      toast.error("Gagal memuat data mata kuliah");
+    }
+  };
+
+  // Function to fetch rooms
+  const fetchRooms = async () => {
+    try {
+      const response = await api('/admin/rooms', {
+        method: 'GET',
+      });
+      
+      if (response.status === "success") {
+        setRooms(response.data);
+      } else {
+        toast.error("Gagal memuat data ruangan");
+      }
+    } catch (error) {
+      console.error("Error fetching rooms:", error);
+      toast.error("Gagal memuat data ruangan");
+    }
+  };
+
+  // Function to fetch lecturers
+  const fetchLecturers = async () => {
+    try {
+      const response = await api('/admin/lecturers', {
+        method: 'GET',
+      });
+      
+      if (response.status === "success" || (response.data && Array.isArray(response.data))) {
+        // Map the response data to match our Lecturer interface
+        const formattedLecturers = response.data.map((lecturer: any) => ({
+          id: lecturer.id,
+          name: lecturer.full_name || lecturer.FullName || lecturer.name || lecturer.username || `Dosen ID: ${lecturer.id}`,
+          code: lecturer.nidn || lecturer.NIDN || lecturer.nip || lecturer.NIP,
+          email: lecturer.email || lecturer.Email,
+          department_id: lecturer.study_program_id || lecturer.StudyProgramID,
+          department: {
+            id: lecturer.study_program_id || lecturer.StudyProgramID || 0,
+            name: lecturer.study_program_name || lecturer.StudyProgramName || lecturer.prodi || ""
+          }
+        }));
+        
+        setLecturers(formattedLecturers);
+      } else {
+        toast.error("Gagal memuat data dosen");
+      }
+    } catch (error) {
+      console.error("Error fetching lecturers:", error);
+      toast.error("Gagal memuat data dosen");
+    }
+  };
+
+  // Function to fetch student groups
+  const fetchStudentGroups = async () => {
+    try {
+      const response = await api('/admin/student-groups', {
+        method: 'GET',
+      });
+      
+      if (response.status === "success") {
+        setStudentGroups(response.data);
+      } else {
+        toast.error("Gagal memuat data kelompok mahasiswa");
+      }
+    } catch (error) {
+      console.error("Error fetching student groups:", error);
+      toast.error("Gagal memuat data kelompok mahasiswa");
+    }
+  };
+
+  // Function to fetch academic years
+  const fetchAcademicYears = async () => {
+    try {
+      const response = await api('/admin/academic-years', {
+        method: 'GET',
+      });
+      
+      if (response.status === "success") {
+        setAcademicYears(response.data);
+      } else {
+        toast.error("Gagal memuat data tahun akademik");
+      }
+    } catch (error) {
+      console.error("Error fetching academic years:", error);
+      toast.error("Gagal memuat data tahun akademik");
+    }
+  };
+
+  // Fetch all necessary data on component mount
+  useEffect(() => {
+    const loadAllData = async () => {
+      await Promise.all([
+        fetchCourses(),
+        fetchRooms(),
+        fetchLecturers(),
+        fetchStudentGroups(),
+        fetchAcademicYears()
+      ]);
+      setLoadingRelatedData(false);
+      fetchSchedules();
+    };
+    
+    loadAllData();
+  }, []);
+
   // Setup edit schedule
   const setupEditSchedule = (schedule: CourseSchedule) => {
     setCurrentSchedule(schedule);
     setShowEditDialog(true);
+    
+    // Set the lecturer search term when editing
+    if (schedule.lecturer_name) {
+      setLecturerSearchTerm(schedule.lecturer_name);
+      setSelectedLecturer({
+        id: schedule.lecturer_id,
+        full_name: schedule.lecturer_name
+      });
+    }
   };
   
   // Setup delete schedule
@@ -702,6 +1024,9 @@ export default function ScheduleManagePage() {
     setLecturerFilter(null);
     setCourseFilter(null);
     setAcademicYearFilter(null);
+    
+    // Fetch all schedules without filters
+    fetchSchedules();
   };
 
   // Forms for adding/editing schedules
@@ -732,6 +1057,40 @@ export default function ScheduleManagePage() {
       notes: ""
     }
   });
+
+  // Clear lecturer search when dialogs close
+  useEffect(() => {
+    if (!showAddDialog && !showEditDialog) {
+      setSearchedLecturers([]);
+      setShowLecturerResults(false);
+    }
+  }, [showAddDialog, showEditDialog]);
+
+  useEffect(() => {
+    if (currentSchedule) {
+      // Populate edit form with current schedule data
+      editForm.reset({
+        student_group_id: currentSchedule.student_group_id?.toString() || "",
+        academic_year_id: currentSchedule.academic_year_id?.toString() || "",
+        lecturer_id: currentSchedule.lecturer_id?.toString() || "",
+        course_id: currentSchedule.course_id?.toString() || "",
+        day: currentSchedule.day || "",
+        start_time: currentSchedule.start_time || "",
+        end_time: currentSchedule.end_time || "",
+        room_id: currentSchedule.room_id?.toString() || "",
+        notes: currentSchedule.notes || ""
+      });
+      
+      // Set the selected lecturer for display
+      if (currentSchedule.lecturer_id && currentSchedule.lecturer_name) {
+        setSelectedLecturer({
+          id: currentSchedule.lecturer_id,
+          full_name: currentSchedule.lecturer_name,
+          name: currentSchedule.lecturer_name
+        });
+      }
+    }
+  }, [currentSchedule, editForm]);
 
   return (
     <div className="container p-4 mx-auto space-y-6">
@@ -896,29 +1255,58 @@ export default function ScheduleManagePage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Dosen</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
+                            <div className="relative">
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih dosen" />
-                                </SelectTrigger>
+                                <Input 
+                                  placeholder="Cari dosen..." 
+                                  value={lecturerSearchTerm}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setLecturerSearchTerm(value);
+                                    searchLecturers(value);
+                                  }}
+                                  className="w-full"
+                                />
                               </FormControl>
-                              <SelectContent>
-                                {lecturers.length > 0 ? (
-                                  lecturers.map(lecturer => (
-                                    <SelectItem key={lecturer.id} value={lecturer.id.toString()}>
-                                      {lecturer.name}
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="loading" disabled>
-                                    Memuat data dosen...
-                                  </SelectItem>
-                                )}
-                              </SelectContent>
-                            </Select>
+                              
+                              {showLecturerResults && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto min-w-[300px]">
+                                  {searchingLecturers ? (
+                                    <div className="flex items-center justify-center p-4">
+                                      <Loader2 className="h-5 w-5 animate-spin text-gray-500 mr-2" />
+                                      <span className="text-sm text-gray-500">Mencari dosen...</span>
+                                    </div>
+                                  ) : searchedLecturers.length > 0 ? (
+                                    <ul className="py-1">
+                                      {searchedLecturers.map((lecturer) => (
+                                        <li 
+                                          key={lecturer.id} 
+                                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                          onClick={() => selectLecturer(lecturer)}
+                                        >
+                                          <div className="font-medium">{lecturer.full_name}</div>
+                                          <div className="text-xs text-gray-500 flex items-center">
+                                            <span className="mr-2">{lecturer.nidn || lecturer.nip || ""}</span>
+                                            {lecturer.program && (
+                                              <span>{lecturer.program}</span>
+                                            )}
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : lecturerSearchTerm.length >= 2 ? (
+                                    <div className="p-3 text-center text-sm text-gray-500">
+                                      Tidak ada dosen yang ditemukan.
+                                    </div>
+                                  ) : (
+                                    <div className="p-3 text-center text-sm text-gray-500">
+                                      Ketik minimal 2 karakter untuk mencari dosen.
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <input type="hidden" {...field} />
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1085,7 +1473,7 @@ export default function ScheduleManagePage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Gedung</SelectItem>
-                    {buildings.map((building) => (
+                    {uniqueBuildings.map((building) => (
                       <SelectItem key={building} value={building}>{building}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1100,7 +1488,7 @@ export default function ScheduleManagePage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Semester</SelectItem>
-                    {semesters.map((semester) => (
+                    {uniqueSemesters.map((semester) => (
                             <SelectItem key={semester} value={semester.toString()}>
                               Semester {semester}
                             </SelectItem>
@@ -1126,7 +1514,7 @@ export default function ScheduleManagePage() {
                     <TableHead className="font-bold text-black">Jadwal</TableHead>
                     <TableHead className="font-bold text-black">Ruangan</TableHead>
                     <TableHead className="font-bold text-black">Dosen</TableHead>
-                    <TableHead className="font-bold text-black">Kelas</TableHead>
+                    <TableHead className="font-bold text-black">Kelompok Mahasiswa</TableHead>
                     <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1266,7 +1654,7 @@ export default function ScheduleManagePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Semua Gedung</SelectItem>
-                        {buildings.map((building) => (
+                        {uniqueBuildings.map((building) => (
                           <SelectItem key={building} value={building}>{building}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1283,7 +1671,7 @@ export default function ScheduleManagePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Semua Semester</SelectItem>
-                        {semesters.map((semester) => (
+                        {uniqueSemesters.map((semester) => (
                                     <SelectItem key={semester} value={semester.toString()}>
                                       Semester {semester}
                                     </SelectItem>
@@ -1302,17 +1690,9 @@ export default function ScheduleManagePage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="all">Semua Dosen</SelectItem>
-                                  {schedules.map(s => s.lecturer_id)
-                                    .filter((id, index, self) => self.indexOf(id) === index)
-                                    .map(id => {
-                                      const lecturer = schedules.find(s => s.lecturer_id === id);
-                                      return lecturer ? (
-                                        <SelectItem key={id} value={id.toString()}>
-                                          {lecturer.lecturer_name}
-                                        </SelectItem>
-                                      ) : null;
-                                    })
-                                  }
+                                  {uniqueLecturers.map(lecturer => (
+                                    <SelectItem key={lecturer} value={lecturer}>{lecturer}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1347,7 +1727,11 @@ export default function ScheduleManagePage() {
                           <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-8">
                             Reset Filter
                           </Button>
-                          <Button size="sm" className="text-xs h-8 bg-[#0687C9] hover:bg-[#0670a8]">
+                          <Button 
+                            size="sm" 
+                            className="text-xs h-8 bg-[#0687C9] hover:bg-[#0670a8]"
+                            onClick={fetchFilteredSchedules}
+                          >
                             Terapkan
                           </Button>
                         </div>
@@ -1998,30 +2382,58 @@ export default function ScheduleManagePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Dosen</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          defaultValue={currentSchedule.lecturer_id.toString()}
-                        >
+                        <div className="relative">
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih dosen" />
-                            </SelectTrigger>
+                            <Input 
+                              placeholder="Cari dosen..." 
+                              value={lecturerSearchTerm}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setLecturerSearchTerm(value);
+                                searchLecturers(value);
+                              }}
+                              className="w-full"
+                            />
                           </FormControl>
-                          <SelectContent>
-                            {lecturers.length > 0 ? (
-                              lecturers.map(lecturer => (
-                                <SelectItem key={lecturer.id} value={lecturer.id.toString()}>
-                                  {lecturer.name}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem value={currentSchedule.lecturer_id.toString()}>
-                                {currentSchedule.lecturer_name}
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
+                          
+                          {showLecturerResults && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto min-w-[300px]">
+                              {searchingLecturers ? (
+                                <div className="flex items-center justify-center p-4">
+                                  <Loader2 className="h-5 w-5 animate-spin text-gray-500 mr-2" />
+                                  <span className="text-sm text-gray-500">Mencari dosen...</span>
+                                </div>
+                              ) : searchedLecturers.length > 0 ? (
+                                <ul className="py-1">
+                                  {searchedLecturers.map((lecturer) => (
+                                    <li 
+                                      key={lecturer.id} 
+                                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                      onClick={() => selectLecturer(lecturer)}
+                                    >
+                                      <div className="font-medium">{lecturer.full_name}</div>
+                                      <div className="text-xs text-gray-500 flex items-center">
+                                        <span className="mr-2">{lecturer.nidn || lecturer.nip || ""}</span>
+                                        {lecturer.program && (
+                                          <span>{lecturer.program}</span>
+                                        )}
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : lecturerSearchTerm.length >= 2 ? (
+                                <div className="p-3 text-center text-sm text-gray-500">
+                                  Tidak ada dosen yang ditemukan.
+                                </div>
+                              ) : (
+                                <div className="p-3 text-center text-sm text-gray-500">
+                                  Ketik minimal 2 karakter untuk mencari dosen.
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <input type="hidden" {...field} />
                         <FormMessage />
                       </FormItem>
                     )}
@@ -2162,7 +2574,7 @@ export default function ScheduleManagePage() {
               <p><strong>Jadwal:</strong> {currentSchedule.day}, {currentSchedule.start_time} - {currentSchedule.end_time}</p>
               <p><strong>Ruangan:</strong> {currentSchedule.room_name}, {currentSchedule.building_name}</p>
               <p><strong>Dosen:</strong> {currentSchedule.lecturer_name}</p>
-              <p><strong>Kelas:</strong> {currentSchedule.student_group_name}</p>
+              <p><strong>Kelompok Mahasiswa:</strong> {currentSchedule.student_group_name}</p>
             </div>
           )}
           

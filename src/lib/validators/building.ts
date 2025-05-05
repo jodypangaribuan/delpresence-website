@@ -19,9 +19,6 @@ export const buildingSchema = z.object({
     .min(1, { message: "Jumlah lantai minimal 1" })
     .max(200, { message: "Jumlah lantai maksimal 200" })
     .int({ message: "Jumlah lantai harus berupa bilangan bulat" }),
-  description: z.string()
-    .max(500, { message: "Deskripsi maksimal 500 karakter" })
-    .optional(),
 });
 
 export type BuildingValues = z.infer<typeof buildingSchema>;
@@ -47,11 +44,6 @@ export const buildingFormSchema = z.object({
   ]).refine(val => Number.isInteger(val), {
     message: "Jumlah lantai harus berupa bilangan bulat"
   }),
-  description: z.string()
-    .max(500, { message: "Deskripsi maksimal 500 karakter" })
-    .optional()
-    .nullable()
-    .transform(val => val === null ? undefined : val),
 });
 
 export type BuildingFormValues = z.infer<typeof buildingFormSchema>; 

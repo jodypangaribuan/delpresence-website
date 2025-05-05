@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -18,9 +19,7 @@ func CampusLogin(c *gin.Context) {
 	if err := c.ShouldBind(&req); err != nil {
 		log.Printf("Error binding request data: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"result":  false,
-			"error":   "Invalid request format",
-			"success": "",
+			"error": "Invalid request format",
 		})
 		return
 	}
@@ -41,14 +40,9 @@ func CampusLogin(c *gin.Context) {
 
 		log.Printf("Campus login failed: %v", err)
 
-		// Return a properly formatted response even on error
+		// Return a properly formatted error response
 		c.JSON(statusCode, gin.H{
-			"result":        false,
-			"error":         message,
-			"success":       "",
-			"user":          nil,
-			"token":         "",
-			"refresh_token": "",
+			"error": message,
 		})
 		return
 	}
@@ -58,14 +52,29 @@ func CampusLogin(c *gin.Context) {
 	// Convert to standard login response
 	loginResponse := auth.ConvertCampusResponseToLoginResponse(campusResponse)
 	log.Printf("Converted to login response with user role: %s", loginResponse.User.Role)
+	
+	// Debug logging to help diagnose token structure issues
+	log.Printf("Response token length: %d, refresh token length: %d", 
+		len(loginResponse.Token), len(loginResponse.RefreshToken))
 
-	// Return the login response with user data
-	c.JSON(http.StatusOK, gin.H{
-		"result":        true,
-		"error":         "",
-		"success":       "Login successful",
-		"user":          loginResponse.User,
-		"token":         loginResponse.Token,
-		"refresh_token": loginResponse.RefreshToken,
-	})
+	// Use custom response struct to ensure the correct field order
+	orderedResponse := models.OrderedLoginResponse{
+		User:         loginResponse.User,
+		Token:        loginResponse.Token,
+		RefreshToken: loginResponse.RefreshToken,
+	}
+	
+	// Set content type
+	c.Header("Content-Type", "application/json")
+	
+	// Manually marshal to JSON to ensure field order
+	jsonBytes, err := json.Marshal(orderedResponse)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating response"})
+		return
+	}
+	
+	// Write the response
+	c.Writer.WriteHeader(http.StatusOK)
+	c.Writer.Write(jsonBytes)
 }

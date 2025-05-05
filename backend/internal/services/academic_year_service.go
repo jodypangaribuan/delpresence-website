@@ -2,9 +2,11 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
+	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/repositories"
 )
@@ -23,13 +25,24 @@ func NewAcademicYearService() *AcademicYearService {
 
 // CreateAcademicYear creates a new academic year
 func (s *AcademicYearService) CreateAcademicYear(academicYear *models.AcademicYear) error {
-	// Check if name already exists
+	// Check if name already exists in active records
 	existingAcademicYear, err := s.repository.FindByName(academicYear.Name)
 	if err != nil {
 		return err
 	}
 	if existingAcademicYear != nil {
 		return errors.New("academic year with this name already exists")
+	}
+
+	// Try to restore a soft-deleted academic year with this name
+	restoredAcademicYear, err := s.repository.RestoreSoftDeletedByName(academicYear.Name, academicYear)
+	if err != nil {
+		return err
+	}
+	
+	// If a soft-deleted record was found and restored
+	if restoredAcademicYear != nil {
+		return nil
 	}
 
 	// Validate dates
@@ -40,19 +53,6 @@ func (s *AcademicYearService) CreateAcademicYear(academicYear *models.AcademicYe
 	// Validate semester
 	if academicYear.Semester != "Ganjil" && academicYear.Semester != "Genap" {
 		return errors.New("semester must be 'Ganjil' or 'Genap'")
-	}
-
-	// If this academic year is set to be active, deactivate all others
-	if academicYear.IsActive {
-		activateCount, err := s.repository.CountActive()
-		if err != nil {
-			return err
-		}
-		if activateCount > 0 {
-			if err := s.repository.DeactivateAll(); err != nil {
-				return err
-			}
-		}
 	}
 
 	// Create academic year
@@ -91,13 +91,6 @@ func (s *AcademicYearService) UpdateAcademicYear(academicYear *models.AcademicYe
 		return errors.New("semester must be 'Ganjil' or 'Genap'")
 	}
 
-	// If this academic year is set to be active and wasn't active before, deactivate all others
-	if academicYear.IsActive && !existingAcademicYear.IsActive {
-		if err := s.repository.DeactivateAll(); err != nil {
-			return err
-		}
-	}
-
 	// Update academic year
 	return s.repository.Update(academicYear)
 }
@@ -123,13 +116,64 @@ func (s *AcademicYearService) DeleteAcademicYear(id uint) error {
 		return errors.New("academic year not found")
 	}
 
-	// Can't delete active academic year
-	if academicYear.IsActive {
-		return errors.New("cannot delete an active academic year")
+	// Get DB connection
+	db := database.GetDB()
+
+	// Begin transaction
+	tx := db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Hard delete related lecturer assignments
+	if err := tx.Unscoped().Where("academic_year_id = ?", id).Delete(&models.LecturerAssignment{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete related lecturer assignments: %w", err)
 	}
 
-	// Delete academic year
-	return s.repository.DeleteByID(id)
+	// Hard delete related course schedules
+	if err := tx.Unscoped().Where("academic_year_id = ?", id).Delete(&models.CourseSchedule{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete related course schedules: %w", err)
+	}
+
+	// Get student group IDs to delete associated student-to-group relationships
+	var studentGroupIDs []uint
+	if err := tx.Model(&models.StudentGroup{}).Where("academic_year_id = ?", id).Pluck("id", &studentGroupIDs).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to get student group IDs: %w", err)
+	}
+
+	// If there are student groups, delete their student-to-group relationships
+	if len(studentGroupIDs) > 0 {
+		if err := tx.Unscoped().Where("student_group_id IN ?", studentGroupIDs).Delete(&models.StudentToGroup{}).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to delete related student-to-group relationships: %w", err)
+		}
+	}
+
+	// Hard delete related student groups
+	if err := tx.Unscoped().Where("academic_year_id = ?", id).Delete(&models.StudentGroup{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete related student groups: %w", err)
+	}
+
+	// Hard delete related courses
+	if err := tx.Unscoped().Where("academic_year_id = ?", id).Delete(&models.Course{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete related courses: %w", err)
+	}
+
+	// Delete the academic year
+	if err := tx.Delete(&models.AcademicYear{}, id).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete academic year: %w", err)
+	}
+
+	// Commit transaction
+	return tx.Commit().Error
 }
 
 // AcademicYearWithStats represents an academic year with additional statistics
@@ -196,45 +240,4 @@ func (s *AcademicYearService) GetAllAcademicYearsWithStats() ([]AcademicYearWith
 	}
 
 	return result, nil
-}
-
-// ActivateAcademicYear activates an academic year and deactivates all others
-func (s *AcademicYearService) ActivateAcademicYear(id uint) error {
-	// Check if academic year exists
-	academicYear, err := s.repository.FindByID(id)
-	if err != nil {
-		return err
-	}
-	if academicYear == nil {
-		return errors.New("academic year not found")
-	}
-
-	// Log for debugging
-	log.Printf("Activating academic year ID: %d, Name: %s", id, academicYear.Name)
-
-	return s.repository.ActivateByID(id)
-}
-
-// DeactivateAcademicYear deactivates an academic year
-func (s *AcademicYearService) DeactivateAcademicYear(id uint) error {
-	// Check if academic year exists
-	academicYear, err := s.repository.FindByID(id)
-	if err != nil {
-		return err
-	}
-	if academicYear == nil {
-		return errors.New("academic year not found")
-	}
-
-	if !academicYear.IsActive {
-		return errors.New("academic year is already inactive")
-	}
-
-	academicYear.IsActive = false
-	return s.repository.Update(academicYear)
-}
-
-// GetActiveAcademicYear gets the active academic year
-func (s *AcademicYearService) GetActiveAcademicYear() (*models.AcademicYear, error) {
-	return s.repository.FindActive()
 } 

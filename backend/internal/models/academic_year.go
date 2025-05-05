@@ -13,7 +13,6 @@ type AcademicYear struct {
 	StartDate time.Time      `json:"start_date" gorm:"not null"`
 	EndDate   time.Time      `json:"end_date" gorm:"not null"`
 	Semester  string         `json:"semester" gorm:"type:varchar(20);not null"` // Ganjil, Genap
-	IsActive  bool           `json:"is_active" gorm:"default:false"`
 	CreatedAt time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`

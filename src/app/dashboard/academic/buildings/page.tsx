@@ -83,8 +83,7 @@ export default function BuildingsPage() {
     defaultValues: {
       code: "",
       name: "",
-      floors: 1,
-      description: ""
+      floors: 1
     }
   });
 
@@ -94,8 +93,7 @@ export default function BuildingsPage() {
     defaultValues: {
       code: "",
       name: "",
-      floors: 1,
-      description: ""
+      floors: 1
     }
   });
 
@@ -145,8 +143,7 @@ export default function BuildingsPage() {
       id: buildingData.building.id,
       code: buildingData.building.code,
       name: buildingData.building.name,
-      floors: buildingData.building.floors as number,
-      description: buildingData.building.description || ""
+      floors: buildingData.building.floors as number
     });
     
     setShowEditDialog(true);
@@ -449,22 +446,6 @@ export default function BuildingsPage() {
                 )}
               />
               
-              <FormField
-                control={addForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <FormLabel className="text-right">Deskripsi</FormLabel>
-                    <div className="col-span-3">
-                      <FormControl>
-                        <Input placeholder="Deskripsi gedung (opsional)" {...field} value={field.value || ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </div>
-                  </FormItem>
-                )}
-              />
-              
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => {
                   setShowAddDialog(false);
@@ -544,22 +525,6 @@ export default function BuildingsPage() {
                             {...field}
                             onChange={e => field.onChange(e.target.value === "" ? "" : parseInt(e.target.value))}
                           />
-                        </FormControl>
-                        <FormMessage />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={editForm.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Deskripsi</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <Input placeholder="Deskripsi gedung (opsional)" {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
                       </div>

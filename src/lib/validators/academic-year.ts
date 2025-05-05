@@ -19,7 +19,6 @@ export const academicYearFormSchema = z.object({
   semester: z.enum(["Ganjil", "Genap"], {
     required_error: "Semester harus dipilih",
   }),
-  is_active: z.boolean().optional(),
 }).refine((data) => {
   return data.start_date < data.end_date;
 }, {
@@ -34,7 +33,6 @@ export interface AcademicYear {
   start_date: Date | string;
   end_date: Date | string;
   semester: "Ganjil" | "Genap";
-  is_active: boolean;
   created_at?: string;
   updated_at?: string;
 }

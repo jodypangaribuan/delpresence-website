@@ -28,13 +28,10 @@ import {
   Plus, 
   Search, 
   CalendarDays, 
-  CheckCircle2, 
-  XCircle, 
   Pencil,
   Trash2,
   MoreHorizontal,
   Calendar,
-  Power
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -64,22 +61,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Switch } from "@/components/ui/switch";
 
 export default function AcademicYearsPage() {
   const [academicYears, setAcademicYears] = useState<AcademicYearWithStats[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [semesterFilter, setSemesterFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isActivating, setIsActivating] = useState<boolean>(false);
-  const [isDeactivating, setIsDeactivating] = useState<boolean>(false);
   
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -94,7 +86,6 @@ export default function AcademicYearsPage() {
       start_date: new Date(),
       end_date: new Date(),
       semester: "Ganjil" as const,
-      is_active: false,
     },
   });
 
@@ -105,7 +96,6 @@ export default function AcademicYearsPage() {
       start_date: new Date(),
       end_date: new Date(),
       semester: "Ganjil" as const,
-      is_active: false,
     },
   });
 
@@ -209,57 +199,6 @@ export default function AcademicYearsPage() {
     }
   };
 
-  // Toggle academic year active status
-  const toggleAcademicYearStatus = async (year: AcademicYearWithStats) => {
-    const academicYear = year.academic_year;
-    const newStatus = !academicYear.is_active;
-    
-    const actionText = newStatus ? "mengaktifkan" : "menonaktifkan";
-    const successText = newStatus ? "diaktifkan" : "dinonaktifkan";
-    
-    // Set loading state based on the action
-    if (newStatus) {
-      setIsActivating(true);
-    } else {
-      setIsDeactivating(true);
-    }
-    
-    try {
-      console.log(`${newStatus ? "Activating" : "Deactivating"} academic year:`, academicYear.id);
-      console.log("URL:", `${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years/${academicYear.id}/status`);
-      
-      const response = await axios.patch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years/${academicYear.id}/status`,
-        { is_active: newStatus },
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
-          }
-        }
-      );
-      
-      console.log("Response:", response.data);
-      
-      if (response.data.status === "success") {
-        toast.success(`Tahun akademik berhasil ${successText}`);
-        fetchAcademicYears();
-      } else {
-        toast.error(response.data.message || `Gagal ${actionText} tahun akademik`);
-      }
-    } catch (error: any) {
-      console.error(`Error ${newStatus ? "activating" : "deactivating"} academic year:`, error);
-      console.error("Error details:", error.response?.data);
-      toast.error(error.response?.data?.message || `Gagal ${actionText} tahun akademik`);
-    } finally {
-      // Reset loading state
-      if (newStatus) {
-        setIsActivating(false);
-      } else {
-        setIsDeactivating(false);
-      }
-    }
-  };
-
   // Setup edit academic year
   const setupEditAcademicYear = (year: AcademicYearWithStats) => {
     const academicYear = year.academic_year;
@@ -269,24 +208,19 @@ export default function AcademicYearsPage() {
       start_date: new Date(academicYear.start_date),
       end_date: new Date(academicYear.end_date),
       semester: academicYear.semester,
-      is_active: academicYear.is_active,
     });
     setShowEditDialog(true);
   };
 
-  // Filter academic years based on search, status, and semester
+  // Filter academic years based on search and semester
   const filteredYears = academicYears.filter((year) => {
     const matchesSearch = year.academic_year.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = 
-      statusFilter === "all" || 
-      (statusFilter === "active" && year.academic_year.is_active) || 
-      (statusFilter === "inactive" && !year.academic_year.is_active);
     const matchesSemester =
       semesterFilter === "all" ||
       (semesterFilter === "ganjil" && year.academic_year.semester === "Ganjil") ||
       (semesterFilter === "genap" && year.academic_year.semester === "Genap");
     
-    return matchesSearch && matchesStatus && matchesSemester;
+    return matchesSearch && matchesSemester;
   });
 
   return (
@@ -328,21 +262,6 @@ export default function AcademicYearsPage() {
             <div className="flex gap-2">
               <div className="w-full md:w-48">
                 <Select 
-                  onValueChange={setStatusFilter}
-                  value={statusFilter}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Filter Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Status</SelectItem>
-                    <SelectItem value="active">Aktif</SelectItem>
-                    <SelectItem value="inactive">Tidak Aktif</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-full md:w-48">
-                <Select 
                   onValueChange={setSemesterFilter}
                   value={semesterFilter}
                 >
@@ -362,12 +281,11 @@ export default function AcademicYearsPage() {
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50">
+                <TableRow>
                   <TableHead className="w-[50px] font-semibold text-gray-700">No</TableHead>
                   <TableHead className="font-semibold text-gray-700">Tahun Akademik</TableHead>
                   <TableHead className="font-semibold text-gray-700">Semester</TableHead>
                   <TableHead className="font-semibold text-gray-700">Periode</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   <TableHead className="text-center font-semibold text-gray-700">Mata Kuliah</TableHead>
                   <TableHead className="text-center font-semibold text-gray-700">Jadwal</TableHead>
                   <TableHead className="w-[100px] text-right font-semibold text-gray-700">Aksi</TableHead>
@@ -376,7 +294,7 @@ export default function AcademicYearsPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-10">
+                    <TableCell colSpan={7} className="text-center py-10">
                       <div className="flex justify-center">
                         <div className="animate-spin h-6 w-6 border-2 border-[#0687C9] border-opacity-50 border-t-[#0687C9] rounded-full"></div>
                       </div>
@@ -400,17 +318,6 @@ export default function AcademicYearsPage() {
                       <TableCell className="text-gray-600">
                         {format(new Date(year.academic_year.start_date), "dd MMM yyyy")} - {format(new Date(year.academic_year.end_date), "dd MMM yyyy")}
                       </TableCell>
-                      <TableCell>
-                        {year.academic_year.is_active ? (
-                          <Badge className="bg-green-50 text-green-700 font-normal">
-                            Aktif
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-gray-500 font-normal">
-                            Tidak Aktif
-                          </Badge>
-                        )}
-                      </TableCell>
                       <TableCell className="text-center font-medium">
                         {year.stats?.total_courses || 0}
                       </TableCell>
@@ -430,25 +337,6 @@ export default function AcademicYearsPage() {
                               <Pencil className="mr-2 h-4 w-4" />
                               <span>Edit</span>
                             </DropdownMenuItem>
-                            {year.academic_year.is_active ? (
-                              <DropdownMenuItem 
-                                onClick={() => toggleAcademicYearStatus(year)}
-                                disabled={isDeactivating}
-                                className="text-amber-600"
-                              >
-                                <Power className="mr-2 h-4 w-4" />
-                                <span>Nonaktifkan</span>
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem 
-                                onClick={() => toggleAcademicYearStatus(year)}
-                                disabled={isActivating}
-                                className="text-emerald-600"
-                              >
-                                <Power className="mr-2 h-4 w-4" />
-                                <span>Aktifkan</span>
-                              </DropdownMenuItem>
-                            )}
                             <DropdownMenuItem 
                               onClick={() => {
                                 setCurrentAcademicYear(year.academic_year);
@@ -466,7 +354,7 @@ export default function AcademicYearsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                       Tidak ada data yang ditemukan.
                     </TableCell>
                   </TableRow>
@@ -502,6 +390,31 @@ export default function AcademicYearsPage() {
                 )}
               />
               
+              <FormField
+                control={addForm.control}
+                name="semester"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Semester</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih semester" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Ganjil">Ganjil</SelectItem>
+                        <SelectItem value="Genap">Genap</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={addForm.control}
@@ -529,52 +442,6 @@ export default function AcademicYearsPage() {
                   )}
                 />
               </div>
-              
-              <FormField
-                control={addForm.control}
-                name="semester"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Semester</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih semester" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Ganjil">Ganjil</SelectItem>
-                        <SelectItem value="Genap">Genap</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={addForm.control}
-                name="is_active"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                    <div className="space-y-0.5">
-                      <FormLabel>Status Aktif</FormLabel>
-                      <FormDescription>
-                        Jadikan sebagai tahun akademik aktif
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
               
               <DialogFooter>
                 <Button 
@@ -621,6 +488,31 @@ export default function AcademicYearsPage() {
                 )}
               />
               
+              <FormField
+                control={editForm.control}
+                name="semester"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Semester</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih semester" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Ganjil">Ganjil</SelectItem>
+                        <SelectItem value="Genap">Genap</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}
@@ -648,52 +540,6 @@ export default function AcademicYearsPage() {
                   )}
                 />
               </div>
-              
-              <FormField
-                control={editForm.control}
-                name="semester"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Semester</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih semester" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Ganjil">Ganjil</SelectItem>
-                        <SelectItem value="Genap">Genap</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="is_active"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                    <div className="space-y-0.5">
-                      <FormLabel>Status Aktif</FormLabel>
-                      <FormDescription>
-                        Jadikan sebagai tahun akademik aktif
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
               
               <DialogFooter>
                 <Button 

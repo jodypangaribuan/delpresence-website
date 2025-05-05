@@ -190,10 +190,12 @@ func ConvertCampusResponseToLoginResponse(campusResponse *models.CampusLoginResp
 	}
 
 	log.Printf("Converted campus user to login response with role: %s", user.Role)
-	// Return login response
+	
+	// Return login response - ensure token and refreshToken are correctly set
+	// This is critical for frontend compatibility
 	return &models.LoginResponse{
-		Token:        campusResponse.Token,
-		RefreshToken: campusResponse.RefreshToken,
+		Token:        campusResponse.Token,        // JWT token for authorization
+		RefreshToken: campusResponse.RefreshToken, // Refresh token for obtaining new JWT
 		User:         *user,
 	}
 }

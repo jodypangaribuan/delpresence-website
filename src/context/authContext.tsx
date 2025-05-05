@@ -144,28 +144,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Parse response
         const campusData = await campusResponse.json();
+        
+        console.log("[AuthContext] Campus login response:", campusData);
 
-        // Only proceed if login was successful
-        if (campusResponse.ok && campusData.result && 
-            (campusData.user.role === "Dosen" || campusData.user.role === "Asisten Dosen")) {
-          console.log("[AuthContext] Campus login successful, role:", campusData.user.role);
-          
-          // Create login data
-          const userData = {
-            id: campusData.user.user_id,
-            username: campusData.user.username,
-            name: campusData.user.name || "",
-            email: campusData.user.email,
-            role: campusData.user.role,
-            photo: campusData.user.photo || "",
-          };
+        // Check if we got a successful response
+        if (campusResponse.ok) {
+          // Check if we have a user with the right role in the response
+          if (campusData.user && 
+             (campusData.user.role === "Dosen" || campusData.user.role === "Asisten Dosen")) {
+            console.log("[AuthContext] Campus login successful, role:", campusData.user.role);
+            
+            // Create login data
+            const userData = {
+              id: campusData.user.id || campusData.user.user_id, // Handle both formats
+              username: campusData.user.username,
+              name: campusData.user.name || "",
+              email: campusData.user.email || "",
+              role: campusData.user.role,
+              photo: campusData.user.photo || "",
+            };
 
-          // Save auth data securely
-          saveAuthData(campusData.token, campusData.refresh_token, userData);
-          return;
+            // Save auth data securely
+            saveAuthData(campusData.token, campusData.refresh_token, userData);
+            return;
+          }
         }
+        
+        console.log("[AuthContext] Campus login unsuccessful or invalid role");
       } catch (campusError) {
-        console.log("[AuthContext] Campus login failed, trying admin login");
+        console.log("[AuthContext] Campus login failed:", campusError);
       }
       
       // If campus login failed or returned invalid role, try admin login

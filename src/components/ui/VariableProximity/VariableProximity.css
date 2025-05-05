@@ -1,0 +1,23 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
+
+.variable-proximity {
+  font-family: "Inter", sans-serif;
+  font-variation-settings: 'wght' 500;
+  transition: font-variation-settings 0.05s ease;
+  will-change: font-variation-settings;
+  letter-spacing: -0.025em;
+  font-feature-settings: 'calt' 1, 'liga' 1;
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

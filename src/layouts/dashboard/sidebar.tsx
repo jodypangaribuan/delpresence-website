@@ -330,10 +330,10 @@ export function Sidebar() {
         {/* Lecturer-specific menu items */}
         {userRole === UserRole.LECTURER && (
           <>
-            {/* Course Management */}
+            {/* Teaching Management */}
             <div className="mb-2">
               <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Manajemen Mata Kuliah
+                Manajemen Pengajaran
               </p>
             </div>
             <ul className="space-y-1 mb-6">
@@ -344,85 +344,49 @@ export function Sidebar() {
                 Mata Kuliah Saya
               </MenuLink>
               <MenuLink
-                href="/dashboard/lecturer/classes"
-                icon={<SidebarIcons.Users />}
-              >
-                Kelas Saya
-              </MenuLink>
-            </ul>
-
-            {/* Schedule Management */}
-            <div className="mb-2">
-              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Manajemen Jadwal
-              </p>
-            </div>
-            <ul className="space-y-1 mb-6">
-              <MenuLink
                 href="/dashboard/lecturer/schedules"
                 icon={<SidebarIcons.Calendar />}
               >
                 Jadwal Mengajar
               </MenuLink>
               <MenuLink
-                href="/dashboard/lecturer/reschedule"
-                icon={<SidebarIcons.CalendarDays />}
-              >
-                Pengajuan Kelas Pengganti
-              </MenuLink>
-            </ul>
-
-            {/* Attendance Management */}
-            <div className="mb-2">
-              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Manajemen Kehadiran
-              </p>
-            </div>
-            <ul className="space-y-1 mb-6">
-              <MenuLink
-                href="/dashboard/lecturer/attendance/manage"
+                href="/dashboard/lecturer/attendance"
                 icon={<SidebarIcons.ClipboardList />}
               >
-                Kelola Presensi
+                Kelola Kehadiran
               </MenuLink>
               <MenuLink
-                href="/dashboard/lecturer/attendance/qr"
+                href="/dashboard/lecturer/qrcode"
                 icon={<SidebarIcons.QrCode />}
               >
-                Generate QR Presensi
+                Generate QR Code
               </MenuLink>
               <MenuLink
-                href="/dashboard/lecturer/attendance/face"
-                icon={<SidebarIcons.ScanFace />}
+                href="/dashboard/lecturer/assistants"
+                icon={<SidebarIcons.UserCog />}
               >
-                Aktivasi Face Recognition
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/lecturer/attendance/summary"
-                icon={<SidebarIcons.BarChart2 />}
-              >
-                Rekap Kehadiran
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/lecturer/attendance/permissions"
-                icon={<SidebarIcons.FileCheck />}
-              >
-                Izin Mahasiswa
+                Kelola Asisten Dosen
               </MenuLink>
             </ul>
 
-            {/* Communication */}
+            {/* Academic Report */}
             <div className="mb-2">
               <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Komunikasi
+                Laporan Akademik
               </p>
             </div>
             <ul className="space-y-1 mb-6">
               <MenuLink
-                href="/dashboard/lecturer/announcements"
-                icon={<SidebarIcons.MessageSquare />}
+                href="/dashboard/lecturer/student-progress"
+                icon={<SidebarIcons.BarChart2 />}
               >
-                Pengumuman Kelas
+                Perkembangan Mahasiswa
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/lecturer/attendance-reports"
+                icon={<SidebarIcons.FileCheck />}
+              >
+                Laporan Kehadiran
               </MenuLink>
             </ul>
           </>
@@ -430,70 +394,7 @@ export function Sidebar() {
 
         {/* Assistant-specific menu items */}
         {userRole === UserRole.ASSISTANT && (
-          <>
-            {/* Course Management */}
-            <div className="mb-2">
-              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Manajemen Mata Kuliah
-              </p>
-            </div>
-            <ul className="space-y-1 mb-6">
-              <MenuLink
-                href="/dashboard/assistant/courses"
-                icon={<SidebarIcons.BookOpen />}
-              >
-                Mata Kuliah Asisten
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/assistant/classes"
-                icon={<SidebarIcons.Users />}
-              >
-                Kelas Asisten
-              </MenuLink>
-            </ul>
-
-            {/* Schedule Management */}
-            <div className="mb-2">
-              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Manajemen Jadwal
-              </p>
-            </div>
-            <ul className="space-y-1 mb-6">
-              <MenuLink
-                href="/dashboard/assistant/schedules"
-                icon={<SidebarIcons.Calendar />}
-              >
-                Jadwal Asistensi
-              </MenuLink>
-            </ul>
-
-            {/* Attendance Management */}
-            <div className="mb-2">
-              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Manajemen Kehadiran
-              </p>
-            </div>
-            <ul className="space-y-1 mb-6">
-              <MenuLink
-                href="/dashboard/assistant/attendance/manage"
-                icon={<SidebarIcons.ClipboardList />}
-              >
-                Kelola Presensi
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/assistant/attendance/qr"
-                icon={<SidebarIcons.QrCode />}
-              >
-                Generate QR Presensi
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/assistant/attendance/summary"
-                icon={<SidebarIcons.BarChart2 />}
-              >
-                Rekap Kehadiran
-              </MenuLink>
-            </ul>
-          </>
+          <></>
         )}
       </nav>
     </aside>

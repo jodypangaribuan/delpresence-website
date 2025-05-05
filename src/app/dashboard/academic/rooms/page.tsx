@@ -12,8 +12,6 @@ import {
   Building,
   Users,
   LayoutGrid,
-  Wifi,
-  Monitor,
   MoreHorizontal
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +45,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import axios from "axios";
 import { toast } from "sonner";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
@@ -75,10 +72,6 @@ interface Room {
   };
   floor: number | string;
   capacity: number | string;
-  has_ac: boolean;
-  has_projector: boolean;
-  has_internet: boolean;
-  description?: string;
 }
 
 export default function RoomsPage() {
@@ -105,11 +98,7 @@ export default function RoomsPage() {
       name: "",
       building_id: 0,
       floor: 0,
-      capacity: 0,
-      has_ac: false,
-      has_projector: false,
-      has_internet: false,
-      description: ""
+      capacity: 0
     }
   });
 
@@ -121,11 +110,7 @@ export default function RoomsPage() {
       name: "",
       building_id: 0,
       floor: 0,
-      capacity: 0,
-      has_ac: false,
-      has_projector: false,
-      has_internet: false,
-      description: ""
+      capacity: 0
     }
   });
 
@@ -234,11 +219,7 @@ export default function RoomsPage() {
       name: room.name,
       building_id: room.building_id.toString(), // Convert to string for the select input
       floor: room.floor.toString(), // Convert to string in case it's a number
-      capacity: room.capacity.toString(), // Convert to string in case it's a number
-      has_ac: room.has_ac,
-      has_projector: room.has_projector,
-      has_internet: room.has_internet,
-      description: room.description || ""
+      capacity: room.capacity.toString() // Convert to string in case it's a number
     } as any);
     
     setShowEditDialog(true);
@@ -409,14 +390,13 @@ export default function RoomsPage() {
                   <TableHead className="font-bold text-black">Gedung</TableHead>
                   <TableHead className="text-center font-bold text-black">Lantai</TableHead>
                   <TableHead className="text-center font-bold text-black">Kapasitas</TableHead>
-                  <TableHead className="font-bold text-black">Fasilitas</TableHead>
                   <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-10">
+                    <TableCell colSpan={7} className="text-center py-10">
                       <div className="flex justify-center">
                         <div className="animate-spin h-6 w-6 border-2 border-[#0687C9] border-opacity-50 border-t-[#0687C9] rounded-full"></div>
                       </div>
@@ -440,27 +420,6 @@ export default function RoomsPage() {
                         <div className="flex items-center justify-center">
                           <Users className="h-4 w-4 mr-1 text-gray-500" />
                           {room.capacity}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
-                          {room.has_ac && (
-                            <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700">
-                              AC
-                            </Badge>
-                          )}
-                          {room.has_projector && (
-                            <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700">
-                              <Monitor className="h-3 w-3 mr-1" />
-                              Proyektor
-                            </Badge>
-                          )}
-                          {room.has_internet && (
-                            <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
-                              <Wifi className="h-3 w-3 mr-1" />
-                              Internet
-                            </Badge>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -492,7 +451,7 @@ export default function RoomsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-4 text-gray-500">
+                    <TableCell colSpan={7} className="text-center py-4 text-gray-500">
                       Tidak ada ruangan yang sesuai dengan filter
                     </TableCell>
                   </TableRow>
@@ -617,103 +576,6 @@ export default function RoomsPage() {
                           {...field}
                           onChange={e => field.onChange(e.target.value === "" ? "" : parseInt(e.target.value))}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </div>
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={addForm.control}
-                name="has_ac"
-                render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <FormLabel className="text-right">Fasilitas</FormLabel>
-                    <div className="col-span-3">
-                      <FormControl>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="has_ac" 
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                          <label
-                            htmlFor="has_ac"
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            AC
-                          </label>
-                        </div>
-                      </FormControl>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={addForm.control}
-                name="has_projector"
-                render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <div className="col-span-1"></div>
-                    <div className="col-span-3">
-                      <FormControl>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="has_projector" 
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                          <label
-                            htmlFor="has_projector"
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            Proyektor
-                          </label>
-                        </div>
-                      </FormControl>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={addForm.control}
-                name="has_internet"
-                render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <div className="col-span-1"></div>
-                    <div className="col-span-3">
-                      <FormControl>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="has_internet" 
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                          <label
-                            htmlFor="has_internet"
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            Koneksi Internet
-                          </label>
-                        </div>
-                      </FormControl>
-                    </div>
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={addForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <FormLabel className="text-right">Deskripsi</FormLabel>
-                    <div className="col-span-3">
-                      <FormControl>
-                        <Input placeholder="Deskripsi ruangan (opsional)" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </div>
@@ -852,103 +714,6 @@ export default function RoomsPage() {
                             {...field}
                             onChange={e => field.onChange(e.target.value === "" ? "" : parseInt(e.target.value))}
                           />
-                        </FormControl>
-                        <FormMessage />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={editForm.control}
-                  name="has_ac"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Fasilitas</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id="has_ac" 
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                            <label
-                              htmlFor="has_ac"
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              AC
-                            </label>
-                          </div>
-                        </FormControl>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={editForm.control}
-                  name="has_projector"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <div className="col-span-1"></div>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id="has_projector" 
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                            <label
-                              htmlFor="has_projector"
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Proyektor
-                            </label>
-                          </div>
-                        </FormControl>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={editForm.control}
-                  name="has_internet"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <div className="col-span-1"></div>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id="has_internet" 
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                            <label
-                              htmlFor="has_internet"
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              Koneksi Internet
-                            </label>
-                          </div>
-                        </FormControl>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={editForm.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Deskripsi</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <Input placeholder="Deskripsi ruangan (opsional)" {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
                       </div>

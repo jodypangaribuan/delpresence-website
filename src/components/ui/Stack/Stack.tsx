@@ -84,7 +84,7 @@ export default function Stack({
         ]
   );
 
-  const sendToBack = (id: number) => {
+  const sendToBack = (id: number | string) => {
     setCards((prev: CardImage[]) => {
       const newCards = [...prev];
       const index = newCards.findIndex((card) => card.id === id);
@@ -132,7 +132,7 @@ export default function Stack({
               }}
               style={{
                 width: cardDimensions.width,
-                height: cardDimensions.height,
+                height: cardDimensions.height
               }}
             >
               <img

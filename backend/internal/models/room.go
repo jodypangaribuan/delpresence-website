@@ -15,10 +15,6 @@ type Room struct {
 	Building     Building       `json:"building" gorm:"foreignKey:BuildingID"`
 	Floor        int            `json:"floor" gorm:"type:int;default:1"`
 	Capacity     int            `json:"capacity" gorm:"type:int;default:0"`
-	HasAC        bool           `json:"has_ac" gorm:"default:false"`
-	HasProjector bool           `json:"has_projector" gorm:"default:false"`
-	HasInternet  bool           `json:"has_internet" gorm:"default:false"`
-	Description  string         `json:"description" gorm:"type:text"`
 	CreatedAt    time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt    time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index"`

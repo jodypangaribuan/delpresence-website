@@ -60,6 +60,13 @@ type LoginRequest struct {
 // LoginResponse represents the login response body
 type LoginResponse struct {
 	User         User   `json:"user"`
+	Token        string `json:"token"`         // JWT token for authorization
+	RefreshToken string `json:"refresh_token"` // Field name must match frontend expectations
+}
+
+// OrderedLoginResponse represents a login response with controlled field order
+type OrderedLoginResponse struct {
+	User         User   `json:"user"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
 }

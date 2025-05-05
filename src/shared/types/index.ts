@@ -8,20 +8,27 @@ export interface SiteConfig {
   url: string;
   ogImage: string;
   links: {
-    twitter: string;
-    github: string;
+    institution: string;
+    privacyPolicy: string;
+    termsOfUse: string;
+    download: string;
   };
   colors: {
     primary: string;
-    secondary: string;
+    primaryHover: string;
+    gradient: {
+      from: string;
+      to: string;
+    }
   };
+  copyright: string;
 }
 
 /**
  * Card image type for the Stack component
  */
 export interface CardImage {
-  id: string;
+  id: number | string;
   img: string;
 }
 
@@ -55,7 +62,6 @@ export interface StudyProgram {
  * - code: 2-10 characters, alphanumeric with dashes
  * - name: 3-100 characters, cannot be empty
  * - floors: minimum 1, must be a positive integer
- * - description: optional, maximum 500 characters
  */
 export interface Building {
   id: number;
@@ -63,7 +69,6 @@ export interface Building {
   code: string;
   name: string;
   floors: number;
-  description?: string;
 }
 
 /**
@@ -81,7 +86,6 @@ export interface BuildingWithStats {
  * - building_id: must be valid building id
  * - floor: minimum 0 (ground floor), must be non-negative integer
  * - capacity: minimum 0, must be a non-negative integer
- * - description: optional, maximum 500 characters
  */
 export interface Room {
   id: number;
@@ -95,8 +99,4 @@ export interface Room {
   };
   floor: number;
   capacity: number;
-  has_ac: boolean;
-  has_projector: boolean;
-  has_internet: boolean;
-  description?: string;
 } 

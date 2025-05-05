@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -39,8 +40,26 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Return the login response
-	c.JSON(http.StatusOK, response)
+	// Use custom response struct to ensure the correct field order
+	orderedResponse := models.OrderedLoginResponse{
+		User:         response.User,
+		Token:        response.Token,
+		RefreshToken: response.RefreshToken,
+	}
+	
+	// Set content type
+	c.Header("Content-Type", "application/json")
+	
+	// Manually marshal to JSON to ensure field order
+	jsonBytes, err := json.Marshal(orderedResponse)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating response"})
+		return
+	}
+	
+	// Write the response
+	c.Writer.WriteHeader(http.StatusOK)
+	c.Writer.Write(jsonBytes)
 }
 
 // RefreshToken handles token refresh requests
@@ -76,8 +95,26 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	// Return the login response
-	c.JSON(http.StatusOK, response)
+	// Use custom response struct to ensure the correct field order
+	orderedResponse := models.OrderedLoginResponse{
+		User:         response.User,
+		Token:        response.Token,
+		RefreshToken: response.RefreshToken,
+	}
+	
+	// Set content type
+	c.Header("Content-Type", "application/json")
+	
+	// Manually marshal to JSON to ensure field order
+	jsonBytes, err := json.Marshal(orderedResponse)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating response"})
+		return
+	}
+	
+	// Write the response
+	c.Writer.WriteHeader(http.StatusOK)
+	c.Writer.Write(jsonBytes)
 }
 
 // GetCurrentUser returns the currently logged-in user

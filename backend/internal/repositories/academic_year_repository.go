@@ -4,6 +4,7 @@ import (
 	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/models"
 	"gorm.io/gorm"
+	"time"
 )
 
 // AcademicYearRepository is a repository for academic year operations
@@ -54,6 +55,19 @@ func (r *AcademicYearRepository) FindByName(name string) (*models.AcademicYear, 
 	return &academicYear, nil
 }
 
+// FindByNameIncludingDeleted finds an academic year by name including soft-deleted records
+func (r *AcademicYearRepository) FindByNameIncludingDeleted(name string) (*models.AcademicYear, error) {
+	var academicYear models.AcademicYear
+	err := r.db.Unscoped().Where("name = ?", name).First(&academicYear).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &academicYear, nil
+}
+
 // FindAll finds all academic years
 func (r *AcademicYearRepository) FindAll() ([]models.AcademicYear, error) {
 	var academicYears []models.AcademicYear
@@ -69,59 +83,49 @@ func (r *AcademicYearRepository) DeleteByID(id uint) error {
 	return r.db.Delete(&models.AcademicYear{}, id).Error
 }
 
-// CountActive counts the number of active academic years
-func (r *AcademicYearRepository) CountActive() (int64, error) {
-	var count int64
-	err := r.db.Model(&models.AcademicYear{}).Where("is_active = ?", true).Count(&count).Error
-	return count, err
-}
-
-// ActivateByID activates an academic year and deactivates all others
-func (r *AcademicYearRepository) ActivateByID(id uint) error {
-	// Start a transaction
-	tx := r.db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// Deactivate all academic years with a proper WHERE condition
-	if err := tx.Model(&models.AcademicYear{}).Where("id <> ?", id).Update("is_active", false).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	// Activate the specified academic year
-	if err := tx.Model(&models.AcademicYear{}).Where("id = ?", id).Update("is_active", true).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
-}
-
-// DeactivateAll deactivates all academic years
-func (r *AcademicYearRepository) DeactivateAll() error {
-	// Add a WHERE condition to prevent the "WHERE conditions required" error
-	return r.db.Model(&models.AcademicYear{}).Where("is_active = ?", true).Update("is_active", false).Error
-}
-
-// FindActive finds the active academic year
-func (r *AcademicYearRepository) FindActive() (*models.AcademicYear, error) {
+// RestoreSoftDeletedByName finds a soft-deleted academic year by name and restores it with new data
+func (r *AcademicYearRepository) RestoreSoftDeletedByName(name string, newData *models.AcademicYear) (*models.AcademicYear, error) {
 	var academicYear models.AcademicYear
-	err := r.db.Where("is_active = ?", true).First(&academicYear).Error
+	
+	// Find the soft-deleted record
+	err := r.db.Unscoped().Where("name = ? AND deleted_at IS NOT NULL", name).First(&academicYear).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, nil
+			return nil, nil // No soft-deleted record found
 		}
 		return nil, err
 	}
-	return &academicYear, nil
+	
+	// Update the record with new data and clear the DeletedAt field
+	err = r.db.Unscoped().Model(&academicYear).Updates(map[string]interface{}{
+		"start_date": newData.StartDate,
+		"end_date":   newData.EndDate,
+		"semester":   newData.Semester,
+		"deleted_at": nil, // This clears the DeletedAt field, effectively restoring the record
+	}).Error
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	// Return the restored record with its ID
+	newData.ID = academicYear.ID
+	return newData, nil
 }
 
-// GetActiveAcademicYear returns the active academic year
-// This is an alias for FindActive to maintain compatibility with handler usage
+// GetActiveAcademicYear returns the currently active academic year
+// An academic year is considered active if the current date falls between its start and end dates
 func (r *AcademicYearRepository) GetActiveAcademicYear() (*models.AcademicYear, error) {
-	return r.FindActive()
+	var academicYear models.AcademicYear
+	now := time.Now()
+	
+	err := r.db.Where("start_date <= ? AND end_date >= ?", now, now).First(&academicYear).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil // No active academic year found
+		}
+		return nil, err
+	}
+	
+	return &academicYear, nil
 } 

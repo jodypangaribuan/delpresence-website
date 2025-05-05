@@ -179,6 +179,13 @@ func Initialize() {
 	}
 	log.Println("LecturerAssignment table migrated successfully")
 	
+	// Then migrate the CourseSchedule model
+	err = DB.AutoMigrate(&models.CourseSchedule{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating CourseSchedule model: %v\n", err)
+	}
+	log.Println("CourseSchedule table migrated successfully")
+	
 	log.Println("Database schema migrated successfully")
 }
 
