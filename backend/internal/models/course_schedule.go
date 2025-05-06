@@ -24,8 +24,6 @@ type CourseSchedule struct {
 	AcademicYear    AcademicYear   `gorm:"foreignKey:AcademicYearID" json:"academic_year,omitempty"`
 	Capacity        int            `json:"capacity"`
 	Enrolled        int            `json:"enrolled"`
-	Notes           string         `json:"notes"`
-	IsActive        bool           `gorm:"default:true" json:"is_active"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`

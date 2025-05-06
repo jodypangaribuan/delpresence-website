@@ -64,7 +64,6 @@ func Initialize() {
 
 	log.Println("Connected to database successfully")
 
-	// Auto-migrate in specific order to handle dependencies
 	log.Println("Starting database migration...")
 	
 	// First migrate the User model (no external dependencies)
@@ -87,7 +86,7 @@ func Initialize() {
 		log.Fatalf("Error auto-migrating StudyProgram model: %v\n", err)
 	}
 	log.Println("StudyProgram table migrated successfully")
-	
+
 	// Then migrate the Student model
 	err = DB.AutoMigrate(&models.Student{})
 	if err != nil {

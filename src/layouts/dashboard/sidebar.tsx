@@ -278,18 +278,6 @@ export function Sidebar() {
               >
                 Jadwal Perkuliahan
               </MenuLink>
-              <MenuLink
-                href="/dashboard/schedules/import"
-                icon={<SidebarIcons.FileSpreadsheet />}
-              >
-                Import Jadwal
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/schedules/export"
-                icon={<SidebarIcons.FileOutput />}
-              >
-                Export Jadwal
-              </MenuLink>
             </ul>
 
             {/* User Management */}

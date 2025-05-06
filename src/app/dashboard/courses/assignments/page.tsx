@@ -212,7 +212,15 @@ export default function LecturerAssignmentsPage() {
       });
       
       if (response.data.status === "success") {
-        setCourses(response.data.data);
+        const coursesData = response.data.data || [];
+        setCourses(coursesData);
+        
+        // Add a check for empty courses
+        if (coursesData.length === 0) {
+          toast.warning("Tidak ada mata kuliah tersedia", {
+            description: "Silakan tambahkan mata kuliah terlebih dahulu"
+          });
+        }
       } else {
         toast.error("Gagal memuat data mata kuliah");
       }
@@ -297,15 +305,17 @@ export default function LecturerAssignmentsPage() {
   
   // Select lecturer for assignment
   const selectLecturer = async (lecturer: Lecturer) => {
-    // Check if user_id exists before proceeding
+    // Check if user_id exists before proceeding - change to warning
     if (lecturer.user_id === undefined) {
-      toast.error("Data dosen tidak lengkap. ID pengguna tidak ditemukan.");
-      return;
+      toast.warning("Data dosen tidak lengkap. ID pengguna tidak ditemukan.", {
+        description: "Dosen belum disinkronisasi dengan pengguna sistem."
+      });
+      // Continue and select the lecturer anyway
     }
     
     setSelectedLecturer(lecturer);
-    // Always use user_id from lecturer
-    setFormLecturerId(lecturer.user_id.toString());
+    // Always use user_id from lecturer, fallback to lecturer.id if user_id is undefined
+    setFormLecturerId(lecturer.user_id?.toString() || lecturer.id.toString());
     setFormLecturerName(lecturer.full_name);
     setShowLecturerResults(false);
   };
@@ -346,6 +356,20 @@ export default function LecturerAssignmentsPage() {
 
   // Handle add assignment
   const handleAddAssignment = async () => {
+    // Change error blocks to warnings
+    if (courses.length === 0) {
+      toast.warning("Tidak ada mata kuliah tersedia", {
+        description: "Silakan tambahkan mata kuliah terlebih dahulu"
+      });
+    }
+    
+    // Check if academic years are available
+    if (academicYears.length === 0) {
+      toast.warning("Tidak ada tahun akademik tersedia", {
+        description: "Silakan tambahkan tahun akademik terlebih dahulu"
+      });
+    }
+    
     if (!formLecturerId || !formCourseId || !formAcademicYearId) {
       toast.error("Mohon lengkapi semua field");
       return;
@@ -355,10 +379,11 @@ export default function LecturerAssignmentsPage() {
     const courseId = parseInt(formCourseId);
     const academicYearId = parseInt(formAcademicYearId);
     
-    // Validate that we have a valid user_id (not lecturer.id)
+    // Change to warning but still allow the submission
     if (selectedLecturer && selectedLecturer.user_id === undefined) {
-      toast.error("Data dosen tidak valid, silakan pilih dosen lain");
-      return;
+      toast.warning("Data dosen tidak lengkap", {
+        description: "Dosen belum disinkronisasi dengan pengguna sistem"
+      });
     }
     
     setIsSubmitting(true);
@@ -440,9 +465,30 @@ export default function LecturerAssignmentsPage() {
   
   // Handle update assignment
   const handleUpdateAssignment = async () => {
+    // Change error blocks to warnings
+    if (courses.length === 0) {
+      toast.warning("Tidak ada mata kuliah tersedia", {
+        description: "Silakan tambahkan mata kuliah terlebih dahulu"
+      });
+    }
+    
+    // Check if academic years are available
+    if (academicYears.length === 0) {
+      toast.warning("Tidak ada tahun akademik tersedia", {
+        description: "Silakan tambahkan tahun akademik terlebih dahulu"
+      });
+    }
+    
     if (!currentAssignment || !formLecturerId || !formCourseId || !formAcademicYearId) {
       toast.error("Mohon lengkapi semua field");
       return;
+    }
+    
+    // Change to warning but still allow the submission
+    if (selectedLecturer && selectedLecturer.user_id === undefined) {
+      toast.warning("Data dosen tidak lengkap", {
+        description: "Dosen belum disinkronisasi dengan pengguna sistem"
+      });
     }
     
     setIsSubmitting(true);
@@ -594,6 +640,19 @@ export default function LecturerAssignmentsPage() {
             <Button 
               onClick={() => {
                 resetForm();
+                // Replace error blocks with warning toasts
+                if (courses.length === 0) {
+                  toast.warning("Tidak ada mata kuliah tersedia", {
+                    description: "Silakan tambahkan mata kuliah terlebih dahulu"
+                  });
+                }
+                
+                if (academicYears.length === 0) {
+                  toast.warning("Tidak ada tahun akademik tersedia", {
+                    description: "Silakan tambahkan tahun akademik terlebih dahulu"
+                  });
+                }
+                
                 setShowAddDialog(true);
               }}
               className="bg-[#0687C9] hover:bg-[#0670a8]"

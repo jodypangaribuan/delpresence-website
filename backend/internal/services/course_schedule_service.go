@@ -273,8 +273,6 @@ func (s *CourseScheduleService) FormatScheduleForResponse(schedule models.Course
 		"academic_year_id": schedule.AcademicYearID,
 		"capacity":       schedule.Capacity,
 		"enrolled":       schedule.Enrolled,
-		"notes":          schedule.Notes,
-		"is_active":      schedule.IsActive,
 	}
 
 	// Add related data if loaded

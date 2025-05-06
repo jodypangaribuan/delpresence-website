@@ -130,8 +130,6 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 		AcademicYearID  uint   `json:"academic_year_id" binding:"required"`
 		Capacity        int    `json:"capacity"`
 		Enrolled        int    `json:"enrolled"`
-		Notes           string `json:"notes"`
-		IsActive        bool   `json:"is_active"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -184,8 +182,6 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 		AcademicYearID: request.AcademicYearID,
 		Capacity:       request.Capacity,
 		Enrolled:       request.Enrolled,
-		Notes:          request.Notes,
-		IsActive:       request.IsActive,
 	}
 
 	// Create the schedule
@@ -222,8 +218,6 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 		AcademicYearID  uint   `json:"academic_year_id" binding:"required"`
 		Capacity        int    `json:"capacity"`
 		Enrolled        int    `json:"enrolled"`
-		Notes           string `json:"notes"`
-		IsActive        bool   `json:"is_active"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -285,8 +279,6 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 		AcademicYearID: request.AcademicYearID,
 		Capacity:       request.Capacity,
 		Enrolled:       request.Enrolled,
-		Notes:          request.Notes,
-		IsActive:       request.IsActive,
 	}
 
 	// Update the schedule

@@ -84,6 +84,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { api } from "@/utils/api";
+import { z } from "zod";
 
 interface Course {
   id: number;
@@ -168,8 +169,6 @@ interface CourseSchedule {
   semester?: number;
   capacity: number;
   enrolled: number;
-  notes?: string;
-  is_active: boolean;
 }
 
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
@@ -205,8 +204,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 1,
     capacity: 50,
-    enrolled: 45,
-    is_active: true
+    enrolled: 45
   },
   // ... other sample schedules with the updated structure
   {
@@ -228,8 +226,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 3,
     capacity: 40,
-    enrolled: 38,
-    is_active: true
+    enrolled: 38
   },
   {
     id: 3,
@@ -250,8 +247,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 3,
     capacity: 35,
-    enrolled: 35,
-    is_active: true
+    enrolled: 35
   },
   {
     id: 4,
@@ -272,8 +268,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 5,
     capacity: 30,
-    enrolled: 24,
-    is_active: true
+    enrolled: 24
   },
   {
     id: 5,
@@ -294,8 +289,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 5,
     capacity: 30,
-    enrolled: 28,
-    is_active: true
+    enrolled: 28
   },
   {
     id: 6,
@@ -316,8 +310,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 1,
     capacity: 45,
-    enrolled: 42,
-    is_active: true
+    enrolled: 42
   },
   {
     id: 7,
@@ -338,8 +331,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 3,
     capacity: 35,
-    enrolled: 30,
-    is_active: true
+    enrolled: 30
   },
   {
     id: 8,
@@ -360,8 +352,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 5,
     capacity: 30,
-    enrolled: 29,
-    is_active: true
+    enrolled: 29
   },
   {
     id: 9,
@@ -382,8 +373,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 5,
     capacity: 25,
-    enrolled: 20,
-    is_active: true
+    enrolled: 20
   },
   {
     id: 10,
@@ -404,8 +394,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 5,
     capacity: 25,
-    enrolled: 23,
-    is_active: true
+    enrolled: 23
   },
   {
     id: 11,
@@ -426,8 +415,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 1,
     capacity: 40,
-    enrolled: 40,
-    is_active: true
+    enrolled: 40
   },
   {
     id: 12,
@@ -448,8 +436,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 3,
     capacity: 30,
-    enrolled: 28,
-    is_active: true
+    enrolled: 28
   },
   {
     id: 13,
@@ -470,8 +457,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 1,
     capacity: 45,
-    enrolled: 40,
-    is_active: true
+    enrolled: 40
   },
   {
     id: 14,
@@ -492,8 +478,7 @@ const SAMPLE_SCHEDULES: CourseSchedule[] = [
     academic_year_name: "2023/2024",
     semester: 3,
     capacity: 60,
-    enrolled: 55,
-    is_active: true
+    enrolled: 55
   }
 ];
 
@@ -1075,7 +1060,6 @@ export default function ScheduleManagePage() {
       lecturer_id: "",
       student_group_id: "",
       academic_year_id: "",
-      notes: ""
     }
   });
 
@@ -1089,7 +1073,6 @@ export default function ScheduleManagePage() {
       lecturer_id: "",
       student_group_id: "",
       academic_year_id: "",
-      notes: ""
     }
   });
 
@@ -1112,8 +1095,7 @@ export default function ScheduleManagePage() {
         day: currentSchedule.day || "",
         start_time: currentSchedule.start_time || "",
         end_time: currentSchedule.end_time || "",
-        room_id: currentSchedule.room_id?.toString() || "",
-        notes: currentSchedule.notes || ""
+        room_id: currentSchedule.room_id?.toString() || ""
       });
       
       // Set the selected lecturer for display
@@ -1410,24 +1392,6 @@ export default function ScheduleManagePage() {
                                 )}
                   </SelectContent>
                 </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={addForm.control}
-                        name="notes"
-                        render={({ field }) => (
-                          <FormItem className="col-span-2">
-                            <FormLabel>Catatan</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="Tambahkan catatan jika diperlukan" 
-                                className="resize-none"
-                                {...field}
-                              />
-                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -2539,25 +2503,6 @@ export default function ScheduleManagePage() {
                             )}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={editForm.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormLabel>Catatan</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Tambahkan catatan jika diperlukan" 
-                            className="resize-none"
-                            {...field}
-                            defaultValue={currentSchedule.notes}
-                          />
-                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

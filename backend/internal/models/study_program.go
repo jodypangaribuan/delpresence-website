@@ -14,8 +14,8 @@ type StudyProgram struct {
 	FacultyID         uint           `json:"faculty_id" gorm:"not null"`
 	Faculty           Faculty        `json:"faculty" gorm:"foreignKey:FacultyID"`
 	Degree            string         `json:"degree" gorm:"type:varchar(10)"`
-	Accreditation     string         `json:"accreditation" gorm:"type:varchar(10)"`
-	HeadOfDepartment  string         `json:"head_of_department" gorm:"type:varchar(100)"`
+	Accreditation     string         `json:"accreditation" gorm:"type:varchar(50)"`
+	HeadOfDepartment  string         `json:"head_of_department" gorm:"type:varchar(200)"`
 	LecturerCount     int            `json:"lecturer_count" gorm:"type:int;default:0"`
 	StudentCount      int            `json:"student_count" gorm:"type:int;default:0"`
 	CreatedAt         time.Time      `json:"created_at" gorm:"autoCreateTime"`
