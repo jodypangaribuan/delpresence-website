@@ -85,6 +85,7 @@ import {
 import { cn } from "@/lib/utils";
 import { api } from "@/utils/api";
 import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface Course {
   id: number;
@@ -182,305 +183,24 @@ const DAY_MAPPING: Record<string, number> = {
   "Minggu": 0
 };
 
-// Dummy data for now - will be replaced with API calls
-const SAMPLE_SCHEDULES: CourseSchedule[] = [
-  // Keep the existing data but update to match the new interface
-  {
-    id: 1,
-    course_id: 101,
-    course_code: "MK101",
-    course_name: "Pengantar Teknologi Informasi",
-    room_id: 1,
-    room_name: "Ruang 101",
-    building_name: "Gedung Teknik",
-    day: "Senin",
-    start_time: "08:00",
-    end_time: "10:30",
-    lecturer_id: 1,
-    lecturer_name: "Dr. Ahmad Wijaya",
-    student_group_id: 1,
-    student_group_name: "Informatika 2023",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 1,
-    capacity: 50,
-    enrolled: 45
-  },
-  // ... other sample schedules with the updated structure
-  {
-    id: 2,
-    course_id: 102,
-    course_code: "MK201",
-    course_name: "Struktur Data dan Algoritma",
-    room_id: 2,
-    room_name: "Ruang 203",
-    building_name: "Gedung Teknik",
-    day: "Selasa",
-    start_time: "13:00",
-    end_time: "15:30",
-    lecturer_id: 2,
-    lecturer_name: "Prof. Siti Rahayu",
-    student_group_id: 2,
-    student_group_name: "Informatika 2022",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 3,
-    capacity: 40,
-    enrolled: 38
-  },
-  {
-    id: 3,
-    course_id: 103,
-    course_code: "MK301",
-    course_name: "Basis Data Lanjut",
-    room_id: 3,
-    room_name: "Lab Database",
-    building_name: "Gedung Informatika",
-    day: "Rabu",
-    start_time: "10:00",
-    end_time: "12:30",
-    lecturer_id: 3,
-    lecturer_name: "Dr. Budi Santoso",
-    student_group_id: 3,
-    student_group_name: "Sistem Informasi 2022",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 3,
-    capacity: 35,
-    enrolled: 35
-  },
-  {
-    id: 4,
-    course_id: 104,
-    course_code: "MK401",
-    course_name: "Kecerdasan Buatan dan Machine Learning",
-    room_id: 4,
-    room_name: "Lab AI",
-    building_name: "Gedung Riset",
-    day: "Kamis",
-    start_time: "15:00",
-    end_time: "17:30",
-    lecturer_id: 4,
-    lecturer_name: "Dr. Dewi Pratiwi",
-    student_group_id: 4,
-    student_group_name: "Informatika 2021",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 5,
-    capacity: 30,
-    enrolled: 24
-  },
-  {
-    id: 5,
-    course_id: 105,
-    course_code: "MK501",
-    course_name: "Pengembangan Aplikasi Web",
-    room_id: 5,
-    room_name: "Lab Komputer 3",
-    building_name: "Gedung Teknik",
-    day: "Jumat",
-    start_time: "08:00",
-    end_time: "10:30",
-    lecturer_id: 5,
-    lecturer_name: "Prof. Rudi Hartono",
-    student_group_id: 5,
-    student_group_name: "Sistem Informasi 2021",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 5,
-    capacity: 30,
-    enrolled: 28
-  },
-  {
-    id: 6,
-    course_id: 106,
-    course_code: "MK102",
-    course_name: "Matematika Diskrit",
-    room_id: 6,
-    room_name: "Ruang 105",
-    building_name: "Gedung MIPA",
-    day: "Senin",
-    start_time: "13:00",
-    end_time: "15:30",
-    lecturer_id: 6,
-    lecturer_name: "Dr. Hendra Gunawan",
-    student_group_id: 6,
-    student_group_name: "Informatika 2023",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 1,
-    capacity: 45,
-    enrolled: 42
-  },
-  {
-    id: 7,
-    course_id: 107,
-    course_code: "MK202",
-    course_name: "Jaringan Komputer",
-    room_id: 7,
-    room_name: "Lab Jaringan",
-    building_name: "Gedung Informatika",
-    day: "Rabu",
-    start_time: "13:00",
-    end_time: "15:30",
-    lecturer_id: 7,
-    lecturer_name: "Prof. Agus Setiawan",
-    student_group_id: 7,
-    student_group_name: "Informatika 2022",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 3,
-    capacity: 35,
-    enrolled: 30
-  },
-  {
-    id: 8,
-    course_id: 108,
-    course_code: "MK302",
-    course_name: "Pemrograman Mobile",
-    room_id: 8,
-    room_name: "Lab Mobile",
-    building_name: "Gedung Informatika",
-    day: "Kamis",
-    start_time: "10:00",
-    end_time: "12:30",
-    lecturer_id: 8,
-    lecturer_name: "Dr. Maya Anggraini",
-    student_group_id: 8,
-    student_group_name: "Informatika 2021",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 5,
-    capacity: 30,
-    enrolled: 29
-  },
-  {
-    id: 9,
-    course_id: 109,
-    course_code: "MK601",
-    course_name: "Praktikum Komputasi Awan",
-    room_id: 9,
-    room_name: "Lab Cloud",
-    building_name: "Gedung Riset",
-    day: "Senin",
-    start_time: "08:00",
-    end_time: "11:30",
-    lecturer_id: 9,
-    lecturer_name: "Dr. Rini Wulandari",
-    student_group_id: 9,
-    student_group_name: "Informatika 2021",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 5,
-    capacity: 25,
-    enrolled: 20
-  },
-  {
-    id: 10,
-    course_id: 110,
-    course_code: "MK602",
-    course_name: "Workshop Internet of Things",
-    room_id: 10,
-    room_name: "Lab IoT",
-    building_name: "Gedung Riset",
-    day: "Senin",
-    start_time: "13:00",
-    end_time: "16:30",
-    lecturer_id: 10,
-    lecturer_name: "Prof. Bambang Supriyanto",
-    student_group_id: 10,
-    student_group_name: "Sistem Informasi 2021",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 5,
-    capacity: 25,
-    enrolled: 23
-  },
-  {
-    id: 11,
-    course_id: 111,
-    course_code: "MK103",
-    course_name: "Praktikum Pemrograman Dasar",
-    room_id: 11,
-    room_name: "Lab Komputer 1",
-    building_name: "Gedung Teknik",
-    day: "Sabtu",
-    start_time: "08:00",
-    end_time: "10:30",
-    lecturer_id: 11,
-    lecturer_name: "Dr. Anita Permatasari",
-    student_group_id: 11,
-    student_group_name: "Informatika 2023",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 1,
-    capacity: 40,
-    enrolled: 40
-  },
-  {
-    id: 12,
-    course_id: 112,
-    course_code: "MK203",
-    course_name: "Workshop Desain UI/UX",
-    room_id: 12,
-    room_name: "Studio Desain",
-    building_name: "Gedung Multimedia",
-    day: "Sabtu",
-    start_time: "13:00",
-    end_time: "16:30",
-    lecturer_id: 12,
-    lecturer_name: "Dr. Ratna Kusuma",
-    student_group_id: 12,
-    student_group_name: "Sistem Informasi 2022",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 3,
-    capacity: 30,
-    enrolled: 28
-  },
-  {
-    id: 13,
-    course_id: 113,
-    course_code: "MK104",
-    course_name: "Bahasa Inggris untuk IT",
-    room_id: 13,
-    room_name: "Ruang 201",
-    building_name: "Gedung Bahasa",
-    day: "Sabtu",
-    start_time: "10:30",
-    end_time: "12:30",
-    lecturer_id: 13,
-    lecturer_name: "Dr. Sarah Johnson",
-    student_group_id: 13,
-    student_group_name: "Informatika 2023",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 1,
-    capacity: 45,
-    enrolled: 40
-  },
-  {
-    id: 14,
-    course_id: 114,
-    course_code: "MK303",
-    course_name: "Seminar Teknologi Terkini",
-    room_id: 14,
-    room_name: "Auditorium",
-    building_name: "Gedung Multimedia",
-    day: "Minggu",
-    start_time: "09:00",
-    end_time: "12:00",
-    lecturer_id: 14,
-    lecturer_name: "Prof. Darmawan Pratama",
-    student_group_id: 14,
-    student_group_name: "Informatika 2022",
-    academic_year_id: 1,
-    academic_year_name: "2023/2024",
-    semester: 3,
-    capacity: 60,
-    enrolled: 55
-  }
-];
+// Form schema
+const scheduleFormSchema = z.object({
+  course_id: z.string().nonempty("Pilih mata kuliah"),
+  room_id: z.string().nonempty("Pilih ruangan"),
+  day: z.string().nonempty("Pilih hari"),
+  start_time: z.string().nonempty("Masukkan jam mulai"),
+  end_time: z.string().nonempty("Masukkan jam selesai"),
+  lecturer_id: z.string().nonempty("Pilih dosen").refine((val) => {
+    const num = Number(val);
+    return !isNaN(num) && num > 0;
+  }, {
+    message: "ID dosen tidak valid"
+  }),
+  student_group_id: z.string().nonempty("Pilih kelompok mahasiswa"),
+  academic_year_id: z.string().nonempty("Pilih tahun akademik"),
+});
+
+type FormValues = z.infer<typeof scheduleFormSchema>;
 
 export default function ScheduleManagePage() {
   // State for schedules data
@@ -634,91 +354,89 @@ export default function ScheduleManagePage() {
   
   // Function to select lecturer from search results
   const selectLecturer = (lecturer: any) => {
+    console.log("Selected lecturer:", lecturer);
+    
+    // Ensure lecturer has a valid ID and it can be converted to a number
+    if (!lecturer || typeof lecturer.id === 'undefined') {
+      console.error("Invalid lecturer selected - missing ID:", lecturer);
+      toast.error("Data dosen tidak valid (ID tidak ditemukan)");
+      return;
+    }
+    
+    // Store full lecturer object for reference
     setSelectedLecturer(lecturer);
+    
+    // Ensure ID is a valid number
+    const lecturerId = Number(lecturer.id);
+    
+    if (isNaN(lecturerId) || lecturerId <= 0) {
+      console.error("Invalid lecturer ID (not a valid number):", lecturer.id);
+      toast.error("ID dosen tidak valid (bukan angka)");
+      return;
+    }
+    
+    // Log for debugging
+    console.log("Lecturer ID as number:", lecturerId);
+    console.log("Lecturer ID type:", typeof lecturerId);
+        
+    // Store as string in the form (React Hook Form expects string values)
+    const lecturerIdStr = String(lecturerId);
     
     // If we're in add form
     if (showAddDialog) {
-      addForm.setValue("lecturer_id", lecturer.id.toString());
-    }
-    
+      addForm.setValue("lecturer_id", lecturerIdStr);
+      console.log("Set lecturer_id in add form:", lecturerIdStr, typeof lecturerIdStr);
+      
+      // Force validation update
+      addForm.trigger("lecturer_id");
+          }
+          
     // If we're in edit form
     if (showEditDialog) {
-      editForm.setValue("lecturer_id", lecturer.id.toString());
+      editForm.setValue("lecturer_id", lecturerIdStr);
+      console.log("Set lecturer_id in edit form:", lecturerIdStr, typeof lecturerIdStr);
+      
+      // Force validation update
+      editForm.trigger("lecturer_id");
     }
     
+    // Set search term for display
     setLecturerSearchTerm(lecturer.full_name || lecturer.name);
     setShowLecturerResults(false);
   };
 
-  // Function to check schedule conflicts before saving
-  const checkScheduleConflicts = async (scheduleData: any, scheduleId?: number) => {
-    try {
-      const endpoint = '/admin/schedules/check-conflicts';
-      const body = {
-        ...scheduleData,
-        schedule_id: scheduleId
-      };
-      
-      const response = await api(endpoint, {
-        method: 'POST',
-        body
-      });
-      
-      if (response.status === "success") {
-        const conflicts = response.data;
-        
-        // Check if any conflicts exist
-        const hasConflicts = Object.values(conflicts).some(value => !!value);
-        
-        if (hasConflicts) {
-          let conflictMessage = "Konflik jadwal terdeteksi:";
-          
-          if (conflicts.room) {
-            conflictMessage += "\n- Ruangan sudah digunakan pada waktu tersebut";
-          }
-          
-          if (conflicts.lecturer) {
-            conflictMessage += "\n- Dosen sudah dijadwalkan pada waktu tersebut";
-          }
-          
-          if (conflicts.student_group) {
-            conflictMessage += "\n- Kelompok mahasiswa sudah memiliki jadwal pada waktu tersebut";
-          }
-          
-          toast.error("Konflik jadwal", {
-            description: conflictMessage
-          });
-          
-          return true; // Has conflicts
-        }
-        
-        return false; // No conflicts
-      } else {
-        toast.error("Gagal memeriksa konflik jadwal");
-        return true; // Treat as conflict to prevent save
-      }
-    } catch (error) {
-      console.error("Error checking schedule conflicts:", error);
-      toast.error("Gagal memeriksa konflik jadwal");
-      return true; // Treat as conflict to prevent save
-    }
-  };
-
   // Function to handle adding a new schedule
-  const handleAddSchedule = async (data: any) => {
+  const handleAddSchedule = async (data: FormValues) => {
     setIsSubmitting(true);
     try {
-      // First check for conflicts
-      const hasConflicts = await checkScheduleConflicts(data);
+      // Log raw form data for debugging
+      console.log("Raw form data:", data);
       
-      if (hasConflicts) {
-        setIsSubmitting(false);
-        return;
-      }
-      
+      // Convert form string values to appropriate types for the API
+      try {
+        // Since we're using zod validation, we know the values are valid
+        const formattedData = {
+          course_id: parseInt(data.course_id),
+          room_id: parseInt(data.room_id),
+          day: data.day,
+          start_time: data.start_time,
+          end_time: data.end_time,
+          lecturer_id: parseInt(data.lecturer_id), // Safe to parse due to zod refinement
+          student_group_id: parseInt(data.student_group_id),
+          academic_year_id: parseInt(data.academic_year_id)
+        };
+        
+        // Debug log for troubleshooting
+        console.log("Sending schedule data:", formattedData);
+        console.log("Lecturer ID type in formattedData:", typeof formattedData.lecturer_id);
+        
+        // Make API request
       const response = await api('/admin/schedules', {
         method: 'POST',
-        body: data,
+          body: {
+            ...formattedData,
+            lecturer_id: Number(formattedData.lecturer_id) // Ensure it's sent as a number
+          },
       });
       
       if (response.status === "success") {
@@ -730,6 +448,12 @@ export default function ScheduleManagePage() {
       } else {
         toast.error("Gagal menambahkan jadwal", {
           description: response.message || "Terjadi kesalahan saat menambahkan jadwal baru"
+          });
+        }
+      } catch (parseError) {
+        console.error("Error parsing form data:", parseError);
+        toast.error("Format data tidak valid", {
+          description: "Periksa kembali semua field dan pastikan data yang dimasukkan valid"
         });
       }
     } catch (error: any) {
@@ -746,17 +470,25 @@ export default function ScheduleManagePage() {
   const handleEditSchedule = async (data: any) => {
     setIsSubmitting(true);
     try {
-      // First check for conflicts
-      const hasConflicts = await checkScheduleConflicts(data, currentSchedule?.id);
+      // Convert form string values to appropriate types for the API
+      const formattedData = {
+        course_id: parseInt(data.course_id),
+        room_id: parseInt(data.room_id),
+        day: data.day,
+        start_time: data.start_time,
+        end_time: data.end_time, 
+        lecturer_id: parseInt(data.lecturer_id),
+        student_group_id: parseInt(data.student_group_id),
+        academic_year_id: parseInt(data.academic_year_id)
+      };
       
-      if (hasConflicts) {
-        setIsSubmitting(false);
-        return;
-      }
+      // Debug log for troubleshooting
+      console.log("Sending updated schedule data:", formattedData);
       
+      // Conflict check removed based on user feedback
       const response = await api(`/admin/schedules/${currentSchedule?.id}`, {
         method: 'PUT',
-        body: data,
+        body: formattedData,
       });
       
       if (response.status === "success") {
@@ -931,45 +663,56 @@ export default function ScheduleManagePage() {
 
   // Function to fetch academic years
   const fetchAcademicYears = async () => {
+    setLoading(true);
     try {
       const response = await api('/admin/academic-years', {
         method: 'GET',
       });
-      
       if (response.status === "success") {
         setAcademicYears(response.data);
-        
-        // Show warning if no academic years are available
-        if (response.data.length === 0) {
-          toast.warning("Tidak ada tahun akademik tersedia", {
-            description: "Silakan tambahkan tahun akademik terlebih dahulu"
-          });
+        // Set default academic year filter to the first active one if not already set
+        if (!academicYearFilter && response.data.length > 0) {
+          const activeYear = response.data.find((year: AcademicYear) => year.is_active);
+          if (activeYear) {
+            setAcademicYearFilter(activeYear.id);
+          } else {
+            // If no active year, set to the first year in the list
+            setAcademicYearFilter(response.data[0].id);
+          }
         }
       } else {
-        toast.error("Gagal memuat data tahun akademik");
+        toast.error("Gagal memuat tahun akademik");
       }
     } catch (error) {
       console.error("Error fetching academic years:", error);
-      toast.error("Gagal memuat data tahun akademik");
+      toast.error("Gagal memuat tahun akademik");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Fetch all necessary data on component mount
   useEffect(() => {
     const loadAllData = async () => {
-      await Promise.all([
-        fetchCourses(),
-        fetchRooms(),
-        fetchLecturers(),
-        fetchStudentGroups(),
-        fetchAcademicYears()
-      ]);
-      setLoadingRelatedData(false);
-      fetchSchedules();
+      setLoading(true);
+      await fetchAcademicYears(); // Fetch academic years first to set the filter
+      // fetchSchedules will be called by the useEffect watching academicYearFilter
+      await fetchCourses();
+      await fetchRooms();
+      await fetchLecturers();
+      await fetchStudentGroups();
+      setLoading(false);
     };
-    
     loadAllData();
-  }, []);
+  }, []); // Initial load
+
+  // useEffect to fetch schedules when academicYearFilter changes
+  useEffect(() => {
+    if (academicYearFilter) {
+      fetchFilteredSchedules(); // Use fetchFilteredSchedules to include the academic year
+    } else {
+      fetchSchedules(); // Fallback or initial load if no year filter is set (though academicYearFilter is usually set by loadAllData)
+    }
+  }, [academicYearFilter]);
 
   // Setup edit schedule
   const setupEditSchedule = (schedule: CourseSchedule) => {
@@ -1050,26 +793,28 @@ export default function ScheduleManagePage() {
   };
 
   // Forms for adding/editing schedules
-  const addForm = useForm({
+  const addForm = useForm<FormValues>({
+    resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
       course_id: "",
       room_id: "",
-      day: "",
-      start_time: "",
-      end_time: "",
+      day: "Senin",
+      start_time: "08:00",
+      end_time: "10:00",
       lecturer_id: "",
       student_group_id: "",
       academic_year_id: "",
     }
   });
 
-  const editForm = useForm({
+  const editForm = useForm<FormValues>({
+    resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
       course_id: "",
       room_id: "",
-      day: "",
-      start_time: "",
-      end_time: "",
+      day: "Senin",
+      start_time: "08:00",
+      end_time: "10:00",
       lecturer_id: "",
       student_group_id: "",
       academic_year_id: "",
@@ -1153,8 +898,8 @@ export default function ScheduleManagePage() {
                               value={field.value}
                             >
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih mata kuliah" />
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Pilih mata kuliah" className="truncate" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -1187,8 +932,8 @@ export default function ScheduleManagePage() {
                               value={field.value}
                             >
                               <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih hari" />
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pilih hari" className="truncate" />
                   </SelectTrigger>
                               </FormControl>
                   <SelectContent>
@@ -1243,8 +988,8 @@ export default function ScheduleManagePage() {
                               value={field.value}
                             >
                               <FormControl>
-                  <SelectTrigger>
-                                  <SelectValue placeholder="Pilih ruangan" />
+                  <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Pilih ruangan" className="truncate" />
                   </SelectTrigger>
                               </FormControl>
                   <SelectContent>
@@ -1274,6 +1019,28 @@ export default function ScheduleManagePage() {
                             <FormLabel>Dosen</FormLabel>
                             <div className="relative">
                               <FormControl>
+                                <div className="flex flex-col space-y-2">
+                                  {selectedLecturer ? (
+                                    <div className="flex items-center space-x-2">
+                                      <Input 
+                                        value={lecturerSearchTerm}
+                                        className="w-full"
+                                        readOnly
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedLecturer(null);
+                                          setLecturerSearchTerm("");
+                                          field.onChange("");
+                                        }}
+                                      >
+                                        Ganti
+                                      </Button>
+                                    </div>
+                                  ) : (
                                 <Input 
                                   placeholder="Cari dosen..." 
                                   value={lecturerSearchTerm}
@@ -1284,9 +1051,11 @@ export default function ScheduleManagePage() {
                                   }}
                                   className="w-full"
                                 />
+                                  )}
+                                </div>
                               </FormControl>
                               
-                              {showLecturerResults && (
+                              {showLecturerResults && !selectedLecturer && (
                                 <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto min-w-[300px]">
                                   {searchingLecturers ? (
                                     <div className="flex items-center justify-center p-4">
@@ -1323,7 +1092,20 @@ export default function ScheduleManagePage() {
                                 </div>
                               )}
                             </div>
-                            <input type="hidden" {...field} />
+                            
+                            {/* Hidden input with the actual lecturer ID value */}
+                            <input 
+                              type="hidden" 
+                              name={field.name}
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                            />
+                            
+                            {!field.value && (
+                              <p className="text-xs text-red-500 mt-1">
+                                * Silakan pilih dosen dengan mencari dan memilih dari daftar
+                              </p>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1340,8 +1122,8 @@ export default function ScheduleManagePage() {
                               value={field.value}
                             >
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih kelompok mahasiswa" />
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Pilih kelompok mahasiswa" className="truncate" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -1374,8 +1156,8 @@ export default function ScheduleManagePage() {
                               value={field.value}
                             >
                               <FormControl>
-                  <SelectTrigger>
-                                  <SelectValue placeholder="Pilih tahun akademik" />
+                  <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Pilih tahun akademik" className="truncate" />
                   </SelectTrigger>
                               </FormControl>
                   <SelectContent>
@@ -2252,8 +2034,8 @@ export default function ScheduleManagePage() {
                           defaultValue={currentSchedule.course_id.toString()}
                         >
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih mata kuliah" />
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Pilih mata kuliah" className="truncate" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -2287,8 +2069,8 @@ export default function ScheduleManagePage() {
                           defaultValue={currentSchedule.day}
                         >
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih hari" />
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Pilih hari" className="truncate" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -2352,8 +2134,8 @@ export default function ScheduleManagePage() {
                           defaultValue={currentSchedule.room_id.toString()}
                         >
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih ruangan" />
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Pilih ruangan" className="truncate" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -2383,6 +2165,28 @@ export default function ScheduleManagePage() {
                         <FormLabel>Dosen</FormLabel>
                         <div className="relative">
                           <FormControl>
+                            <div className="flex flex-col space-y-2">
+                              {selectedLecturer ? (
+                                <div className="flex items-center space-x-2">
+                                  <Input 
+                                    value={lecturerSearchTerm}
+                                    className="w-full"
+                                    readOnly
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedLecturer(null);
+                                      setLecturerSearchTerm("");
+                                      field.onChange("");
+                                    }}
+                                  >
+                                    Ganti
+                                  </Button>
+                                </div>
+                              ) : (
                             <Input 
                               placeholder="Cari dosen..." 
                               value={lecturerSearchTerm}
@@ -2393,9 +2197,11 @@ export default function ScheduleManagePage() {
                               }}
                               className="w-full"
                             />
+                              )}
+                            </div>
                           </FormControl>
                           
-                          {showLecturerResults && (
+                          {showLecturerResults && !selectedLecturer && (
                             <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto min-w-[300px]">
                               {searchingLecturers ? (
                                 <div className="flex items-center justify-center p-4">
@@ -2432,7 +2238,20 @@ export default function ScheduleManagePage() {
                             </div>
                           )}
                         </div>
-                        <input type="hidden" {...field} />
+                        
+                        {/* Hidden input with the actual lecturer ID value */}
+                        <input 
+                          type="hidden" 
+                          name={field.name}
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                        />
+                        
+                        {!field.value && (
+                          <p className="text-xs text-red-500 mt-1">
+                            * Silakan pilih dosen dengan mencari dan memilih dari daftar
+                          </p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -2450,8 +2269,8 @@ export default function ScheduleManagePage() {
                           defaultValue={currentSchedule.student_group_id.toString()}
                         >
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih kelompok mahasiswa" />
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Pilih kelompok mahasiswa" className="truncate" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -2485,8 +2304,8 @@ export default function ScheduleManagePage() {
                           defaultValue={currentSchedule.academic_year_id.toString()}
                         >
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih tahun akademik" />
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Pilih tahun akademik" className="truncate" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>

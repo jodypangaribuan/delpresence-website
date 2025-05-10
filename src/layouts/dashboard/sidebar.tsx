@@ -39,6 +39,18 @@ import { getUserRole, UserRole } from "@/app/dashboard/page";
 import { useEffect, useState } from "react";
 import LoadingLink from "@/components/ui/LoadingLink";
 
+// Function to check if token is valid
+function checkTokenValidity(): boolean {
+  if (typeof window === "undefined") return true;
+  
+  const token = localStorage.getItem("access_token");
+  const expiry = localStorage.getItem("token_expiry");
+  
+  if (!token || !expiry) return false;
+  
+  return parseInt(expiry) > Date.now();
+}
+
 // Create customized icons with consistent size
 const createSidebarIcon = (Icon: React.ComponentType<LucideProps>) => {
   return (props: LucideProps) => <Icon size={20} strokeWidth={2} {...props} />;
@@ -83,9 +95,38 @@ export function Sidebar() {
   // Add dependency on pathname to re-validate role when pathname changes
   useEffect(() => {
     const fetchUserRole = () => {
+      // First check if token is still valid
+      if (!checkTokenValidity()) {
+        console.log("[Sidebar] Invalid or expired token detected, redirecting to login");
+        window.location.href = "/login";
+        return;
+      }
+      
       const role = getUserRole();
       setUserRole(role);
       console.log("[Sidebar] Current user role:", role);
+      
+      // Check if the current path is allowed for this role
+      if (
+        (pathname.startsWith('/dashboard/academic/') || 
+         pathname.startsWith('/dashboard/courses/') || 
+         pathname.startsWith('/dashboard/schedules/manage') || 
+         pathname.startsWith('/dashboard/users/')) && 
+        role !== UserRole.ADMIN
+      ) {
+        console.log("[Sidebar] Redirecting: Admin-only path accessed by non-admin");
+        window.location.href = "/dashboard";
+      }
+      
+      if (pathname.startsWith('/dashboard/lecturer/') && role !== UserRole.LECTURER) {
+        console.log("[Sidebar] Redirecting: Lecturer-only path accessed by non-lecturer");
+        window.location.href = "/dashboard";
+      }
+      
+      if (pathname.startsWith('/dashboard/assistant/') && role !== UserRole.ASSISTANT) {
+        console.log("[Sidebar] Redirecting: Assistant-only path accessed by non-assistant");
+        window.location.href = "/dashboard";
+      }
     };
     
     // Re-fetch user role on pathname changes to ensure fresh data
@@ -93,10 +134,33 @@ export function Sidebar() {
   }, [pathname]);
 
   const isLinkActive = (path: string) => {
+    // First check if token is still valid
+    if (!checkTokenValidity()) {
+      return false;
+    }
+    
+    // First check if the user role has permission for this path
+    if (path.startsWith('/dashboard/academic/') || 
+        path.startsWith('/dashboard/courses/') || 
+        path.startsWith('/dashboard/schedules/manage') || 
+        path.startsWith('/dashboard/users/')) {
+      if (userRole !== UserRole.ADMIN) return false;
+    }
+    
+    if (path.startsWith('/dashboard/lecturer/')) {
+      if (userRole !== UserRole.LECTURER) return false;
+    }
+    
+    if (path.startsWith('/dashboard/assistant/')) {
+      if (userRole !== UserRole.ASSISTANT) return false;
+    }
+    
+    // Now check if the path matches
     if (path === "/dashboard") {
       // Only consider dashboard active if we're exactly at /dashboard or /
       return pathname === "/dashboard" || pathname === "/";
     }
+    
     // For all other paths, check if the current pathname starts with the path
     return pathname.startsWith(`${path}`);
   };
@@ -252,12 +316,6 @@ export function Sidebar() {
                 Mata Kuliah
               </MenuLink>
               <MenuLink
-                href="/dashboard/courses/groups"
-                icon={<SidebarIcons.Layers />}
-              >
-                Kelompok Mata Kuliah
-              </MenuLink>
-              <MenuLink
                 href="/dashboard/courses/assignments"
                 icon={<SidebarIcons.UserCog />}
               >
@@ -338,16 +396,10 @@ export function Sidebar() {
                 Jadwal Mengajar
               </MenuLink>
               <MenuLink
-                href="/dashboard/lecturer/attendance"
+                href="/dashboard/lecturer/qrcode"
                 icon={<SidebarIcons.ClipboardList />}
               >
-                Kelola Kehadiran
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/lecturer/qrcode"
-                icon={<SidebarIcons.QrCode />}
-              >
-                Generate QR Code
+                Kelola Presensi
               </MenuLink>
               <MenuLink
                 href="/dashboard/lecturer/assistants"
@@ -356,33 +408,39 @@ export function Sidebar() {
                 Kelola Asisten Dosen
               </MenuLink>
             </ul>
-
-            {/* Academic Report */}
-            <div className="mb-2">
-              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
-                Laporan Akademik
-              </p>
-            </div>
-            <ul className="space-y-1 mb-6">
-              <MenuLink
-                href="/dashboard/lecturer/student-progress"
-                icon={<SidebarIcons.BarChart2 />}
-              >
-                Perkembangan Mahasiswa
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/lecturer/attendance-reports"
-                icon={<SidebarIcons.FileCheck />}
-              >
-                Laporan Kehadiran
-              </MenuLink>
-            </ul>
           </>
         )}
 
         {/* Assistant-specific menu items */}
         {userRole === UserRole.ASSISTANT && (
-          <></>
+          <>
+            {/* Teaching Assistant Management */}
+            <div className="mb-2">
+              <p className="px-3 py-2 text-xs uppercase tracking-wider text-neutral-500 font-semibold">
+                Manajemen Asisten Dosen
+              </p>
+            </div>
+            <ul className="space-y-1 mb-6">
+              <MenuLink
+                href="/dashboard/assistant/schedules"
+                icon={<SidebarIcons.Calendar />}
+              >
+                Jadwal Mengajar
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/assistant/qrcode"
+                icon={<SidebarIcons.ClipboardList />}
+              >
+                Kelola Presensi
+              </MenuLink>
+              <MenuLink
+                href="/dashboard/assistant/assignments"
+                icon={<SidebarIcons.UserCog />}
+              >
+                Penugasan Saya
+              </MenuLink>
+            </ul>
+          </>
         )}
       </nav>
     </aside>

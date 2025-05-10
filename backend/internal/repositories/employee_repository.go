@@ -84,7 +84,6 @@ func (r *EmployeeRepository) UpsertMany(employees []models.Employee) error {
 		if result.Error == nil {
 			// Update existing employee
 			employee.ID = existingEmployee.ID
-			employee.UUID = existingEmployee.UUID
 			employee.CreatedAt = existingEmployee.CreatedAt
 			
 			if err := tx.Save(&employee).Error; err != nil {

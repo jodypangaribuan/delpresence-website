@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
+import axios from "axios";
+import { toast } from "sonner";
 import {
   Users,
   GraduationCap,
@@ -32,333 +34,391 @@ import {
   FileText,
   UserCog,
   FileOutput,
+  Loader2,
+  UserCircle,
+  UsersRound,
+  DoorClosed
 } from "lucide-react";
 import Link from "next/link";
 
+// Interfaces for API responses
+interface StudyProgramWithStats {
+  study_program: {
+    id: number;
+    name: string;
+    code: string;
+  };
+  lecturer_count: number;
+  student_count: number;
+}
+
+interface FacultyWithStats {
+  faculty: {
+    id: number;
+    name: string;
+    code: string;
+  };
+  program_count: number;
+  lecturer_count: number;
+}
+
+interface BuildingWithStats {
+  building: {
+    id: number;
+    name: string;
+    code: string;
+  };
+  room_count: number;
+}
+
 export default function AdminDashboard() {
-  const [stats] = useState({
-    totalStudents: 1245,
-    totalLecturers: 68,
-    totalAssistants: 32,
-    totalCourses: 96,
-    totalRooms: 24,
-    pendingRequests: 8,
-    totalDepartments: 10,
-    totalBuildings: 5,
-    classesTodayActive: 24,
-    pendingAttendance: 12,
-    pendingPermissions: 5,
+  const [stats, setStats] = useState({
+    totalProgramStudi: 0,
+    totalFaculties: 0,
+    totalBuildings: 0,
+    totalRooms: 0,
+    totalLecturers: 0,
+    totalEmployees: 0,
+    totalStudents: 0,
+    totalStudentGroups: 0,
+    totalCourses: 0,
+    totalSchedules: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [userInfo, setUserInfo] = useState({
+    name: 'Admin',
+    role: 'Administrator'
   });
 
-  const [recentActivity] = useState([
-    {
-      id: 1,
-      title: "Pengajuan Reschedule",
-      description: "Dosen Algoritma meminta perubahan jadwal",
-      time: "15 menit yang lalu",
-      status: "pending",
-    },
-    {
-      id: 2,
-      title: "Tambahan Asisten",
-      description: "Permintaan asisten baru Mata Kuliah Basis Data",
-      time: "2 jam yang lalu",
-      status: "approved",
-    },
-    {
-      id: 3,
-      title: "Perubahan Kurikulum",
-      description: "Update Mata Kuliah Algoritma dan Pemrograman",
-      time: "Kemarin, 10:24",
-      status: "completed",
-    },
-  ]);
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchDashboardData();
+    fetchUserInfo();
+  }, []);
+
+  // Function to fetch user info
+  const fetchUserInfo = async () => {
+    try {
+      // Get token from localStorage or sessionStorage
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+      
+      if (!token) return;
+
+      // Prepare API URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      
+      // Configuration for API requests
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      };
+      
+      const response = await axios.get(`${apiUrl}/api/auth/me`, config);
+      
+      if (response.data && response.data.status === "success") {
+        setUserInfo({
+          name: response.data.data.name || 'Admin',
+          role: response.data.data.role || 'Administrator'
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+    }
+  };
+
+  // Function to fetch all dashboard data
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      // Get token from localStorage or sessionStorage
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+      
+      if (!token) {
+        toast.error("Anda harus login terlebih dahulu");
+        return;
+      }
+
+      // Prepare API URL
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      
+      // Configuration for API requests
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      };
+      
+      // Fetch all data in parallel
+      const [
+        studyProgramsResponse, 
+        facultiesResponse, 
+        buildingsResponse, 
+        roomsResponse,
+        lecturersResponse,
+        employeesResponse,
+        studentsResponse,
+        studentGroupsResponse,
+        coursesResponse,
+        schedulesResponse
+      ] = await Promise.all([
+        axios.get(`${apiUrl}/api/admin/study-programs?stats=true`, config),
+        axios.get(`${apiUrl}/api/admin/faculties?stats=true`, config),
+        axios.get(`${apiUrl}/api/admin/buildings?stats=true`, config),
+        axios.get(`${apiUrl}/api/admin/rooms`, config),
+        axios.get(`${apiUrl}/api/admin/lecturers?stats=true`, config),
+        axios.get(`${apiUrl}/api/admin/employees`, config),
+        axios.get(`${apiUrl}/api/admin/students`, config),
+        axios.get(`${apiUrl}/api/admin/student-groups`, config),
+        axios.get(`${apiUrl}/api/admin/courses`, config),
+        axios.get(`${apiUrl}/api/admin/schedules`, config)
+      ]);
+      
+      // Helper function to extract count from API response
+      const getCount = (response: any) => {
+        if (!response || !response.data) return 0;
+        
+        // Case 1: API returns a data array directly
+        if (response.data.status === "success" && Array.isArray(response.data.data)) {
+          return response.data.data.length;
+        }
+        
+        // Case 2: API returns a count property
+        if (response.data.status === "success" && response.data.data && response.data.data.count !== undefined) {
+          return response.data.data.count;
+        }
+        
+        // Case 3: API returns a total property
+        if (response.data.status === "success" && response.data.data && response.data.data.total !== undefined) {
+          return response.data.data.total;
+        }
+        
+        // Case 4: API returns the count in a meta object
+        if (response.data.status === "success" && response.data.meta && response.data.meta.count !== undefined) {
+          return response.data.meta.count;
+        }
+        
+        // Case 5: Special case for lecturers endpoint
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+          return response.data.length;
+        }
+        
+        // Fallback to zero if no recognizable format
+        return 0;
+      };
+      
+      // Special handling for lecturers endpoint which might return data in a different format
+      let lecturerCount = getCount(lecturersResponse);
+      
+      // If the count is still 0, try alternative ways to get the lecturer count
+      if (lecturerCount === 0 && lecturersResponse && lecturersResponse.data) {
+        // Try to access the data directly if it's an array
+        if (Array.isArray(lecturersResponse.data)) {
+          lecturerCount = lecturersResponse.data.length;
+        }
+        // Try to access nested data if it's in a different format
+        else if (lecturersResponse.data.data && Array.isArray(lecturersResponse.data.data)) {
+          lecturerCount = lecturersResponse.data.data.length;
+        }
+      }
+      
+      // Update statistics
+      setStats({
+        totalProgramStudi: getCount(studyProgramsResponse),
+        totalFaculties: getCount(facultiesResponse),
+        totalBuildings: getCount(buildingsResponse),
+        totalRooms: getCount(roomsResponse),
+        totalLecturers: lecturerCount,
+        totalEmployees: getCount(employeesResponse),
+        totalStudents: getCount(studentsResponse),
+        totalStudentGroups: getCount(studentGroupsResponse),
+        totalCourses: getCount(coursesResponse),
+        totalSchedules: getCount(schedulesResponse)
+      });
+      
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      toast.error("Gagal memuat data dashboard");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="space-y-8">
-      {/* Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-6 bg-white border-l-4 border-l-primary border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-neutral-600">
-                Total Mahasiswa
-              </h3>
-              <div className="mt-2">
-                <span className="text-3xl font-bold text-neutral-800">
-                  {stats.totalStudents}
-                </span>
-              </div>
-            </div>
-            <div className="p-3 rounded-full bg-primary/10">
-              <Users className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 bg-white border-l-4 border-l-primary border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-neutral-600">
-                Total Dosen
-              </h3>
-              <div className="mt-2">
-                <span className="text-3xl font-bold text-neutral-800">
-                  {stats.totalLecturers}
-                </span>
-              </div>
-            </div>
-            <div className="p-3 rounded-full bg-primary/10">
-              <GraduationCap className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 bg-white border-l-4 border-l-green-500 border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-neutral-600">
-                Kelas Aktif Hari Ini
-              </h3>
-              <div className="mt-2">
-                <span className="text-3xl font-bold text-neutral-800">
-                  {stats.classesTodayActive}
-                </span>
-              </div>
-            </div>
-            <div className="p-3 rounded-full bg-green-500/10">
-              <CalendarDays className="h-6 w-6 text-green-500" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 bg-white border-l-4 border-l-amber-500 border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-neutral-600">
-                Persetujuan Pending
-              </h3>
-              <div className="mt-2">
-                <span className="text-3xl font-bold text-neutral-800">
-                  {stats.pendingPermissions}
-                </span>
-              </div>
-            </div>
-            <div className="p-3 rounded-full bg-amber-500/10">
-              <FileCheck className="h-6 w-6 text-amber-500" />
-            </div>
-          </div>
-        </Card>
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <div className="bg-white rounded-lg p-6 border border-gray-100 shadow-sm">
+        <h1 className="text-2xl font-bold text-[#002A5C] mb-2">Selamat Datang, {userInfo.name}</h1>
+        <p className="text-gray-600">Kelola program studi, fakultas, dan data akademik dengan mudah di satu tempat.</p>
       </div>
 
-      {/* Academic Overview & Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2">
-          <h2 className="text-xl font-bold text-[#002A5C] mb-4">
-            Aktivitas Terbaru
-          </h2>
-          <Card className="p-6 bg-white border border-neutral-100 rounded-lg">
-            <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-start justify-between border-b border-neutral-100 pb-4 last:border-0 last:pb-0"
-                >
-                  <div className="flex items-start space-x-3">
-                    <div
-                      className={`p-2 rounded-full ${
-                        activity.status === "pending"
-                          ? "bg-amber-100"
-                          : activity.status === "approved"
-                          ? "bg-blue-100"
-                          : "bg-green-100"
-                      }`}
-                    >
-                      {activity.status === "pending" ? (
-                        <AlertTriangle className="h-5 w-5 text-amber-600" />
-                      ) : activity.status === "approved" ? (
-                        <UserPlus className="h-5 w-5 text-blue-600" />
-                      ) : (
-                        <Calendar className="h-5 w-5 text-green-600" />
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-neutral-800">
-                        {activity.title}
-                      </h3>
-                      <p className="text-sm text-neutral-600">
-                        {activity.description}
-                      </p>
-                      <p className="text-xs text-neutral-500 mt-1">
-                        {activity.time}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <button className="text-neutral-400 hover:text-neutral-600">
-                      <MoreHorizontal className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-4 border-t border-neutral-100">
-              <Link
-                href="/dashboard/activities"
-                className="text-sm text-primary hover:underline font-medium"
-              >
-                Lihat semua aktivitas
-              </Link>
-            </div>
-          </Card>
+      {/* Main Statistics */}
+      {isLoading ? (
+        <div className="flex justify-center items-center h-40">
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
+          <span className="ml-2 text-neutral-600">Memuat data...</span>
         </div>
-
-        <div>
-          <h2 className="text-xl font-bold text-[#002A5C] mb-4">Akses Cepat</h2>
-          <Card className="p-6 bg-white border border-neutral-100 rounded-lg">
-            <div className="space-y-4">
-              <QuickMenuItem
-                title="Kelola Dosen"
-                href="/dashboard/users/lecturers"
-                icon={<GraduationCap className="h-4 w-4 text-primary" />}
-              />
-              <QuickMenuItem
-                title="Kelola Mahasiswa"
-                href="/dashboard/users/students"
-                icon={<Users className="h-4 w-4 text-green-600" />}
-              />
-              <QuickMenuItem
-                title="Jadwal Perkuliahan"
-                href="/dashboard/schedules/manage"
-                icon={<Calendar className="h-4 w-4 text-blue-600" />}
-              />
-              <QuickMenuItem
-                title="Kelola Mata Kuliah"
-                href="/dashboard/courses/manage"
-                icon={<BookOpen className="h-4 w-4 text-amber-600" />}
-              />
-              <QuickMenuItem
-                title="Verifikasi Izin"
-                href="/dashboard/attendance/permissions"
-                icon={<FileCheck className="h-4 w-4 text-red-600" />}
-              />
-              <QuickMenuItem
-                title="Face Recognition"
-                href="/dashboard/attendance/face-recognition"
-                icon={<ScanFace className="h-4 w-4 text-purple-600" />}
-              />
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      {/* Main Function Areas */}
-      <div>
-        <h2 className="text-xl font-bold text-[#002A5C] mb-4">
-          Area Fungsi Utama
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <FeatureCard
-            title="Manajemen Pengguna"
-            description="Kelola dosen, pegawai dan mahasiswa"
-            icon={<Users className="h-5 w-5 text-blue-600" />}
-            href="/dashboard/users"
-            textColor="text-blue-600"
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard 
+            title="Program Studi" 
+            value={stats.totalProgramStudi} 
+            icon={<School className="h-6 w-6 text-[#0687C9]" />} 
           />
-          <FeatureCard
-            title="Manajemen Akademik"
-            description="Program studi, kurikulum, fakultas"
-            icon={<School className="h-5 w-5 text-green-600" />}
-            href="/dashboard/academic"
-            textColor="text-green-600"
+          <StatCard 
+            title="Dosen" 
+            value={stats.totalLecturers} 
+            icon={<Users className="h-6 w-6 text-[#0687C9]" />} 
           />
-          <FeatureCard
-            title="Manajemen Mata Kuliah"
-            description="Mata kuliah, kelas, penugasan"
-            icon={<BookOpen className="h-5 w-5 text-amber-600" />}
-            href="/dashboard/courses"
-            textColor="text-amber-600"
+          <StatCard 
+            title="Mahasiswa" 
+            value={stats.totalStudents} 
+            icon={<GraduationCap className="h-6 w-6 text-[#0687C9]" />} 
           />
-          <FeatureCard
-            title="Manajemen Jadwal"
-            description="Jadwal, konflik, persetujuan reschedule"
-            icon={<Calendar className="h-5 w-5 text-indigo-600" />}
-            href="/dashboard/schedules"
-            textColor="text-indigo-600"
-          />
-          <FeatureCard
-            title="Manajemen Kehadiran"
-            description="Presensi, izin, face recognition"
-            icon={<ClipboardList className="h-5 w-5 text-red-600" />}
-            href="/dashboard/attendance"
-            textColor="text-red-600"
+          <StatCard 
+            title="Mata Kuliah" 
+            value={stats.totalCourses} 
+            icon={<BookOpen className="h-6 w-6 text-[#0687C9]" />} 
           />
         </div>
-      </div>
+      )}
       
-      {/* Common Tasks */}
-      <div>
-        <h2 className="text-xl font-bold text-[#002A5C] mb-4">
-          Tugas Umum
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <CommonTaskCard 
-            title="Akademik"
-            tasks={[
-              { name: "Program Studi", icon: <School className="h-4 w-4" />, href: "/dashboard/academic/study-programs" },
-              { name: "Kurikulum", icon: <BookCopy className="h-4 w-4" />, href: "/dashboard/academic/curriculum" },
-              { name: "Fakultas", icon: <Building className="h-4 w-4" />, href: "/dashboard/academic/faculties" },
-              { name: "Tahun Akademik", icon: <Calendar className="h-4 w-4" />, href: "/dashboard/academic/academic-years" },
-            ]}
+      {/* Second Row Statistics */}
+      {!isLoading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard 
+            title="Fakultas" 
+            value={stats.totalFaculties} 
+            icon={<Building2 className="h-6 w-6 text-[#0687C9]" />} 
           />
-          
-          <CommonTaskCard 
-            title="Jadwal & Kelas"
-            tasks={[
-              { name: "Mata Kuliah", icon: <BookOpen className="h-4 w-4" />, href: "/dashboard/courses/manage" },
-              { name: "Jadwal Perkuliahan", icon: <Calendar className="h-4 w-4" />, href: "/dashboard/schedules/manage" },
-              { name: "Kelas Kuliah", icon: <Users className="h-4 w-4" />, href: "/dashboard/courses/classes" },
-              { name: "Penugasan Dosen", icon: <UserCog className="h-4 w-4" />, href: "/dashboard/courses/assignments" },
-            ]}
+          <StatCard 
+            title="Gedung" 
+            value={stats.totalBuildings} 
+            icon={<Building className="h-6 w-6 text-[#0687C9]" />} 
           />
-          
-          <CommonTaskCard 
-            title="Presensi"
-            tasks={[
-              { name: "Rekap Kehadiran", icon: <BarChart2 className="h-4 w-4" />, href: "/dashboard/attendance/summary" },
-              { name: "Verifikasi Izin", icon: <FileCheck className="h-4 w-4" />, href: "/dashboard/attendance/permissions" },
-              { name: "Laporan Kehadiran", icon: <FileOutput className="h-4 w-4" />, href: "/dashboard/attendance/reports" },
-              { name: "Face Recognition", icon: <ScanFace className="h-4 w-4" />, href: "/dashboard/attendance/face-recognition" },
-            ]}
+          <StatCard 
+            title="Ruangan" 
+            value={stats.totalRooms} 
+            icon={<DoorClosed className="h-6 w-6 text-[#0687C9]" />} 
+          />
+          <StatCard 
+            title="Jadwal" 
+            value={stats.totalSchedules} 
+            icon={<CalendarDays className="h-6 w-6 text-[#0687C9]" />} 
           />
         </div>
-      </div>
+      )}
 
-      {/* Additional Stats */}
-      <div>
-        <h2 className="text-xl font-bold text-[#002A5C] mb-4">
-          Statistik Akademik
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <StatCard
-            title="Total Program Studi"
-            value={stats.totalDepartments}
-            icon={<School className="h-5 w-5 text-primary" />}
+      {/* Quick Actions Section */}
+      <div className="mt-8">
+        <h2 className="text-xl font-bold text-[#002A5C] mb-4 border-b pb-2">Aksi Cepat</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Academic Management Card */}
+          <QuickActionCard 
+            title="Administrasi Akademik"
+            icon={<School className="h-5 w-5 text-[#0687C9]" />}
+            actions={[
+              { 
+                title: "Kelola Program Studi", 
+                icon: <School className="h-4 w-4" />, 
+                href: "/dashboard/academic/study-programs" 
+              },
+              { 
+                title: "Kelola Fakultas", 
+                icon: <Building2 className="h-4 w-4" />, 
+                href: "/dashboard/academic/faculties" 
+              },
+              { 
+                title: "Kelola Tahun Akademik", 
+                icon: <Calendar className="h-4 w-4" />, 
+                href: "/dashboard/academic/academic-years" 
+              }
+            ]}
           />
-          <StatCard
-            title="Total Mata Kuliah"
-            value={stats.totalCourses}
-            icon={<BookOpen className="h-5 w-5 text-primary" />}
+
+          {/* Facilities Management Card */}
+          <QuickActionCard 
+            title="Fasilitas" 
+            icon={<Building className="h-5 w-5 text-[#0687C9]" />}
+            actions={[
+              { 
+                title: "Kelola Gedung", 
+                icon: <Building className="h-4 w-4" />, 
+                href: "/dashboard/academic/buildings" 
+              },
+              { 
+                title: "Kelola Ruangan", 
+                icon: <DoorClosed className="h-4 w-4" />, 
+                href: "/dashboard/academic/rooms" 
+              }
+            ]}
           />
-          <StatCard
-            title="Total Gedung"
-            value={stats.totalBuildings}
-            icon={<Building className="h-5 w-5 text-primary" />}
+
+          {/* Course Management Card */}
+          <QuickActionCard 
+            title="Manajemen Mata Kuliah" 
+            icon={<BookOpen className="h-5 w-5 text-[#0687C9]" />}
+            actions={[
+              { 
+                title: "Kelola Mata Kuliah", 
+                icon: <BookOpen className="h-4 w-4" />, 
+                href: "/dashboard/courses/manage" 
+              },
+              { 
+                title: "Penugasan Dosen", 
+                icon: <UserCog className="h-4 w-4" />, 
+                href: "/dashboard/courses/assignments" 
+              }
+            ]}
           />
-          <StatCard
-            title="Total Ruangan"
-            value={stats.totalRooms}
-            icon={<Building2 className="h-5 w-5 text-primary" />}
+
+          {/* Schedule Management Card */}
+          <QuickActionCard 
+            title="Manajemen Jadwal" 
+            icon={<CalendarDays className="h-5 w-5 text-[#0687C9]" />}
+            actions={[
+              { 
+                title: "Jadwal Perkuliahan", 
+                icon: <CalendarDays className="h-4 w-4" />, 
+                href: "/dashboard/schedules/manage" 
+              }
+            ]}
+          />
+
+          {/* User Management - Lecturers and Employees */}
+          <QuickActionCard 
+            title="Manajemen Staf" 
+            icon={<Users className="h-5 w-5 text-[#0687C9]" />}
+            actions={[
+              { 
+                title: "Daftar Dosen", 
+                icon: <Users className="h-4 w-4" />, 
+                href: "/dashboard/users/lecturers" 
+              },
+              { 
+                title: "Daftar Pegawai", 
+                icon: <UserCog className="h-4 w-4" />, 
+                href: "/dashboard/users/employees" 
+              }
+            ]}
+          />
+
+          {/* User Management - Students */}
+          <QuickActionCard 
+            title="Manajemen Mahasiswa" 
+            icon={<GraduationCap className="h-5 w-5 text-[#0687C9]" />}
+            actions={[
+              { 
+                title: "Daftar Mahasiswa", 
+                icon: <GraduationCap className="h-4 w-4" />, 
+                href: "/dashboard/users/students" 
+              },
+              { 
+                title: "Kelompok Mahasiswa", 
+                icon: <Users className="h-4 w-4" />, 
+                href: "/dashboard/users/student-groups" 
+              }
+            ]}
           />
         </div>
       </div>
@@ -366,95 +426,61 @@ export default function AdminDashboard() {
   );
 }
 
-function FeatureCard({
-  title,
-  description,
-  icon,
-  href,
-  textColor,
-}: {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  href: string;
-  textColor: string;
-}) {
-  return (
-    <Link href={href}>
-      <Card className="p-5 bg-white border border-neutral-100 hover:shadow-md transition-all rounded-lg h-full">
-        <div className="flex flex-col h-full">
-          <div className="flex items-center">
-            <div className={`p-2 rounded-full bg-[#E6F3FB]`}>{icon}</div>
-            <h3 className={`ml-3 font-medium ${textColor}`}>{title}</h3>
-          </div>
-          <p className="mt-2 text-sm text-neutral-600">{description}</p>
-        </div>
-      </Card>
-    </Link>
-  );
-}
-
-function QuickMenuItem({
-  title,
-  href,
-  icon,
-}: {
-  title: string;
-  href: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <Link href={href}>
-      <div className="flex items-center p-2 rounded-lg hover:bg-neutral-50 transition-colors">
-        <div className="p-1.5 rounded-md bg-[#E6F3FB] mr-3">{icon}</div>
-        <span className="text-sm font-medium text-neutral-700">{title}</span>
-      </div>
-    </Link>
-  );
-}
-
+// Stat Card Component
 function StatCard({
   title,
   value,
-  icon,
-  isText = false,
+  icon
 }: {
   title: string;
-  value: number | string;
+  value: number;
   icon: React.ReactNode;
-  isText?: boolean;
 }) {
   return (
-    <Card className="p-5 bg-white border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
-      <div className="flex items-center space-x-3">
-        <div className="p-2 rounded-full bg-primary/10">{icon}</div>
-        <div>
-          <h3 className="text-sm font-medium text-neutral-600">{title}</h3>
-          <p className={`text-lg font-bold text-neutral-800 ${isText ? "" : ""}`}>
-            {value}
-          </p>
+    <Card className="p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all">
+      <div className="flex items-center justify-between">
+        <div className="p-3">
+          {icon}
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-500 mb-1">{title}</p>
+          <p className="text-xl font-bold text-[#0687C9]">{value}</p>
         </div>
       </div>
     </Card>
   );
 }
 
-function CommonTaskCard({
+// Quick Action Card Component
+function QuickActionCard({
   title,
-  tasks,
+  icon,
+  actions
 }: {
   title: string;
-  tasks: { name: string; icon: React.ReactNode; href: string }[];
+  icon: React.ReactNode;
+  actions: {
+    title: string;
+    icon: React.ReactNode;
+    href: string;
+  }[];
 }) {
   return (
-    <Card className="p-5 bg-white border border-neutral-100 hover:shadow-sm transition-all rounded-lg">
-      <h3 className="font-medium text-[#002A5C] mb-3">{title}</h3>
+    <Card className="p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all">
+      <div className="flex items-center mb-3">
+        <div className="mr-2">
+          {icon}
+        </div>
+        <h3 className="font-medium text-[#002A5C]">{title}</h3>
+      </div>
       <div className="space-y-2">
-        {tasks.map((task, index) => (
-          <Link href={task.href} key={index}>
+        {actions.map((action, index) => (
+          <Link key={index} href={action.href}>
             <div className="flex items-center p-2 rounded-lg hover:bg-neutral-50 transition-colors">
-              <div className="p-1.5 rounded-md bg-[#E6F3FB] mr-3">{task.icon}</div>
-              <span className="text-sm font-medium text-neutral-700">{task.name}</span>
+              <div className="p-1.5 rounded-md mr-3 text-[#0687C9]">
+                {action.icon}
+              </div>
+              <span className="text-sm font-medium text-neutral-700">{action.title}</span>
             </div>
           </Link>
         ))}

@@ -92,31 +92,52 @@ func (r *LecturerAssignmentRepository) AssignmentExists(userID, courseID, academ
 func (r *LecturerAssignmentRepository) GetAvailableLecturers(courseID, academicYearID uint) ([]models.Lecturer, error) {
 	var lecturers []models.Lecturer
 	
-	// Get UserIDs of lecturers already assigned to this course in this academic year
-	subQuery := r.db.Model(&models.LecturerAssignment{}).
-		Select("user_id").
-		Where("course_id = ? AND academic_year_id = ?", courseID, academicYearID)
+	// Check if there are any assignments for this course
+	var count int64
+	r.db.Model(&models.LecturerAssignment{}).
+		Where("course_id = ? AND academic_year_id = ?", courseID, academicYearID).
+		Count(&count)
 	
-	// Get all lecturers not in the assigned list - checking against UserID column
-	err := r.db.Where("user_id NOT IN (?)", subQuery).
-		Find(&lecturers).Error
-	
-	return lecturers, err
+	if count > 0 {
+		// Get UserIDs of lecturers already assigned to this course in this academic year
+		subQuery := r.db.Model(&models.LecturerAssignment{}).
+			Select("user_id").
+			Where("course_id = ? AND academic_year_id = ?", courseID, academicYearID)
+		
+		// Get all lecturers not in the assigned list
+		err := r.db.Where("user_id NOT IN (?)", subQuery).
+			Order("full_name ASC").
+			Find(&lecturers).Error
+		
+		return lecturers, err
+	} else {
+		// If no assignments exist, return all lecturers
+		err := r.db.Order("full_name ASC").Find(&lecturers).Error
+		return lecturers, err
+	}
 }
 
 // GetLecturerAssignmentResponses returns all lecturer assignments with detailed information
-func (r *LecturerAssignmentRepository) GetLecturerAssignmentResponses() ([]models.LecturerAssignmentResponse, error) {
+func (r *LecturerAssignmentRepository) GetLecturerAssignmentResponses(academicYearID uint) ([]models.LecturerAssignmentResponse, error) {
 	var responses []models.LecturerAssignmentResponse
 	
-	result := r.db.Model(&models.LecturerAssignment{}).
-		Select("lecturer_assignments.id, lecturer_assignments.user_id, lecturers.full_name as lecturer_name, "+
-			"lecturer_assignments.course_id, courses.code as course_code, courses.name as course_name, "+
-			"lecturer_assignments.academic_year, lecturer_assignments.semester, "+
+	query := r.db.Table("lecturer_assignments").
+		Select("lecturer_assignments.id, lecturer_assignments.user_id, COALESCE(lecturers.full_name, '') as lecturer_name, "+
+			"COALESCE(lecturers.email, '') as lecturer_email, COALESCE(lecturers.n_ip, '') as lecturer_nip, "+
+			"lecturer_assignments.course_id, COALESCE(courses.code, '') as course_code, COALESCE(courses.name, '') as course_name, "+
+			"COALESCE(courses.semester, 0) as course_semester, "+
+			"lecturer_assignments.academic_year_id, COALESCE(academic_years.name, '') as academic_year, COALESCE(academic_years.semester, '') as semester, "+
 			"lecturer_assignments.created_at, lecturer_assignments.updated_at").
 		Joins("LEFT JOIN lecturers ON lecturer_assignments.user_id = lecturers.user_id").
 		Joins("LEFT JOIN courses ON lecturer_assignments.course_id = courses.id").
-		Where("lecturer_assignments.deleted_at IS NULL").
-		Find(&responses)
+		Joins("LEFT JOIN academic_years ON lecturer_assignments.academic_year_id = academic_years.id").
+		Where("lecturer_assignments.deleted_at IS NULL")
+
+	if academicYearID > 0 {
+		query = query.Where("lecturer_assignments.academic_year_id = ?", academicYearID)
+	}
+		
+	result := query.Find(&responses)
 	
 	return responses, result.Error
 }
@@ -125,13 +146,16 @@ func (r *LecturerAssignmentRepository) GetLecturerAssignmentResponses() ([]model
 func (r *LecturerAssignmentRepository) GetLecturerAssignmentResponseByID(id uint) (*models.LecturerAssignmentResponse, error) {
 	var response models.LecturerAssignmentResponse
 	
-	result := r.db.Model(&models.LecturerAssignment{}).
-		Select("lecturer_assignments.id, lecturer_assignments.user_id, lecturers.full_name as lecturer_name, "+
-			"lecturer_assignments.course_id, courses.code as course_code, courses.name as course_name, "+
-			"lecturer_assignments.academic_year, lecturer_assignments.semester, "+
+	result := r.db.Table("lecturer_assignments").
+		Select("lecturer_assignments.id, lecturer_assignments.user_id, COALESCE(lecturers.full_name, '') as lecturer_name, "+
+			"COALESCE(lecturers.email, '') as lecturer_email, COALESCE(lecturers.n_ip, '') as lecturer_nip, "+
+			"lecturer_assignments.course_id, COALESCE(courses.code, '') as course_code, COALESCE(courses.name, '') as course_name, "+
+			"COALESCE(courses.semester, 0) as course_semester, "+
+			"lecturer_assignments.academic_year_id, COALESCE(academic_years.name, '') as academic_year, COALESCE(academic_years.semester, '') as semester, "+
 			"lecturer_assignments.created_at, lecturer_assignments.updated_at").
 		Joins("LEFT JOIN lecturers ON lecturer_assignments.user_id = lecturers.user_id").
 		Joins("LEFT JOIN courses ON lecturer_assignments.course_id = courses.id").
+		Joins("LEFT JOIN academic_years ON lecturer_assignments.academic_year_id = academic_years.id").
 		Where("lecturer_assignments.id = ? AND lecturer_assignments.deleted_at IS NULL", id).
 		First(&response)
 	

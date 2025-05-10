@@ -82,7 +82,7 @@ interface AcademicYear {
 // Interface for lecturer assignment
 interface Assignment {
   id: number;
-  uuid: string;
+  title: string;
   user_id: number;  // Changed back to user_id to match the API response
   course_id: number;
   academic_year_id: number;
@@ -177,8 +177,41 @@ export default function LecturerAssignmentsPage() {
       });
       
       if (response.data.status === "success") {
-        const assignmentsData = response.data.data || [];
-        setAssignments(assignmentsData);
+        const apiData = response.data.data || [];
+        
+        // Transform API response data to match the Assignment interface
+        const transformedAssignments = apiData.map((item: any) => ({
+          id: item.id,
+          title: "",
+          user_id: item.user_id,
+          course_id: item.course_id,
+          academic_year_id: item.academic_year_id,
+          lecturer: {
+            id: 0, // We don't have the actual lecturer ID from the flat response
+            uuid: "", // We don't have the UUID either
+            user_id: item.user_id,
+            full_name: item.lecturer_name || "",
+            nip: item.lecturer_nip || "",
+            email: item.lecturer_email || ""
+          },
+          course: {
+            id: item.course_id,
+            uuid: "",
+            code: item.course_code || "",
+            name: item.course_name || "",
+            semester: item.course_semester || 0 // Use course_semester from API response
+          },
+          academic_year: {
+            id: item.academic_year_id,
+            uuid: "",
+            name: item.academic_year || "",
+            semester: item.semester || "",
+            start_date: "",
+            end_date: ""
+          }
+        }));
+        
+        setAssignments(transformedAssignments);
       } else {
         toast.error("Gagal memuat data penugasan");
         setAssignments([]);
@@ -343,13 +376,14 @@ export default function LecturerAssignmentsPage() {
   // Filter assignments based on search query and semester filter
   const filteredAssignments = assignments.filter((assignment) => {
     const matchesSearch = 
-      assignment.lecturer.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assignment.course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      assignment.course.code.toLowerCase().includes(searchQuery.toLowerCase());
+      (assignment.lecturer?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || !assignment.lecturer) ||
+      (assignment.course?.name?.toLowerCase().includes(searchQuery.toLowerCase()) || !assignment.course) ||
+      (assignment.course?.code?.toLowerCase().includes(searchQuery.toLowerCase()) || !assignment.course);
     
     const matchesSemester = 
       semesterFilter === "all" || 
-      (semesterFilter && assignment.course.semester === parseInt(semesterFilter));
+      !assignment.course?.semester || // Include assignments with undefined semester
+      (semesterFilter && assignment.course?.semester === parseInt(semesterFilter));
     
     return matchesSearch && matchesSemester;
   });
@@ -457,7 +491,7 @@ export default function LecturerAssignmentsPage() {
   const handleEditAssignment = (assignment: Assignment) => {
     setCurrentAssignment(assignment);
     setFormLecturerId(assignment.user_id.toString());
-    setFormLecturerName(assignment.lecturer.full_name);
+    setFormLecturerName(assignment.lecturer?.full_name || 'Unknown Lecturer');
     setFormCourseId(assignment.course_id.toString());
     setFormAcademicYearId(assignment.academic_year_id.toString());
     setShowEditDialog(true);
@@ -536,7 +570,7 @@ export default function LecturerAssignmentsPage() {
   const confirmDeleteAssignment = (assignment: Assignment) => {
     setAssignmentToDelete({ 
       id: assignment.id, 
-      name: `${assignment.lecturer.full_name} - ${assignment.course.code} ${assignment.course.name}` 
+      name: `${assignment.lecturer?.full_name || 'Unknown Lecturer'} - ${assignment.course?.code || ''} ${assignment.course?.name || ''}` 
     });
     setShowDeleteModal(true);
   };
@@ -612,8 +646,42 @@ export default function LecturerAssignmentsPage() {
       });
       
       if (response.data.status === "success") {
-        console.log("Complete assignment data:", response.data.data);
-        return response.data.data;
+        const item = response.data.data;
+        
+        // Transform API response data to match the Assignment interface
+        const transformedAssignment = {
+          id: item.id,
+          title: "",
+          user_id: item.user_id,
+          course_id: item.course_id,
+          academic_year_id: item.academic_year_id,
+          lecturer: {
+            id: 0,
+            uuid: "",
+            user_id: item.user_id,
+            full_name: item.lecturer_name || "",
+            nip: item.lecturer_nip || "",
+            email: item.lecturer_email || ""
+          },
+          course: {
+            id: item.course_id,
+            uuid: "",
+            code: item.course_code || "",
+            name: item.course_name || "",
+            semester: item.course_semester || 0 // Use course_semester from API response
+          },
+          academic_year: {
+            id: item.academic_year_id,
+            uuid: "",
+            name: item.academic_year || "",
+            semester: item.semester || "",
+            start_date: "",
+            end_date: ""
+          }
+        };
+        
+        console.log("Transformed assignment data:", transformedAssignment);
+        return transformedAssignment;
       }
       console.error("Failed to fetch assignment details:", response.data);
       return null;
@@ -754,18 +822,18 @@ export default function LecturerAssignmentsPage() {
                       <TableCell className="text-center font-medium">{index + 1}</TableCell>
                       <TableCell>
                         <div className="font-medium">
-                          {assignment.lecturer.full_name}
+                          {assignment.lecturer?.full_name || 'Unknown Lecturer'}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{assignment.course.code}</TableCell>
+                      <TableCell className="font-medium">{assignment.course?.code || 'N/A'}</TableCell>
                       <TableCell>
                         <div className="font-medium">
-                          {assignment.course.name}
+                          {assignment.course?.name || 'Unknown Course'}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center font-medium">{assignment.course.semester}</TableCell>
+                      <TableCell className="text-center font-medium">{assignment.course?.semester || '-'}</TableCell>
                       <TableCell className="font-medium">
-                        {assignment.academic_year.name} - {assignment.academic_year.semester}
+                        {assignment.academic_year?.name || 'N/A'} - {assignment.academic_year?.semester || 'N/A'}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>

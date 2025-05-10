@@ -65,7 +65,6 @@ func main() {
 	roomHandler := handlers.NewRoomHandler()
 	academicYearHandler := handlers.NewAcademicYearHandler()
 	courseHandler := handlers.NewCourseHandler()
-	courseGroupHandler := handlers.NewCourseGroupHandler()
 	studentGroupHandler := handlers.NewStudentGroupHandler()
 	lecturerAssignmentHandler := handlers.NewLecturerAssignmentHandler()
 	courseScheduleHandler := handlers.NewCourseScheduleHandler()
@@ -143,13 +142,6 @@ func main() {
 			adminRoutes.PUT("/courses/:id", courseHandler.UpdateCourse)
 			adminRoutes.DELETE("/courses/:id", courseHandler.DeleteCourse)
 			
-			// Admin access to course group data
-			adminRoutes.GET("/course-groups", courseGroupHandler.GetAllCourseGroups)
-			adminRoutes.GET("/course-groups/:id", courseGroupHandler.GetCourseGroupByID)
-			adminRoutes.POST("/course-groups", courseGroupHandler.CreateCourseGroup)
-			adminRoutes.PUT("/course-groups/:id", courseGroupHandler.UpdateCourseGroup)
-			adminRoutes.DELETE("/course-groups/:id", courseGroupHandler.DeleteCourseGroup)
-
 			// Admin access to student group data
 			adminRoutes.GET("/student-groups", studentGroupHandler.GetAllStudentGroups)
 			adminRoutes.GET("/student-groups/:id", studentGroupHandler.GetStudentGroupByID)
@@ -185,24 +177,21 @@ func main() {
 		lecturerRoutes := authRequired.Group("/lecturer")
 		lecturerRoutes.Use(middleware.RoleMiddleware("Dosen"))
 		{
-			// Lecturer profile
-			lecturerRoutes.GET("/profile", handlers.GetCurrentUser)
+			// Lecturer routes go here
 		}
 
 		// Employee routes (replacing assistant routes)
 		employeeRoutes := authRequired.Group("/employee")
 		employeeRoutes.Use(middleware.RoleMiddleware("Pegawai"))
 		{
-			// Employee profile
-			employeeRoutes.GET("/profile", handlers.GetCurrentUser)
+			// Employee routes go here
 		}
 
 		// Student routes
 		studentRoutes := authRequired.Group("/student")
 		studentRoutes.Use(middleware.RoleMiddleware("Mahasiswa"))
 		{
-			// Student profile
-			studentRoutes.GET("/profile", handlers.GetCurrentUser)
+			// Student routes go here
 		}
 	}
 

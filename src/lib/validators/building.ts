@@ -5,7 +5,6 @@ import * as z from "zod";
  */
 export const buildingSchema = z.object({
   id: z.number().optional(),
-  uuid: z.string().optional(),
   code: z.string()
     .min(2, { message: "Kode gedung harus minimal 2 karakter" })
     .max(10, { message: "Kode gedung maksimal 10 karakter" })

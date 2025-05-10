@@ -3,14 +3,12 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 // Student represents a student in the system
 type Student struct {
 	ID              uint           `json:"id" gorm:"primaryKey"`
-	UUID            string         `json:"uuid" gorm:"type:varchar(36);uniqueIndex;not null"`
 	DimID           int            `json:"dim_id" gorm:"not null"`
 	UserID          int            `json:"user_id" gorm:"not null;comment:External user ID from campus system"`
 	User            *User          `json:"-" gorm:"foreignKey:ExternalUserID;references:UserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
@@ -33,14 +31,6 @@ type Student struct {
 // TableName returns the table name for the Student model
 func (Student) TableName() string {
 	return "students"
-}
-
-// BeforeCreate is a GORM hook that generates a UUID before creating a new student
-func (s *Student) BeforeCreate(tx *gorm.DB) error {
-	if s.UUID == "" {
-		s.UUID = uuid.New().String()
-	}
-	return nil
 }
 
 // CampusStudentResponse represents the response from the campus API for students

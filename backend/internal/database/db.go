@@ -143,20 +143,6 @@ func Initialize() {
 	}
 	log.Println("Course table migrated successfully")
 	
-	// Then migrate the CourseGroup model (depends on Department, Faculty, and Course)
-	err = DB.AutoMigrate(&models.CourseGroup{})
-	if err != nil {
-		log.Fatalf("Error auto-migrating CourseGroup model: %v\n", err)
-	}
-	log.Println("CourseGroup table migrated successfully")
-	
-	// Then migrate the CourseToGroup join table
-	err = DB.AutoMigrate(&models.CourseToGroup{})
-	if err != nil {
-		log.Fatalf("Error auto-migrating CourseToGroup model: %v\n", err)
-	}
-	log.Println("CourseToGroup table migrated successfully")
-	
 	// Then migrate the StudentGroup model
 	err = DB.AutoMigrate(&models.StudentGroup{})
 	if err != nil {

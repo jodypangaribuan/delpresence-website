@@ -19,9 +19,6 @@ import { ColumnDef } from "@tanstack/react-table";
 // Interface untuk data pegawai
 interface Employee {
   id: number;
-  uuid: string;
-  employee_id: number;
-  user_id: number;
   nip: string;
   full_name: string;
   email: string;

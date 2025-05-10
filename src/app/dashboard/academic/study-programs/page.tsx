@@ -82,7 +82,6 @@ interface Lecturer {
 // Type for StudyProgram
 interface StudyProgram {
   id: number;
-  uuid: string;
   code: string;
   name: string;
   faculty_id: number;

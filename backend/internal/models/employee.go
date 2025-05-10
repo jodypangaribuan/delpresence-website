@@ -3,14 +3,12 @@ package models
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 // Employee represents an employee in the system
 type Employee struct {
 	ID              uint           `json:"id" gorm:"primaryKey"`
-	UUID            string         `json:"uuid" gorm:"type:varchar(36);uniqueIndex;not null"`
 	EmployeeID      int            `json:"employee_id" gorm:"not null;comment:External employee ID from campus system"`
 	UserID          int            `json:"user_id" gorm:"comment:External user ID from campus system"`
 	User            *User          `json:"-" gorm:"foreignKey:ExternalUserID;references:UserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
@@ -19,7 +17,7 @@ type Employee struct {
 	Email           string         `json:"email" gorm:"type:varchar(255)"`
 	Position        string         `json:"position" gorm:"type:varchar(100)"`
 	Department      string         `json:"department" gorm:"type:varchar(100)"`
-	EmploymentType  string         `json:"employment_type" gorm:"type:varchar(50)"` // Permanen, Kontrak, dll
+	EmploymentType  string         `json:"employment_type" gorm:"type:varchar(50)"`
 	JoinDate        *time.Time     `json:"join_date"`
 	LastSync        time.Time      `json:"last_sync" gorm:"autoCreateTime"`
 	CreatedAt       time.Time      `json:"created_at" gorm:"autoCreateTime"`
@@ -30,14 +28,6 @@ type Employee struct {
 // TableName returns the table name for the Employee model
 func (Employee) TableName() string {
 	return "employees"
-}
-
-// BeforeCreate is a GORM hook that generates a UUID before creating a new employee
-func (e *Employee) BeforeCreate(tx *gorm.DB) error {
-	if e.UUID == "" {
-		e.UUID = uuid.New().String()
-	}
-	return nil
 }
 
 // CampusEmployeeResponse represents the response from the campus API for employees

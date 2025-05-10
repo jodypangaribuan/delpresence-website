@@ -80,7 +80,27 @@ export async function api<T = any>(endpoint: string, options: ApiOptions = {}): 
     
     // Handle API errors
     if (!response.ok) {
-      throw new Error(data.error || 'API request failed');
+      // Extract detailed error information if available
+      const errorMsg = data.error || data.message || 'API request failed';
+      const errorDetails = data.details || data.errors;
+      
+      console.error(`API Error (${response.status}):`, {
+        url,
+        method,
+        error: errorMsg,
+        details: errorDetails,
+        rawResponse: data
+      });
+      
+      // Throw error with more context
+      const error = new Error(errorMsg);
+      // @ts-ignore - Add additional properties to the error object
+      error.status = response.status;
+      // @ts-ignore
+      error.details = errorDetails;
+      // @ts-ignore
+      error.rawResponse = data;
+      throw error;
     }
     
     return data;

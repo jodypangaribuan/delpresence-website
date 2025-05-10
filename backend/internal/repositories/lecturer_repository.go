@@ -77,8 +77,6 @@ func (r *LecturerRepository) Upsert(lecturer *models.Lecturer) error {
 	// If lecturer exists, update it
 	if existing != nil {
 		lecturer.ID = existing.ID
-		lecturer.UUID = existing.UUID
-		lecturer.CreatedAt = existing.CreatedAt
 		return r.Update(lecturer)
 	}
 
@@ -131,4 +129,17 @@ func (r *LecturerRepository) Search(query string) ([]models.Lecturer, error) {
 	}
 	
 	return lecturers, nil
+}
+
+// GetByUserID finds a lecturer by their UserID (external ID from campus API)
+func (r *LecturerRepository) GetByUserID(userID uint) (models.Lecturer, error) {
+	var lecturer models.Lecturer
+	err := r.db.Where("user_id = ?", userID).First(&lecturer).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return models.Lecturer{}, nil
+		}
+		return models.Lecturer{}, err
+	}
+	return lecturer, nil
 } 

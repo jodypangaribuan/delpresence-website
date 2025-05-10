@@ -33,7 +33,6 @@ func (h *LecturerHandler) GetAllLecturers(c *gin.Context) {
 	// Transform the data to include the study program name as a string
 	type LecturerResponse struct {
 		ID               uint      `json:"id"`
-		UUID             string    `json:"uuid"`
 		EmployeeID       int       `json:"employee_id"`
 		LecturerID       int       `json:"lecturer_id"`
 		NIP              string    `json:"nip"`
@@ -56,7 +55,6 @@ func (h *LecturerHandler) GetAllLecturers(c *gin.Context) {
 	for i, lecturer := range lecturers {
 		response[i] = LecturerResponse{
 			ID:               lecturer.ID,
-			UUID:             lecturer.UUID,
 			EmployeeID:       lecturer.EmployeeID,
 			LecturerID:       lecturer.LecturerID,
 			NIP:              lecturer.NIP,
@@ -168,7 +166,6 @@ func (h *LecturerHandler) SearchLecturers(c *gin.Context) {
 	type LecturerOption struct {
 		ID       uint   `json:"id"`
 		UserID   int    `json:"user_id"` // Include UserID from lecturer table
-		UUID     string `json:"uuid"`
 		FullName string `json:"full_name"`
 		NIP      string `json:"nip"`      // Include NIP which is mapped to n_ip in DB
 		NIDN     string `json:"nidn"`     // NIDN is mapped to n_id_n in DB
@@ -181,7 +178,6 @@ func (h *LecturerHandler) SearchLecturers(c *gin.Context) {
 		options[i] = LecturerOption{
 			ID:       lecturer.ID,
 			UserID:   lecturer.UserID, // Include UserID in the response
-			UUID:     lecturer.UUID,
 			FullName: lecturer.FullName,
 			NIP:      lecturer.NIP,
 			NIDN:     lecturer.NIDN,

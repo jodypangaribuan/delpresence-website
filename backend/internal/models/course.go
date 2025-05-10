@@ -21,7 +21,6 @@ type Course struct {
 	AcademicYearID  uint           `gorm:"not null" json:"academic_year_id"`
 	AcademicYear    AcademicYear   `gorm:"foreignKey:AcademicYearID" json:"academic_year"`
 	SemesterType    string         `gorm:"not null" json:"semester_type"` // ganjil or genap
-	CourseGroups    []*CourseGroup `gorm:"many2many:course_to_groups;" json:"course_groups,omitempty"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`

@@ -5,13 +5,13 @@ import * as z from "zod";
  */
 export const roomSchema = z.object({
   id: z.number().optional(),
-  uuid: z.string().optional(),
-  code: z.string()
-    .min(2, { message: "Kode ruangan harus minimal 2 karakter" })
-    .max(10, { message: "Kode ruangan maksimal 10 karakter" })
-    .regex(/^[a-zA-Z0-9\-]+$/, { 
-      message: "Kode ruangan hanya boleh berisi huruf, angka, dan tanda hubung" 
-    }),
+  code: z.string().min(2, {
+    message: "Room code must be at least 2 characters."
+  }).max(10, {
+    message: "Room code must not exceed 10 characters."
+  }).regex(/^[a-zA-Z0-9-]*$/, {
+    message: "Room code must contain only letters, numbers, and dashes."
+  }),
   name: z.string()
     .min(3, { message: "Nama ruangan harus minimal 3 karakter" })
     .max(100, { message: "Nama ruangan maksimal 100 karakter" }),

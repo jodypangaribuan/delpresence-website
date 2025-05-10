@@ -5,7 +5,6 @@ import * as z from "zod";
  */
 export const studyProgramSchema = z.object({
   id: z.number().optional(),
-  uuid: z.string().optional(),
   code: z.string()
     .min(2, { message: "Kode program studi harus minimal 2 karakter" })
     .max(10, { message: "Kode program studi maksimal 10 karakter" })

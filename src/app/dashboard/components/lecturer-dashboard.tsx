@@ -92,9 +92,9 @@ export default function LecturerDashboard() {
             <h3 className="font-medium text-[#002A5C] mb-3">Kehadiran</h3>
             <div className="space-y-2">
               <QuickMenuItem
-                title="Lihat Laporan Kehadiran"
-                href="/dashboard/lecturer/attendance-reports"
-                icon={<FileCheck className="h-4 w-4 text-blue-600" />}
+                title="Kelola Kehadiran Mahasiswa"
+                href="/dashboard/lecturer/attendance"
+                icon={<ClipboardList className="h-4 w-4 text-blue-600" />}
               />
             </div>
           </Card>
@@ -108,13 +108,13 @@ export default function LecturerDashboard() {
                 icon={<Calendar className="h-4 w-4 text-green-600" />}
               />
               <QuickMenuItem
-                title="Lihat Perkembangan Mahasiswa"
-                href="/dashboard/lecturer/student-progress"
-                icon={<BarChart2 className="h-4 w-4 text-green-600" />}
+                title="Mata Kuliah Saya"
+                href="/dashboard/lecturer/courses"
+                icon={<BookOpen className="h-4 w-4 text-green-600" />}
               />
               <QuickMenuItem
-                title="Materi Pembelajaran"
-                href="/dashboard/lecturer/materials"
+                title="Generate QR Code"
+                href="/dashboard/lecturer/qrcode"
                 icon={<Clipboard className="h-4 w-4 text-green-600" />}
               />
             </div>
@@ -136,10 +136,10 @@ export default function LecturerDashboard() {
             textColor="text-blue-600"
           />
           <FeatureCard
-            title="Laporan Akademik"
-            description="Lihat laporan perkembangan dan kehadiran mahasiswa"
-            icon={<BarChart2 className="h-5 w-5 text-amber-600" />}
-            href="/dashboard/lecturer/student-progress"
+            title="Kelola Kehadiran"
+            description="Kelola kehadiran mahasiswa untuk mata kuliah Anda"
+            icon={<ClipboardList className="h-5 w-5 text-amber-600" />}
+            href="/dashboard/lecturer/attendance"
             textColor="text-amber-600"
           />
         </div>

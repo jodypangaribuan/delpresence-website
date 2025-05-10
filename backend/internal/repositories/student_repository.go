@@ -84,7 +84,6 @@ func (r *StudentRepository) UpsertMany(students []models.Student) error {
 
 			// Update existing student
 			student.ID = existingStudent.ID
-			student.UUID = existingStudent.UUID
 			student.CreatedAt = existingStudent.CreatedAt
 			
 			if err := tx.Save(&student).Error; err != nil {

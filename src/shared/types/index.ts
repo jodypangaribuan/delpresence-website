@@ -35,7 +35,6 @@ export interface CardImage {
 // Academic types
 export interface Faculty {
   id: number;
-  uuid: string;
   code: string;
   name: string;
   dean?: string;
@@ -45,7 +44,6 @@ export interface Faculty {
 
 export interface StudyProgram {
   id: number;
-  uuid: string;
   code: string;
   name: string;
   faculty_id: number;
@@ -65,7 +63,6 @@ export interface StudyProgram {
  */
 export interface Building {
   id: number;
-  uuid?: string;
   code: string;
   name: string;
   floors: number;
@@ -89,7 +86,6 @@ export interface BuildingWithStats {
  */
 export interface Room {
   id: number;
-  uuid?: string;
   code: string;
   name: string;
   building_id: number;

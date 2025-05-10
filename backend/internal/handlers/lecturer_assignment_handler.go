@@ -35,6 +35,25 @@ func (h *LecturerAssignmentHandler) CreateLecturerAssignment(c *gin.Context) {
 		return
 	}
 
+	// Validate that the lecturer exists
+	lecturerRepo := repositories.NewLecturerRepository()
+	lecturer, err := lecturerRepo.GetByUserID(input.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status": "error",
+			"error":  "Failed to verify lecturer: " + err.Error(),
+		})
+		return
+	}
+
+	if lecturer.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status": "error",
+			"error":  "Lecturer not found with the provided UserID",
+		})
+		return
+	}
+
 	// Check if the assignment already exists
 	exists, err := h.repo.AssignmentExists(input.UserID, input.CourseID, input.AcademicYearID)
 	if err != nil {
@@ -67,9 +86,21 @@ func (h *LecturerAssignmentHandler) CreateLecturerAssignment(c *gin.Context) {
 		return
 	}
 
+	// Get the complete assignment with relationships
+	createdAssignment, err := h.repo.GetByID(assignment.ID)
+	if err != nil {
+		// Just log the error but don't fail the request
+		c.JSON(http.StatusCreated, gin.H{
+			"status": "success",
+			"data":   assignment,
+			"message": "Assignment created successfully, but failed to load complete details",
+		})
+		return
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"status": "success",
-		"data":   assignment,
+		"data":   createdAssignment,
 	})
 }
 
@@ -115,18 +146,19 @@ func (h *LecturerAssignmentHandler) GetAllLecturerAssignments(c *gin.Context) {
 		academicYearIDUint = activeYear.ID
 	}
 
-	assignments, err := h.repo.GetAll(academicYearIDUint)
+	// Get detailed assignment information directly
+	responses, err := h.repo.GetLecturerAssignmentResponses(academicYearIDUint)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status": "error",
-			"error":  "Failed to get assignments: " + err.Error(),
+			"error":  "Failed to get assignment details: " + err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data":   assignments,
+		"data":   responses,
 	})
 }
 
@@ -191,6 +223,25 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 		return
 	}
 
+	// Validate that the lecturer exists
+	lecturerRepo := repositories.NewLecturerRepository()
+	lecturer, err := lecturerRepo.GetByUserID(input.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status": "error",
+			"error":  "Failed to verify lecturer: " + err.Error(),
+		})
+		return
+	}
+
+	if lecturer.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status": "error",
+			"error":  "Lecturer not found with the provided UserID",
+		})
+		return
+	}
+
 	// Get the existing assignment
 	existingAssignment, err := h.repo.GetByID(uint(idUint))
 	if err != nil {
@@ -245,9 +296,21 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 		return
 	}
 
+	// Get the updated assignment with relationships
+	updatedAssignment, err := h.repo.GetByID(existingAssignment.ID)
+	if err != nil {
+		// Just log the error but don't fail the request
+		c.JSON(http.StatusOK, gin.H{
+			"status": "success",
+			"data":   existingAssignment,
+			"message": "Assignment updated successfully, but failed to load complete details",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data":   existingAssignment,
+		"data":   updatedAssignment,
 	})
 }
 
@@ -347,6 +410,7 @@ func (h *LecturerAssignmentHandler) GetAssignmentsByLecturer(c *gin.Context) {
 		academicYearIDUint = activeYear.ID
 	}
 	
+	// Get assignment data with preloaded relationships
 	assignments, err := h.repo.GetByLecturerID(uint(lecturerIDUint), academicYearIDUint)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -414,6 +478,7 @@ func (h *LecturerAssignmentHandler) GetAssignmentsByCourse(c *gin.Context) {
 		academicYearIDUint = activeYear.ID
 	}
 	
+	// Get assignment data with preloaded relationships
 	assignments, err := h.repo.GetByCourseID(uint(courseIDUint), academicYearIDUint)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -429,7 +494,7 @@ func (h *LecturerAssignmentHandler) GetAssignmentsByCourse(c *gin.Context) {
 	})
 }
 
-// GetAvailableLecturers returns lecturers who are not assigned to the specified course
+// GetAvailableLecturers returns lecturers who are not assigned to the specified course in an academic year
 func (h *LecturerAssignmentHandler) GetAvailableLecturers(c *gin.Context) {
 	courseID := c.Param("course_id")
 	courseIDUint, err := strconv.ParseUint(courseID, 10, 32)
@@ -440,11 +505,11 @@ func (h *LecturerAssignmentHandler) GetAvailableLecturers(c *gin.Context) {
 		})
 		return
 	}
-	
-	// Get academic year ID (optional)
+
+	// Extract academic year ID from query params or use the active one
 	academicYearID := c.Query("academic_year_id")
 	var academicYearIDUint uint = 0
-	
+
 	if academicYearID != "" {
 		academicYearIDParsed, err := strconv.ParseUint(academicYearID, 10, 32)
 		if err != nil {
@@ -456,7 +521,7 @@ func (h *LecturerAssignmentHandler) GetAvailableLecturers(c *gin.Context) {
 		}
 		academicYearIDUint = uint(academicYearIDParsed)
 	}
-	
+
 	// If no academic year ID was provided, use the active one
 	if academicYearIDUint == 0 {
 		// Get active academic year
@@ -469,7 +534,7 @@ func (h *LecturerAssignmentHandler) GetAvailableLecturers(c *gin.Context) {
 			})
 			return
 		}
-		
+
 		if activeYear == nil {
 			c.JSON(http.StatusNotFound, gin.H{
 				"status": "error",
@@ -477,10 +542,11 @@ func (h *LecturerAssignmentHandler) GetAvailableLecturers(c *gin.Context) {
 			})
 			return
 		}
-		
+
 		academicYearIDUint = activeYear.ID
 	}
-	
+
+	// Get the available lecturers
 	lecturers, err := h.repo.GetAvailableLecturers(uint(courseIDUint), academicYearIDUint)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -489,9 +555,35 @@ func (h *LecturerAssignmentHandler) GetAvailableLecturers(c *gin.Context) {
 		})
 		return
 	}
-	
+
+	// Prepare the response with detailed lecturer information
+	type lecturerResponse struct {
+		ID             uint   `json:"id"`
+		UserID         int    `json:"user_id"`
+		FullName       string `json:"full_name"`
+		NIP            string `json:"nip"`
+		NIDN           string `json:"nidn"`
+		Email          string `json:"email"`
+		StudyProgramID uint   `json:"study_program_id"`
+		StudyProgram   string `json:"study_program"`
+	}
+
+	var response []lecturerResponse
+	for _, lecturer := range lecturers {
+		response = append(response, lecturerResponse{
+			ID:             lecturer.ID,
+			UserID:         lecturer.UserID,
+			FullName:       lecturer.FullName,
+			NIP:            lecturer.NIP,
+			NIDN:           lecturer.NIDN,
+			Email:          lecturer.Email,
+			StudyProgramID: lecturer.StudyProgramID,
+			StudyProgram:   lecturer.StudyProgramName,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data":   lecturers,
+		"data":   response,
 	})
 } 
