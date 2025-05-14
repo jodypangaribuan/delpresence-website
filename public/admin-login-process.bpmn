@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  id="Definitions_AdminLogin"
+                  targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="bpmn-js (https://demo.bpmn.io)"
+                  exporterVersion="12.0.0">
+  <bpmn:process id="AdminLoginProcess" name="Admin Login Process" isExecutable="false">
+    <!-- Start Event -->
+    <bpmn:startEvent id="StartEvent_AdminLogin" name="Start Admin Login">
+      <bpmn:outgoing>Flow_ToLoginForm</bpmn:outgoing>
+    </bpmn:startEvent>
+    
+    <!-- Present Login Form Task -->
+    <bpmn:task id="Task_PresentLoginForm" name="Present Admin Login Form">
+      <bpmn:incoming>Flow_ToLoginForm</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEnterCredentials</bpmn:outgoing>
+    </bpmn:task>
+    
+    <!-- Enter Credentials Task -->
+    <bpmn:userTask id="Task_EnterCredentials" name="Enter Admin Credentials">
+      <bpmn:incoming>Flow_ToEnterCredentials</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToValidateCredentials</bpmn:outgoing>
+    </bpmn:userTask>
+    
+    <!-- Validate Credentials Task -->
+    <bpmn:serviceTask id="Task_ValidateCredentials" name="Validate Credentials">
+      <bpmn:incoming>Flow_ToValidateCredentials</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCheckCredentials</bpmn:outgoing>
+    </bpmn:serviceTask>
+    
+    <!-- Check Credentials Gateway -->
+    <bpmn:exclusiveGateway id="Gateway_CredentialsCheck" name="Credentials Valid?">
+      <bpmn:incoming>Flow_ToCheckCredentials</bpmn:incoming>
+      <bpmn:outgoing>Flow_ValidCredentials</bpmn:outgoing>
+      <bpmn:outgoing>Flow_InvalidCredentials</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    
+    <!-- Display Error Task -->
+    <bpmn:task id="Task_DisplayError" name="Display Error Message">
+      <bpmn:incoming>Flow_InvalidCredentials</bpmn:incoming>
+      <bpmn:outgoing>Flow_RetryLogin</bpmn:outgoing>
+    </bpmn:task>
+    
+    <!-- Generate Auth Token Task -->
+    <bpmn:serviceTask id="Task_GenerateAuthToken" name="Generate Authentication Token">
+      <bpmn:incoming>Flow_ValidCredentials</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRedirectDashboard</bpmn:outgoing>
+    </bpmn:serviceTask>
+    
+    <!-- Redirect To Dashboard Task -->
+    <bpmn:task id="Task_RedirectToDashboard" name="Redirect to Admin Dashboard">
+      <bpmn:incoming>Flow_ToRedirectDashboard</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndSuccess</bpmn:outgoing>
+    </bpmn:task>
+    
+    <!-- Success End Event -->
+    <bpmn:endEvent id="EndEvent_Success" name="Admin Login Successful">
+      <bpmn:incoming>Flow_ToEndSuccess</bpmn:incoming>
+    </bpmn:endEvent>
+    
+    <!-- Sequence Flows -->
+    <bpmn:sequenceFlow id="Flow_ToLoginForm" sourceRef="StartEvent_AdminLogin" targetRef="Task_PresentLoginForm" />
+    <bpmn:sequenceFlow id="Flow_ToEnterCredentials" sourceRef="Task_PresentLoginForm" targetRef="Task_EnterCredentials" />
+    <bpmn:sequenceFlow id="Flow_ToValidateCredentials" sourceRef="Task_EnterCredentials" targetRef="Task_ValidateCredentials" />
+    <bpmn:sequenceFlow id="Flow_ToCheckCredentials" sourceRef="Task_ValidateCredentials" targetRef="Gateway_CredentialsCheck" />
+    <bpmn:sequenceFlow id="Flow_ValidCredentials" name="Valid" sourceRef="Gateway_CredentialsCheck" targetRef="Task_GenerateAuthToken" />
+    <bpmn:sequenceFlow id="Flow_InvalidCredentials" name="Invalid" sourceRef="Gateway_CredentialsCheck" targetRef="Task_DisplayError" />
+    <bpmn:sequenceFlow id="Flow_RetryLogin" sourceRef="Task_DisplayError" targetRef="Task_EnterCredentials" />
+    <bpmn:sequenceFlow id="Flow_ToRedirectDashboard" sourceRef="Task_GenerateAuthToken" targetRef="Task_RedirectToDashboard" />
+    <bpmn:sequenceFlow id="Flow_ToEndSuccess" sourceRef="Task_RedirectToDashboard" targetRef="EndEvent_Success" />
+  </bpmn:process>
+  
+  <!-- BPMN Diagram Information -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="AdminLoginProcess">
+      <!-- Start Event -->
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_1" bpmnElement="StartEvent_AdminLogin">
+        <dc:Bounds x="152" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="128" y="275" width="85" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      
+      <!-- Present Login Form Task -->
+      <bpmndi:BPMNShape id="Activity_0nip9up_di" bpmnElement="Task_PresentLoginForm">
+        <dc:Bounds x="240" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      
+      <!-- Enter Credentials Task -->
+      <bpmndi:BPMNShape id="Activity_0mltb0q_di" bpmnElement="Task_EnterCredentials">
+        <dc:Bounds x="400" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      
+      <!-- Validate Credentials Task -->
+      <bpmndi:BPMNShape id="Activity_0bvxhpg_di" bpmnElement="Task_ValidateCredentials">
+        <dc:Bounds x="560" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      
+      <!-- Check Credentials Gateway -->
+      <bpmndi:BPMNShape id="Gateway_1s8vgze_di" bpmnElement="Gateway_CredentialsCheck" isMarkerVisible="true">
+        <dc:Bounds x="715" y="225" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="698" y="195" width="84" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      
+      <!-- Display Error Task -->
+      <bpmndi:BPMNShape id="Activity_0n4e9ij_di" bpmnElement="Task_DisplayError">
+        <dc:Bounds x="690" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      
+      <!-- Generate Auth Token Task -->
+      <bpmndi:BPMNShape id="Activity_05x3li4_di" bpmnElement="Task_GenerateAuthToken">
+        <dc:Bounds x="820" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      
+      <!-- Redirect To Dashboard Task -->
+      <bpmndi:BPMNShape id="Activity_0r95u5p_di" bpmnElement="Task_RedirectToDashboard">
+        <dc:Bounds x="980" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      
+      <!-- Success End Event -->
+      <bpmndi:BPMNShape id="Event_1ew8inp_di" bpmnElement="EndEvent_Success">
+        <dc:Bounds x="1142" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1121" y="275" width="78" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      
+      <!-- Sequence Flows -->
+      <bpmndi:BPMNEdge id="Flow_1h87w8h_di" bpmnElement="Flow_ToLoginForm">
+        <di:waypoint x="188" y="250" />
+        <di:waypoint x="240" y="250" />
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Flow_1bjnpbl_di" bpmnElement="Flow_ToEnterCredentials">
+        <di:waypoint x="340" y="250" />
+        <di:waypoint x="400" y="250" />
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Flow_0fkd9yo_di" bpmnElement="Flow_ToValidateCredentials">
+        <di:waypoint x="500" y="250" />
+        <di:waypoint x="560" y="250" />
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Flow_10p8n8a_di" bpmnElement="Flow_ToCheckCredentials">
+        <di:waypoint x="660" y="250" />
+        <di:waypoint x="715" y="250" />
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Flow_0mij580_di" bpmnElement="Flow_ValidCredentials">
+        <di:waypoint x="765" y="250" />
+        <di:waypoint x="820" y="250" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="783" y="232" width="24" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Flow_0g2b2zu_di" bpmnElement="Flow_InvalidCredentials">
+        <di:waypoint x="740" y="275" />
+        <di:waypoint x="740" y="340" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="743" y="304" width="33" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Flow_1qxu3z3_di" bpmnElement="Flow_RetryLogin">
+        <di:waypoint x="690" y="380" />
+        <di:waypoint x="450" y="380" />
+        <di:waypoint x="450" y="290" />
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Flow_0y9ph6v_di" bpmnElement="Flow_ToRedirectDashboard">
+        <di:waypoint x="920" y="250" />
+        <di:waypoint x="980" y="250" />
+      </bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Flow_0s1y56e_di" bpmnElement="Flow_ToEndSuccess">
+        <di:waypoint x="1080" y="250" />
+        <di:waypoint x="1142" y="250" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions> 

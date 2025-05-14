@@ -95,7 +95,7 @@ export default function AssistantDashboard() {
             <div className="space-y-2">
               <QuickMenuItem
                 title="Kelola Presensi"
-                href="/dashboard/assistant/qrcode"
+                href="/dashboard/assistant/attendance"
                 icon={<ClipboardList className="h-4 w-4 text-blue-600" />}
               />
             </div>
@@ -109,11 +109,6 @@ export default function AssistantDashboard() {
                 href="/dashboard/assistant/schedules"
                 icon={<Calendar className="h-4 w-4 text-green-600" />}
               />
-              <QuickMenuItem
-                title="Penugasan Saya"
-                href="/dashboard/assistant/assignments"
-                icon={<UserCog className="h-4 w-4 text-green-600" />}
-              />
             </div>
           </Card>
         </div>
@@ -124,20 +119,20 @@ export default function AssistantDashboard() {
         <h2 className="text-xl font-bold text-[#002A5C] mb-4">
           Area Fungsi Utama
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FeatureCard
             title="Kelola Presensi"
             description="Kelola presensi mahasiswa dalam perkuliahan"
             icon={<ClipboardList className="h-5 w-5 text-amber-600" />}
-            href="/dashboard/assistant/qrcode"
+            href="/dashboard/assistant/attendance"
             textColor="text-amber-600"
           />
           <FeatureCard
-            title="Penugasan Saya"
-            description="Lihat status penugasan anda sebagai asisten dosen"
-            icon={<UserCog className="h-5 w-5 text-purple-600" />}
-            href="/dashboard/assistant/assignments"
-            textColor="text-purple-600"
+            title="Jadwal Mengajar"
+            description="Lihat jadwal dan aktivitas mengajar Anda"
+            icon={<Calendar className="h-5 w-5 text-green-600" />}
+            href="/dashboard/assistant/schedules"
+            textColor="text-green-600"
           />
         </div>
       </div>

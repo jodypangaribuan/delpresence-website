@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"fmt"
 	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/models"
 	"gorm.io/gorm"
@@ -79,7 +80,7 @@ func (r *CourseScheduleRepository) GetByAcademicYear(academicYearID uint) ([]mod
 }
 
 // GetByLecturer returns course schedules by lecturer ID
-func (r *CourseScheduleRepository) GetByLecturer(lecturerID uint) ([]models.CourseSchedule, error) {
+func (r *CourseScheduleRepository) GetByLecturer(userID uint) ([]models.CourseSchedule, error) {
 	var schedules []models.CourseSchedule
 	err := r.db.
 		Preload("Course").
@@ -88,7 +89,22 @@ func (r *CourseScheduleRepository) GetByLecturer(lecturerID uint) ([]models.Cour
 		Preload("Lecturer").
 		Preload("StudentGroup").
 		Preload("AcademicYear").
-		Where("lecturer_id = ?", lecturerID).
+		Where("lecturer_id = ?", userID).
+		Find(&schedules).Error
+	return schedules, err
+}
+
+// GetByLecturerAndAcademicYear returns course schedules by lecturer ID and academic year ID
+func (r *CourseScheduleRepository) GetByLecturerAndAcademicYear(userID uint, academicYearID uint) ([]models.CourseSchedule, error) {
+	var schedules []models.CourseSchedule
+	err := r.db.
+		Preload("Course").
+		Preload("Room").
+		Preload("Room.Building").
+		Preload("Lecturer").
+		Preload("StudentGroup").
+		Preload("AcademicYear").
+		Where("lecturer_id = ? AND academic_year_id = ?", userID, academicYearID).
 		Find(&schedules).Error
 	return schedules, err
 }
@@ -188,9 +204,9 @@ func (r *CourseScheduleRepository) CheckScheduleConflict(roomID uint, day string
 }
 
 // CheckLecturerScheduleConflict checks if there's a lecturer schedule conflict
-func (r *CourseScheduleRepository) CheckLecturerScheduleConflict(lecturerID uint, day string, startTime, endTime string, scheduleID *uint) (bool, error) {
+func (r *CourseScheduleRepository) CheckLecturerScheduleConflict(userID uint, day string, startTime, endTime string, scheduleID *uint) (bool, error) {
 	query := r.db.Model(&models.CourseSchedule{}).
-		Where("lecturer_id = ? AND day = ?", lecturerID, day).
+		Where("lecturer_id = ? AND day = ?", userID, day).
 		Where("(start_time < ? AND end_time > ?) OR (start_time < ? AND end_time > ?) OR (start_time >= ? AND end_time <= ?)",
 			endTime, startTime, endTime, startTime, startTime, endTime)
 	
@@ -221,4 +237,43 @@ func (r *CourseScheduleRepository) CheckStudentGroupScheduleConflict(studentGrou
 	err := query.Count(&count).Error
 	
 	return count > 0, err
+}
+
+// UpdateSchedulesForCourseInAcademicYear updates all schedules for a specific course in an academic year
+// to use the new lecturer ID. This is used when lecturer assignments change.
+func (r *CourseScheduleRepository) UpdateSchedulesForCourseInAcademicYear(courseID, academicYearID, newUserID uint) error {
+	// First, find all schedules that match the criteria
+	var schedules []models.CourseSchedule
+	err := r.db.Where("course_id = ? AND academic_year_id = ?", courseID, academicYearID).Find(&schedules).Error
+	if err != nil {
+		return err
+	}
+	
+	// If no schedules found, there's nothing to update
+	if len(schedules) == 0 {
+		return nil
+	}
+	
+	// Update schedules one by one to ensure proper handling of associations
+	for _, schedule := range schedules {
+		// Update the lecturer_id field
+		schedule.UserID = newUserID
+		
+		// Save the updated schedule - this will trigger any hooks and handle associations
+		if err := r.db.Save(&schedule).Error; err != nil {
+			return err
+		}
+		
+		// Log successful update
+		fmt.Printf("Updated schedule ID %d to use lecturer_id %d\n", schedule.ID, newUserID)
+	}
+	
+	return nil
+}
+
+// UpdateSchedulesForCourse updates all schedules for a specific course to use a new lecturer
+func (r *CourseScheduleRepository) UpdateSchedulesForCourse(courseID, lecturerID uint) error {
+	return r.db.Model(&models.CourseSchedule{}).
+		Where("course_id = ?", courseID).
+		Update("user_id", lecturerID).Error
 } 

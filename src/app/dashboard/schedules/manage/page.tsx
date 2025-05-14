@@ -43,7 +43,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   PopoverContent, PopoverTrigger
 } from "@/components/ui/popover";
@@ -53,7 +52,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { format, addDays, startOfWeek, endOfWeek, isSameDay, parse, isWithinInterval } from "date-fns";
+import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { useForm } from "react-hook-form";
 import axios from "axios";
@@ -68,13 +67,10 @@ import {
   MoreHorizontal, 
   Trash2,
   BookOpen,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
-  CalendarIcon,
   Filter,
-  RefreshCw,
-  MapPin
+  MapPin,
+  Search
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -197,7 +193,7 @@ const scheduleFormSchema = z.object({
     message: "ID dosen tidak valid"
   }),
   student_group_id: z.string().nonempty("Pilih kelompok mahasiswa"),
-  academic_year_id: z.string().nonempty("Pilih tahun akademik"),
+  academic_year_id: z.string(),
 });
 
 type FormValues = z.infer<typeof scheduleFormSchema>;
@@ -223,9 +219,7 @@ export default function ScheduleManagePage() {
   const [searchingLecturers, setSearchingLecturers] = useState(false);
   const [selectedLecturer, setSelectedLecturer] = useState<any | null>(null);
   
-  // State for current date and dialog visibility
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [calendarView, setCalendarView] = useState<'week' | 'day'>('week');
+  // State for dialog visibility
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -268,6 +262,51 @@ export default function ScheduleManagePage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // New function to fetch the lecturer for a selected course
+  const fetchLecturerForCourse = async (courseId: number) => {
+    try {
+      const response = await api(`/admin/course-lecturers/course/${courseId}`, {
+        method: 'GET',
+      });
+      
+      if (response.status === "success" && response.data) {
+        console.log("Lecturer data from API:", response.data);
+        
+        // We can use either lecturer_id or user_id - they should be the same
+        // The backend is now sending both to ensure compatibility
+        return {
+          id: response.data.user_id || response.data.lecturer_id, // Prefer user_id if available
+          external_user_id: response.data.external_user_id, // Store this for reference
+          full_name: response.data.name,
+          email: response.data.email,
+          academicYearId: response.data.academic_year_id,
+          academicYearName: response.data.academic_year_name
+        };
+      } else {
+        console.log("No lecturer assigned to this course");
+        return null;
+      }
+    } catch (error: any) {
+      // Don't show error toast for 404 (no lecturer assigned)
+      if (error.status === 404) {
+        console.log("No lecturer assigned to this course (404)");
+        return null;
+      }
+      
+      // For other errors, log but don't break the UI
+      console.error("Error fetching lecturer for course:", error);
+      
+      // Only show toast for non-404 errors that aren't related to missing lecturer assignments
+      if (error.status !== 404 && !error.message?.includes("Lecturer: unsupported relations")) {
+        toast.error("Gagal mendapatkan data dosen untuk mata kuliah ini", {
+          description: "Silakan pilih dosen secara manual"
+        });
+      }
+      
+      return null;
     }
   };
 
@@ -378,6 +417,10 @@ export default function ScheduleManagePage() {
     // Log for debugging
     console.log("Lecturer ID as number:", lecturerId);
     console.log("Lecturer ID type:", typeof lecturerId);
+    // If this is from our automated lookup, log the external_user_id also
+    if (lecturer.external_user_id) {
+      console.log("Lecturer external_user_id:", lecturer.external_user_id);
+    }
         
     // Store as string in the form (React Hook Form expects string values)
     const lecturerIdStr = String(lecturerId);
@@ -412,6 +455,62 @@ export default function ScheduleManagePage() {
       // Log raw form data for debugging
       console.log("Raw form data:", data);
       
+      // Validate lecturer ID
+      const lecturerId = parseInt(data.lecturer_id);
+      if (isNaN(lecturerId) || lecturerId <= 0) {
+        // If lecturer ID is invalid, try to get a lecturer for the course
+        const courseId = parseInt(data.course_id);
+        if (!isNaN(courseId) && courseId > 0) {
+          try {
+            const lecturer = await fetchLecturerForCourse(courseId);
+            if (lecturer && lecturer.id) {
+              // Use the lecturer from the course
+              data.lecturer_id = lecturer.id.toString();
+              console.log("Using lecturer from course:", lecturer);
+            } else {
+              toast.error("Tidak dapat menambahkan jadwal", {
+                description: "ID dosen tidak valid dan tidak ada dosen yang ditugaskan untuk mata kuliah ini"
+              });
+              setIsSubmitting(false);
+              return;
+            }
+          } catch (error) {
+            console.error("Error fetching lecturer for course:", error);
+            toast.error("Tidak dapat menambahkan jadwal", {
+              description: "Gagal mendapatkan data dosen untuk mata kuliah ini"
+            });
+            setIsSubmitting(false);
+            return;
+          }
+        } else {
+          toast.error("Tidak dapat menambahkan jadwal", {
+            description: "ID dosen dan ID mata kuliah tidak valid"
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
+      // Ensure academic_year_id is populated
+      if (!data.academic_year_id) {
+        // Try to find the active academic year
+        const activeYear = academicYears.find(year => year.is_active);
+        if (activeYear) {
+          data.academic_year_id = activeYear.id.toString();
+          console.log("Using active academic year ID:", activeYear.id);
+        } else if (academicYears.length > 0) {
+          // If no active year, use the first one
+          data.academic_year_id = academicYears[0].id.toString();
+          console.log("Using first academic year ID:", academicYears[0].id);
+        } else {
+          toast.error("Tidak dapat menambahkan jadwal", {
+            description: "Tidak ada tahun akademik yang tersedia"
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
       // Convert form string values to appropriate types for the API
       try {
         // Since we're using zod validation, we know the values are valid
@@ -421,33 +520,30 @@ export default function ScheduleManagePage() {
           day: data.day,
           start_time: data.start_time,
           end_time: data.end_time,
-          lecturer_id: parseInt(data.lecturer_id), // Safe to parse due to zod refinement
+          lecturer_id: parseInt(data.lecturer_id), // This should be the User.ID
           student_group_id: parseInt(data.student_group_id),
           academic_year_id: parseInt(data.academic_year_id)
         };
         
         // Debug log for troubleshooting
         console.log("Sending schedule data:", formattedData);
-        console.log("Lecturer ID type in formattedData:", typeof formattedData.lecturer_id);
+        console.log("Lecturer ID (User.ID) in formattedData:", formattedData.lecturer_id);
         
         // Make API request
-      const response = await api('/admin/schedules', {
-        method: 'POST',
-          body: {
-            ...formattedData,
-            lecturer_id: Number(formattedData.lecturer_id) // Ensure it's sent as a number
-          },
-      });
-      
-      if (response.status === "success") {
-        toast.success("Jadwal berhasil ditambahkan", {
-          description: "Jadwal perkuliahan baru telah berhasil ditambahkan"
+        const response = await api('/admin/schedules', {
+          method: 'POST',
+          body: formattedData,
         });
-        setShowAddDialog(false);
-        fetchSchedules(); // Refresh the schedule list
-      } else {
-        toast.error("Gagal menambahkan jadwal", {
-          description: response.message || "Terjadi kesalahan saat menambahkan jadwal baru"
+        
+        if (response.status === "success") {
+          toast.success("Jadwal berhasil ditambahkan", {
+            description: "Jadwal perkuliahan baru telah berhasil ditambahkan"
+          });
+          setShowAddDialog(false);
+          fetchSchedules(); // Refresh the schedule list
+        } else {
+          toast.error("Gagal menambahkan jadwal", {
+            description: response.message || "Terjadi kesalahan saat menambahkan jadwal baru"
           });
         }
       } catch (parseError) {
@@ -458,9 +554,17 @@ export default function ScheduleManagePage() {
       }
     } catch (error: any) {
       console.error("Error adding schedule:", error);
-      toast.error("Gagal menambahkan jadwal", {
-        description: error.message || "Terjadi kesalahan saat menambahkan jadwal baru"
-      });
+      
+      // Handle specific error messages
+      if (error.message && error.message.includes("invalid lecturer/user ID")) {
+        toast.error("Gagal menambahkan jadwal", {
+          description: "ID dosen tidak valid atau tidak ada dosen yang ditugaskan untuk mata kuliah ini"
+        });
+      } else {
+        toast.error("Gagal menambahkan jadwal", {
+          description: error.message || "Terjadi kesalahan saat menambahkan jadwal baru"
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -470,6 +574,71 @@ export default function ScheduleManagePage() {
   const handleEditSchedule = async (data: any) => {
     setIsSubmitting(true);
     try {
+      // Log raw form data for debugging
+      console.log("Raw edit form data:", data);
+      
+      // Validate lecturer ID
+      const lecturerId = parseInt(data.lecturer_id);
+      if (isNaN(lecturerId) || lecturerId <= 0) {
+        // If lecturer ID is invalid, try to get a lecturer for the course
+        const courseId = parseInt(data.course_id);
+        if (!isNaN(courseId) && courseId > 0) {
+          try {
+            const lecturer = await fetchLecturerForCourse(courseId);
+            if (lecturer && lecturer.id) {
+              // Use the lecturer from the course
+              data.lecturer_id = lecturer.id.toString();
+              console.log("Using lecturer from course for edit:", lecturer);
+            } else {
+              toast.error("Tidak dapat memperbarui jadwal", {
+                description: "ID dosen tidak valid dan tidak ada dosen yang ditugaskan untuk mata kuliah ini"
+              });
+              setIsSubmitting(false);
+              return;
+            }
+          } catch (error) {
+            console.error("Error fetching lecturer for course:", error);
+            toast.error("Tidak dapat memperbarui jadwal", {
+              description: "Gagal mendapatkan data dosen untuk mata kuliah ini"
+            });
+            setIsSubmitting(false);
+            return;
+          }
+        } else {
+          toast.error("Tidak dapat memperbarui jadwal", {
+            description: "ID dosen dan ID mata kuliah tidak valid"
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
+      // Ensure academic_year_id is populated
+      if (!data.academic_year_id && currentSchedule) {
+        // First try to use the current schedule's academic year
+        if (currentSchedule.academic_year_id) {
+          data.academic_year_id = currentSchedule.academic_year_id.toString();
+          console.log("Using current schedule's academic year ID:", currentSchedule.academic_year_id);
+        } else {
+          // Try to find the active academic year
+          const activeYear = academicYears.find(year => year.is_active);
+          if (activeYear) {
+            data.academic_year_id = activeYear.id.toString();
+            console.log("Using active academic year ID:", activeYear.id);
+          } else if (academicYears.length > 0) {
+            // If no active year, use the first one
+            data.academic_year_id = academicYears[0].id.toString();
+            console.log("Using first academic year ID:", academicYears[0].id);
+          } else {
+            toast.error("Tidak dapat memperbarui jadwal", {
+              description: "Tidak ada tahun akademik yang tersedia"
+            });
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+      
       // Convert form string values to appropriate types for the API
       const formattedData = {
         course_id: parseInt(data.course_id),
@@ -477,15 +646,16 @@ export default function ScheduleManagePage() {
         day: data.day,
         start_time: data.start_time,
         end_time: data.end_time, 
-        lecturer_id: parseInt(data.lecturer_id),
+        lecturer_id: parseInt(data.lecturer_id), // This should be the User.ID
         student_group_id: parseInt(data.student_group_id),
         academic_year_id: parseInt(data.academic_year_id)
       };
       
       // Debug log for troubleshooting
-      console.log("Sending updated schedule data:", formattedData);
-      
-      // Conflict check removed based on user feedback
+      console.log("Sending edit schedule data:", formattedData);
+      console.log("Lecturer ID (User.ID) in edit formattedData:", formattedData.lecturer_id);
+        
+      // Make API request
       const response = await api(`/admin/schedules/${currentSchedule?.id}`, {
         method: 'PUT',
         body: formattedData,
@@ -504,9 +674,17 @@ export default function ScheduleManagePage() {
       }
     } catch (error: any) {
       console.error("Error updating schedule:", error);
-      toast.error("Gagal memperbarui jadwal", {
-        description: error.message || "Terjadi kesalahan saat memperbarui jadwal"
-      });
+      
+      // Handle specific error messages
+      if (error.message && error.message.includes("invalid lecturer/user ID")) {
+        toast.error("Gagal memperbarui jadwal", {
+          description: "ID dosen tidak valid atau tidak ada dosen yang ditugaskan untuk mata kuliah ini"
+        });
+      } else {
+        toast.error("Gagal memperbarui jadwal", {
+          description: error.message || "Terjadi kesalahan saat memperbarui jadwal"
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -670,7 +848,13 @@ export default function ScheduleManagePage() {
       });
       if (response.status === "success") {
         setAcademicYears(response.data);
-        // Set default academic year filter to the first active one if not already set
+        
+        // Don't set a default filter value - show all academic years by default
+        // This allows users to see schedules from all academic years initially
+        // They can then filter to a specific year if needed
+        
+        // Optional: If you want to set a default filter, uncomment this code:
+        /*
         if (!academicYearFilter && response.data.length > 0) {
           const activeYear = response.data.find((year: AcademicYear) => year.is_active);
           if (activeYear) {
@@ -680,6 +864,7 @@ export default function ScheduleManagePage() {
             setAcademicYearFilter(response.data[0].id);
           }
         }
+        */
       } else {
         toast.error("Gagal memuat tahun akademik");
       }
@@ -691,42 +876,89 @@ export default function ScheduleManagePage() {
     }
   };
 
+  // Function to fetch all data
   useEffect(() => {
+    // Load all data on component mount
     const loadAllData = async () => {
-      setLoading(true);
-      await fetchAcademicYears(); // Fetch academic years first to set the filter
-      // fetchSchedules will be called by the useEffect watching academicYearFilter
-      await fetchCourses();
-      await fetchRooms();
-      await fetchLecturers();
-      await fetchStudentGroups();
-      setLoading(false);
+      setLoadingRelatedData(true);
+      await fetchSchedules();
+      await Promise.all([
+        fetchCourses(),
+        fetchRooms(),
+        fetchLecturers(),
+        fetchStudentGroups(),
+        fetchAcademicYears()
+      ]);
+      setLoadingRelatedData(false);
     };
+
     loadAllData();
-  }, []); // Initial load
+  }, []);
 
   // useEffect to fetch schedules when academicYearFilter changes
   useEffect(() => {
     if (academicYearFilter) {
-      fetchFilteredSchedules(); // Use fetchFilteredSchedules to include the academic year
+      // If a specific academic year is selected, use filtered schedules
+      fetchFilteredSchedules();
     } else {
-      fetchSchedules(); // Fallback or initial load if no year filter is set (though academicYearFilter is usually set by loadAllData)
+      // If no academic year filter is set, show all schedules
+      fetchSchedules();
     }
   }, [academicYearFilter]);
 
   // Setup edit schedule
   const setupEditSchedule = (schedule: CourseSchedule) => {
-    setCurrentSchedule(schedule);
-    setShowEditDialog(true);
+    console.log("Setting up edit for schedule:", schedule);
     
-    // Set the lecturer search term when editing
+    // First set the current schedule
+    setCurrentSchedule(schedule);
+    
+    // Initialize the lecturer information explicitly
     if (schedule.lecturer_name) {
-      setLecturerSearchTerm(schedule.lecturer_name);
-      setSelectedLecturer({
+      console.log("Initializing lecturer info with name:", schedule.lecturer_name);
+      const lecturerInfo = {
         id: schedule.lecturer_id,
-        full_name: schedule.lecturer_name
-      });
+        full_name: schedule.lecturer_name,
+        name: schedule.lecturer_name
+      };
+      setSelectedLecturer(lecturerInfo);
+      setLecturerSearchTerm(schedule.lecturer_name);
+    } else if (schedule.lecturer_id) {
+      // We have a lecturer ID but no name - this should not happen in normal cases
+      // Still, we'll handle it gracefully
+      console.log("No lecturer name but have ID:", schedule.lecturer_id);
+      
+      // Try to find the lecturer name from our lecturers state
+      const foundLecturer = lecturers.find(lec => lec.id === schedule.lecturer_id);
+      
+      if (foundLecturer && foundLecturer.name) {
+        console.log("Found lecturer name from list:", foundLecturer.name);
+        const lecturerInfo = {
+          id: schedule.lecturer_id,
+          full_name: foundLecturer.name,
+          name: foundLecturer.name
+        };
+        setSelectedLecturer(lecturerInfo);
+        setLecturerSearchTerm(foundLecturer.name);
+      } else {
+        // If we still can't find a name, use a placeholder with ID
+        const lecturerInfo = {
+          id: schedule.lecturer_id,
+          full_name: `Dosen (ID: ${schedule.lecturer_id})`,
+          name: `Dosen (ID: ${schedule.lecturer_id})`
+        };
+        setSelectedLecturer(lecturerInfo);
+        setLecturerSearchTerm(`Dosen (ID: ${schedule.lecturer_id})`);
+      }
+    } else {
+      // No lecturer information at all
+      console.log("No lecturer information available");
+      setSelectedLecturer(null);
+      setLecturerSearchTerm("");
     }
+    
+    // Finally, open the dialog
+    setShowEditDialog(true);
   };
   
   // Setup delete schedule
@@ -735,23 +967,19 @@ export default function ScheduleManagePage() {
     setShowDeleteDialog(true);
   };
 
-  // Calendar navigation functions
-  const goToToday = () => {
-    setCurrentDate(new Date());
+  // Function to reset filters
+  const resetFilters = () => {
+    setDayFilter(null);
+    setBuildingFilter(null);
+    setSemesterFilter(null);
+    setLecturerFilter(null);
+    setCourseFilter(null);
+    setAcademicYearFilter(null); // Reset to null to show all academic years
+    setSearchQuery("");
+    
+    // After resetting filters, fetch all schedules
+    fetchSchedules();
   };
-
-  const goToPreviousWeek = () => {
-    setCurrentDate(prev => addDays(prev, -7));
-  };
-
-  const goToNextWeek = () => {
-    setCurrentDate(prev => addDays(prev, 7));
-  };
-
-  // Get current week range for display
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday as week start
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-  const formattedWeekRange = `${format(weekStart, 'd MMMM')} - ${format(weekEnd, 'd MMMM yyyy')}`;
 
   // Filter schedules based on user criteria
   const filteredSchedules = schedules.filter(schedule => {
@@ -771,26 +999,6 @@ export default function ScheduleManagePage() {
     return matchesSearch && matchesDay && matchesBuilding && matchesSemester && 
            matchesLecturer && matchesCourse && matchesAcademicYear;
   });
-
-  // Group schedules by day for calendar view
-  const schedulesByDay = DAYS.reduce<Record<string, CourseSchedule[]>>((acc, day) => {
-    acc[day] = filteredSchedules.filter(schedule => schedule.day === day);
-    return acc;
-  }, {});
-
-  // Reset all filters
-  const resetFilters = () => {
-    setSearchQuery("");
-    setDayFilter(null);
-    setBuildingFilter(null);
-    setSemesterFilter(null);
-    setLecturerFilter(null);
-    setCourseFilter(null);
-    setAcademicYearFilter(null);
-    
-    // Fetch all schedules without filters
-    fetchSchedules();
-  };
 
   // Forms for adding/editing schedules
   const addForm = useForm<FormValues>({
@@ -829,9 +1037,23 @@ export default function ScheduleManagePage() {
     }
   }, [showAddDialog, showEditDialog]);
 
+  // useEffect to update form when currentSchedule changes
   useEffect(() => {
-    if (currentSchedule) {
-      // Populate edit form with current schedule data
+    if (currentSchedule && showEditDialog) {
+      console.log("Setting up edit form with schedule:", currentSchedule);
+      
+      // Set the lecturer name first before form reset
+      if (currentSchedule.lecturer_name) {
+        console.log("Setting lecturer name:", currentSchedule.lecturer_name);
+        setLecturerSearchTerm(currentSchedule.lecturer_name);
+        setSelectedLecturer({
+          id: currentSchedule.lecturer_id,
+          full_name: currentSchedule.lecturer_name,
+          name: currentSchedule.lecturer_name
+        });
+      }
+      
+      // Then populate edit form with current schedule data
       editForm.reset({
         student_group_id: currentSchedule.student_group_id?.toString() || "",
         academic_year_id: currentSchedule.academic_year_id?.toString() || "",
@@ -842,274 +1064,392 @@ export default function ScheduleManagePage() {
         end_time: currentSchedule.end_time || "",
         room_id: currentSchedule.room_id?.toString() || ""
       });
+    }
+  }, [currentSchedule, editForm, showEditDialog]);
+
+  // Update the effect to do form reset when showing the add dialog
+  useEffect(() => {
+    if (showAddDialog) {
+      // Reset the form when dialog is opened
+      addForm.reset({
+        course_id: "",
+        room_id: "",
+        day: "Senin",
+        start_time: "08:00",
+        end_time: "10:00",
+        lecturer_id: "",
+        student_group_id: "",
+        academic_year_id: "",
+      });
       
-      // Set the selected lecturer for display
-      if (currentSchedule.lecturer_id && currentSchedule.lecturer_name) {
-        setSelectedLecturer({
-          id: currentSchedule.lecturer_id,
-          full_name: currentSchedule.lecturer_name,
-          name: currentSchedule.lecturer_name
-        });
+      // Clear selected lecturer
+      setSelectedLecturer(null);
+      setLecturerSearchTerm("");
+    }
+  }, [showAddDialog, addForm]);
+
+  // Watch for changes in course_id in add form
+  useEffect(() => {
+    const subscription = addForm.watch(async (value, { name, type }) => {
+      // Only respond to course_id changes
+      if (name === 'course_id' && value.course_id) {
+        const courseId = parseInt(value.course_id);
+        if (!isNaN(courseId) && courseId > 0) {
+          try {
+            // Fetch lecturer for this course
+            const lecturer = await fetchLecturerForCourse(courseId);
+            
+            if (lecturer) {
+              // Set the lecturer in the form
+              addForm.setValue("lecturer_id", lecturer.id.toString());
+              setSelectedLecturer(lecturer);
+              setLecturerSearchTerm(lecturer.full_name);
+              
+              // Set academic year from the lecturer assignment
+              if (lecturer.academicYearId) {
+                addForm.setValue("academic_year_id", lecturer.academicYearId.toString());
+                console.log("Setting academic year ID from lecturer assignment:", lecturer.academicYearId);
+              } else {
+                // If no academic year from lecturer, try to get the active one
+                const activeYear = academicYears.find(year => year.is_active);
+                if (activeYear) {
+                  addForm.setValue("academic_year_id", activeYear.id.toString());
+                  console.log("Setting academic year ID from active year:", activeYear.id);
+                } else if (academicYears.length > 0) {
+                  // If no active year, use the first one
+                  addForm.setValue("academic_year_id", academicYears[0].id.toString());
+                  console.log("Setting academic year ID from first year:", academicYears[0].id);
+                }
+              }
+              
+              toast.success("Dosen telah ditentukan secara otomatis", {
+                description: `${lecturer.full_name} ditugaskan untuk mata kuliah ini`
+              });
+            } else {
+              // No lecturer found, but don't show an error - just let user select manually
+              console.log("No lecturer found for course ID:", courseId);
+              
+              // Still try to set academic year even if no lecturer
+              const activeYear = academicYears.find(year => year.is_active);
+              if (activeYear) {
+                addForm.setValue("academic_year_id", activeYear.id.toString());
+                console.log("Setting academic year ID from active year:", activeYear.id);
+              } else if (academicYears.length > 0) {
+                // If no active year, use the first one
+                addForm.setValue("academic_year_id", academicYears[0].id.toString());
+                console.log("Setting academic year ID from first year:", academicYears[0].id);
+              }
+            }
+          } catch (error) {
+            // Silently handle errors - already logged in fetchLecturerForCourse
+            console.log("Error handled in course_id watch:", error);
+            
+            // Try to set academic year even if there was an error
+            const activeYear = academicYears.find(year => year.is_active);
+            if (activeYear) {
+              addForm.setValue("academic_year_id", activeYear.id.toString());
+              console.log("Setting academic year ID from active year:", activeYear.id);
+            } else if (academicYears.length > 0) {
+              // If no active year, use the first one
+              addForm.setValue("academic_year_id", academicYears[0].id.toString());
+              console.log("Setting academic year ID from first year:", academicYears[0].id);
+            }
+          }
+        }
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [addForm, academicYears]);
+
+  // Watch for changes in course_id in edit form
+  useEffect(() => {
+    const subscription = editForm.watch(async (value, { name, type }) => {
+      // Only respond to course_id changes if edit dialog is open
+      if (showEditDialog && name === 'course_id' && value.course_id) {
+        const courseId = parseInt(value.course_id);
+        if (!isNaN(courseId) && courseId > 0) {
+          console.log("Course ID changed in edit form:", courseId);
+          
+          // Check if the course ID is different from the original one
+          if (currentSchedule && courseId !== currentSchedule.course_id) {
+            console.log("Course changed, fetching new lecturer");
+            try {
+              // Fetch lecturer for this course
+              const lecturer = await fetchLecturerForCourse(courseId);
+              
+              if (lecturer) {
+                console.log("Found lecturer for selected course:", lecturer);
+                // Set the lecturer in the form
+                editForm.setValue("lecturer_id", lecturer.id.toString());
+                setSelectedLecturer(lecturer);
+                setLecturerSearchTerm(lecturer.full_name);
+                
+                // Set academic year from the lecturer assignment
+                if (lecturer.academicYearId) {
+                  editForm.setValue("academic_year_id", lecturer.academicYearId.toString());
+                  console.log("Setting academic year ID from lecturer assignment:", lecturer.academicYearId);
+                } else {
+                  // If no academic year from lecturer, try to get the active one
+                  const activeYear = academicYears.find(year => year.is_active);
+                  if (activeYear) {
+                    editForm.setValue("academic_year_id", activeYear.id.toString());
+                    console.log("Setting academic year ID from active year:", activeYear.id);
+                  } else if (academicYears.length > 0) {
+                    // If no active year, use the first one
+                    editForm.setValue("academic_year_id", academicYears[0].id.toString());
+                    console.log("Setting academic year ID from first year:", academicYears[0].id);
+                  }
+                }
+                
+                toast.success("Dosen telah ditentukan secara otomatis", {
+                  description: `${lecturer.full_name} ditugaskan untuk mata kuliah ini`
+                });
+              } else {
+                console.log("No lecturer found for course ID:", courseId);
+                // Don't show warning toast - let user select manually without interruption
+                
+                // Still try to set academic year even if no lecturer
+                const activeYear = academicYears.find(year => year.is_active);
+                if (activeYear) {
+                  editForm.setValue("academic_year_id", activeYear.id.toString());
+                  console.log("Setting academic year ID from active year:", activeYear.id);
+                } else if (academicYears.length > 0) {
+                  // If no active year, use the first one
+                  editForm.setValue("academic_year_id", academicYears[0].id.toString());
+                  console.log("Setting academic year ID from first year:", academicYears[0].id);
+                }
+              }
+            } catch (error) {
+              // Silently handle errors - already logged in fetchLecturerForCourse
+              console.log("Error handled in edit form course_id watch:", error);
+              
+              // Try to set academic year even if there was an error
+              const activeYear = academicYears.find(year => year.is_active);
+              if (activeYear) {
+                editForm.setValue("academic_year_id", activeYear.id.toString());
+                console.log("Setting academic year ID from active year:", activeYear.id);
+              } else if (academicYears.length > 0) {
+                // If no active year, use the first one
+                editForm.setValue("academic_year_id", academicYears[0].id.toString());
+                console.log("Setting academic year ID from first year:", academicYears[0].id);
+              }
+            }
+          } else {
+            console.log("Course ID unchanged or matches original course");
+          }
+        }
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [editForm, showEditDialog, currentSchedule, academicYears]);
+
+  // Watch for changes in edit dialog visibility
+  useEffect(() => {
+    if (showEditDialog && currentSchedule) {
+      // Force update the lecturer search term whenever the dialog opens
+      if (currentSchedule.lecturer_name) {
+        console.log("Dialog opened, updating lecturer term to name:", currentSchedule.lecturer_name);
+        setLecturerSearchTerm(currentSchedule.lecturer_name);
+      } else if (selectedLecturer && selectedLecturer.full_name) {
+        // If we have a selected lecturer but no name in currentSchedule, use that
+        console.log("Using selected lecturer name:", selectedLecturer.full_name);
+        setLecturerSearchTerm(selectedLecturer.full_name);
       }
     }
-  }, [currentSchedule, editForm]);
+  }, [showEditDialog, currentSchedule, selectedLecturer]);
 
   return (
     <div className="container p-4 mx-auto space-y-6">
       <Card className="border-0 shadow-sm">
         <CardContent className="p-6">
           <div className="flex justify-between items-center mb-6">
-        <div>
+            <div>
               <CardTitle className="text-2xl font-bold flex items-center">
-            <CalendarDays className="mr-2 h-6 w-6 text-[#0687C9]" />
-            Jadwal Perkuliahan
+                <CalendarDays className="mr-2 h-6 w-6 text-[#0687C9]" />
+                Jadwal Perkuliahan
               </CardTitle>
               <CardDescription className="mt-1">
-            Kelola jadwal perkuliahan untuk semester aktif
+                Kelola jadwal perkuliahan untuk semester aktif
               </CardDescription>
-        </div>
-        
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogTrigger asChild>
-            <Button className="bg-[#0687C9] hover:bg-[#0670a8]">
-              <Plus className="mr-2 h-4 w-4" />
-              Tambah Jadwal
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Tambah Jadwal Perkuliahan</DialogTitle>
-              <DialogDescription>
-                Masukkan detail jadwal baru yang ingin ditambahkan.
-              </DialogDescription>
-            </DialogHeader>
+            </div>
             
-                <Form {...addForm}>
-                  <form onSubmit={addForm.handleSubmit(handleAddSchedule)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={addForm.control}
-                        name="course_id"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Mata Kuliah</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Pilih mata kuliah" className="truncate" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {courses.length > 0 ? (
-                                  courses.map(course => (
-                                    <SelectItem key={course.id} value={course.id.toString()}>
-                                      {course.code} - {course.name}
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="loading" disabled>
-                                    Memuat data mata kuliah...
-                                  </SelectItem>
-                                )}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={addForm.control}
-                        name="day"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Hari</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
+            <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+              <DialogTrigger asChild>
+                <Button className="bg-[#0687C9] hover:bg-[#0670a8]">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Tambah Jadwal
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Tambah Jadwal Perkuliahan</DialogTitle>
+                  <DialogDescription>
+                    Masukkan detail jadwal baru yang ingin ditambahkan.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                    <Form {...addForm}>
+                      <form onSubmit={addForm.handleSubmit(handleAddSchedule)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={addForm.control}
+                            name="course_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Mata Kuliah</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder="Pilih mata kuliah" className="truncate" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {courses.length > 0 ? (
+                                      courses.map(course => (
+                                        <SelectItem key={course.id} value={course.id.toString()}>
+                                          {course.code} - {course.name}
+                                        </SelectItem>
+                                      ))
+                                    ) : (
+                                      <SelectItem value="loading" disabled>
+                                        Memuat data mata kuliah...
+                                      </SelectItem>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={addForm.control}
+                            name="day"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Hari</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Pilih hari" className="truncate" />
                   </SelectTrigger>
-                              </FormControl>
+                                  </FormControl>
                   <SelectContent>
-                                {DAYS.map(day => (
-                                  <SelectItem key={day} value={day}>
-                                    {day}
-                                  </SelectItem>
+                                    {DAYS.map(day => (
+                                      <SelectItem key={day} value={day}>
+                                        {day}
+                                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={addForm.control}
-                        name="start_time"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Jam Mulai</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={addForm.control}
-                        name="end_time"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Jam Selesai</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={addForm.control}
-                        name="room_id"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Ruangan</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={addForm.control}
+                            name="start_time"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Jam Mulai</FormLabel>
+                                <FormControl>
+                                  <Input type="time" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={addForm.control}
+                            name="end_time"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Jam Selesai</FormLabel>
+                                <FormControl>
+                                  <Input type="time" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={addForm.control}
+                            name="room_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Ruangan</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
                   <SelectTrigger className="w-full">
                                   <SelectValue placeholder="Pilih ruangan" className="truncate" />
                   </SelectTrigger>
-                              </FormControl>
+                                  </FormControl>
                   <SelectContent>
-                                {rooms.length > 0 ? (
-                                  rooms.map(room => (
-                                    <SelectItem key={room.id} value={room.id.toString()}>
-                                      {room.name}, {room.building?.name}
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="loading" disabled>
-                                    Memuat data ruangan...
-                                  </SelectItem>
-                                )}
+                                    {rooms.length > 0 ? (
+                                      rooms.map(room => (
+                                        <SelectItem key={room.id} value={room.id.toString()}>
+                                          {room.name}, {room.building?.name}
+                                        </SelectItem>
+                                      ))
+                                    ) : (
+                                      <SelectItem value="loading" disabled>
+                                        Memuat data ruangan...
+                                      </SelectItem>
+                                    )}
                   </SelectContent>
                 </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={addForm.control}
-                        name="lecturer_id"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Dosen</FormLabel>
-                            <div className="relative">
-                              <FormControl>
-                                <div className="flex flex-col space-y-2">
-                                  {selectedLecturer ? (
-                                    <div className="flex items-center space-x-2">
-                                      <Input 
-                                        value={lecturerSearchTerm}
-                                        className="w-full"
-                                        readOnly
-                                      />
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          setSelectedLecturer(null);
-                                          setLecturerSearchTerm("");
-                                          field.onChange("");
-                                        }}
-                                      >
-                                        Ganti
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                <Input 
-                                  placeholder="Cari dosen..." 
-                                  value={lecturerSearchTerm}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    setLecturerSearchTerm(value);
-                                    searchLecturers(value);
-                                  }}
-                                  className="w-full"
-                                />
-                                  )}
-                                </div>
-                              </FormControl>
-                              
-                              {showLecturerResults && !selectedLecturer && (
-                                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto min-w-[300px]">
-                                  {searchingLecturers ? (
-                                    <div className="flex items-center justify-center p-4">
-                                      <Loader2 className="h-5 w-5 animate-spin text-gray-500 mr-2" />
-                                      <span className="text-sm text-gray-500">Mencari dosen...</span>
-                                    </div>
-                                  ) : searchedLecturers.length > 0 ? (
-                                    <ul className="py-1">
-                                      {searchedLecturers.map((lecturer) => (
-                                        <li 
-                                          key={lecturer.id} 
-                                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                                          onClick={() => selectLecturer(lecturer)}
-                                        >
-                                          <div className="font-medium">{lecturer.full_name}</div>
-                                          <div className="text-xs text-gray-500 flex items-center">
-                                            <span className="mr-2">{lecturer.nidn || lecturer.nip || ""}</span>
-                                            {lecturer.program && (
-                                              <span>{lecturer.program}</span>
-                                            )}
-                                          </div>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  ) : lecturerSearchTerm.length >= 2 ? (
-                                    <div className="p-3 text-center text-sm text-gray-500">
-                                      Tidak ada dosen yang ditemukan.
-                                    </div>
-                                  ) : (
-                                    <div className="p-3 text-center text-sm text-gray-500">
-                                      Ketik minimal 2 karakter untuk mencari dosen.
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Hidden input with the actual lecturer ID value */}
-                            <input 
-                              type="hidden" 
-                              name={field.name}
-                              value={field.value || ""}
-                              onChange={field.onChange}
-                            />
-                            
-                            {!field.value && (
-                              <p className="text-xs text-red-500 mt-1">
-                                * Silakan pilih dosen dengan mencari dan memilih dari daftar
-                              </p>
+                                <FormMessage />
+                              </FormItem>
                             )}
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                          />
+                          
+                          <FormField
+                            control={addForm.control}
+                            name="lecturer_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Dosen</FormLabel>
+                                <FormControl>
+                                  <div className="flex items-center">
+                                    <Input 
+                                      value={lecturerSearchTerm || "Dosen akan ditentukan berdasarkan mata kuliah"}
+                                      className="w-full bg-gray-50"
+                                      readOnly
+                                    />
+                                    {selectedLecturer && (
+                                      <Badge className="ml-2 bg-[#0687C9]">Otomatis</Badge>
+                                    )}
+                                  </div>
+                                </FormControl>
+                                <input 
+                                  type="hidden" 
+                                  name={field.name}
+                                  value={field.value || ""}
+                                  onChange={field.onChange}
+                                />
+                                {!field.value && !addForm.getValues().course_id && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Pilih mata kuliah terlebih dahulu untuk menentukan dosen
+                                  </p>
+                                )}
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                       
                       <FormField
                         control={addForm.control}
@@ -1151,150 +1491,234 @@ export default function ScheduleManagePage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Tahun Akademik</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
-                  <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Pilih tahun akademik" className="truncate" />
-                  </SelectTrigger>
-                              </FormControl>
-                  <SelectContent>
-                                {academicYears.length > 0 ? (
-                                  academicYears.map(year => (
-                                    <SelectItem key={year.id} value={year.id.toString()}>
-                                      {year.name} ({year.semester})
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="loading" disabled>
-                                    Memuat data tahun akademik...
-                                  </SelectItem>
+                            <FormControl>
+                              <div className="flex items-center">
+                                <Input 
+                                  value={
+                                    field.value ? 
+                                      (academicYears.find(y => y.id.toString() === field.value)?.name || "Tahun akademik akan ditentukan otomatis") 
+                                      : "Tahun akademik akan ditentukan berdasarkan mata kuliah"
+                                  }
+                                  className="w-full bg-gray-50"
+                                  readOnly
+                                />
+                                {field.value && (
+                                  <Badge className="ml-2 bg-[#0687C9]">Otomatis</Badge>
                                 )}
-                  </SelectContent>
-                </Select>
+                              </div>
+                            </FormControl>
+                            <input 
+                              type="hidden" 
+                              name={field.name}
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                            />
+                            {!field.value && !addForm.getValues().course_id && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Pilih mata kuliah terlebih dahulu untuk menentukan tahun akademik
+                              </p>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      
+                      <div className="col-span-2 mt-2">
+                        <p className="text-sm text-muted-foreground">
+                          <em>Tahun akademik ditentukan secara otomatis berdasarkan mata kuliah yang dipilih.</em>
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <DialogFooter>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => setShowAddDialog(false)}
+                        >
+                  Batal
+                </Button>
+                        <Button 
+                          type="submit"
+                          className="bg-[#0687C9] hover:bg-[#0670a8]"
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Menyimpan...
+                            </>
+                          ) : (
+                            "Simpan Jadwal"
+                          )}
+                </Button>
+              </DialogFooter>
+                    </form>
+                  </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Cari jadwal perkuliahan..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
             
-            <DialogFooter>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => setShowAddDialog(false)}
-                      >
-                Batal
-              </Button>
-                      <Button 
-                        type="submit"
-                        className="bg-[#0687C9] hover:bg-[#0670a8]"
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Menyimpan...
-                          </>
-                        ) : (
-                          "Simpan Jadwal"
-                        )}
-              </Button>
-            </DialogFooter>
-                  </form>
-                </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Tabs defaultValue="list" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="list">Daftar Jadwal</TabsTrigger>
-          <TabsTrigger value="calendar">Tampilan Kalender</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="list" className="space-y-4">
-          <Card>
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-                    <div className="flex-1 relative">
-                      <MagnifyingGlassIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                        placeholder="Cari jadwal berdasarkan nama, kode, atau dosen..."
-                        className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Select
-                  value={dayFilter || "all"}
-                  onValueChange={(value) => setDayFilter(value === "all" ? null : value)}
-                >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Hari" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Hari</SelectItem>
-                    {DAYS.map((day) => (
-                      <SelectItem key={day} value={day}>{day}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select
-                  value={buildingFilter || "all"}
-                  onValueChange={(value) => setBuildingFilter(value === "all" ? null : value)}
-                >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Gedung" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Gedung</SelectItem>
-                    {uniqueBuildings.map((building) => (
-                      <SelectItem key={building} value={building}>{building}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select
-                  value={semesterFilter?.toString() || "all"}
-                        onValueChange={(value) => setSemesterFilter(value === "all" ? null : Number(value))}
-                >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Semester" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Semester</SelectItem>
-                    {uniqueSemesters.map((semester) => (
-                            <SelectItem key={semester} value={semester.toString()}>
-                              Semester {semester}
-                            </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-                  </div>
-                  
-                  <div className="border rounded-lg overflow-hidden">
-                    {loading ? (
-                      <div className="flex flex-col items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-[#0687C9] mb-2" />
-                        <p className="text-muted-foreground">Memuat data jadwal perkuliahan...</p>
+            <div className="w-full md:w-56">
+              <Select value={dayFilter || "all"} onValueChange={(value) => setDayFilter(value === "all" ? null : value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Filter Hari" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Hari</SelectItem>
+                  {DAYS.map((day) => (
+                    <SelectItem key={day} value={day}>{day}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="w-full md:w-64">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full flex justify-between">
+                    <span>Filter Lanjutan</span>
+                    <Filter className="h-4 w-4 ml-2" />
+                    {(buildingFilter || semesterFilter || lecturerFilter || academicYearFilter) && (
+                      <Badge className="ml-1 h-5 bg-[#0687C9]">{
+                        [buildingFilter, semesterFilter, lecturerFilter, academicYearFilter]
+                          .filter(Boolean).length
+                      }</Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[460px] p-5">
+                  <div className="space-y-5">
+                    <h4 className="font-medium text-base">Filter Jadwal</h4>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="building" className="mb-1.5 block">Gedung</Label>
+                        <Select
+                          value={buildingFilter || "all"}
+                          onValueChange={(value) => setBuildingFilter(value === "all" ? null : value)}
+                        >
+                          <SelectTrigger id="building" className="w-full">
+                            <SelectValue placeholder="Semua Gedung" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Semua Gedung</SelectItem>
+                            {uniqueBuildings.map((building) => (
+                              <SelectItem key={building} value={building}>{building}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    ) : (
+                      
+                      <div>
+                        <Label htmlFor="semester" className="mb-1.5 block">Semester</Label>
+                        <Select
+                          value={semesterFilter?.toString() || "all"}
+                          onValueChange={(value) => setSemesterFilter(value === "all" ? null : Number(value))}
+                        >
+                          <SelectTrigger id="semester" className="w-full">
+                            <SelectValue placeholder="Semua Semester" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Semua Semester</SelectItem>
+                            {uniqueSemesters.map((semester) => (
+                              <SelectItem key={semester} value={semester.toString()}>
+                                Semester {semester}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="lecturer" className="mb-1.5 block">Dosen</Label>
+                        <Select
+                          value={lecturerFilter?.toString() || "all"}
+                          onValueChange={(value) => setLecturerFilter(value === "all" ? null : Number(value))}
+                        >
+                          <SelectTrigger id="lecturer" className="w-full">
+                            <SelectValue placeholder="Semua Dosen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Semua Dosen</SelectItem>
+                            {uniqueLecturers.map(lecturer => (
+                              <SelectItem key={lecturer} value={lecturer}>{lecturer}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="academic-year" className="mb-1.5 block">Tahun Akademik</Label>
+                        <Select
+                          value={academicYearFilter?.toString() || "all"}
+                          onValueChange={(value) => setAcademicYearFilter(value === "all" ? null : Number(value))}
+                        >
+                          <SelectTrigger id="academic-year" className="w-full">
+                            <SelectValue placeholder="Semua Tahun Akademik" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Semua Tahun Akademik</SelectItem>
+                            {schedules.map(s => s.academic_year_id)
+                              .filter((id, index, self) => self.indexOf(id) === index)
+                              .map(id => {
+                                const academicYear = schedules.find(s => s.academic_year_id === id);
+                                return academicYear ? (
+                                  <SelectItem key={id} value={id.toString()}>
+                                    {academicYear.academic_year_name}
+                                  </SelectItem>
+                                ) : null;
+                              })
+                            }
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between pt-2">
+                      <Button variant="outline" onClick={resetFilters}>
+                        Reset Filter
+                      </Button>
+                      <Button 
+                        className="bg-[#0687C9] hover:bg-[#0670a8]"
+                        onClick={fetchFilteredSchedules}
+                      >
+                        Terapkan
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          
+          <div className="border rounded-lg overflow-hidden">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-[#0687C9] mb-2" />
+                <p className="text-muted-foreground">Memuat data jadwal perkuliahan...</p>
+              </div>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px] font-bold text-black">No</TableHead>
                     <TableHead className="w-[100px] font-bold text-black">Kode</TableHead>
                     <TableHead className="font-bold text-black">Mata Kuliah</TableHead>
+                    <TableHead className="font-bold text-black">Dosen</TableHead>
                     <TableHead className="font-bold text-black">Jadwal</TableHead>
                     <TableHead className="font-bold text-black">Ruangan</TableHead>
-                    <TableHead className="font-bold text-black">Dosen</TableHead>
                     <TableHead className="font-bold text-black">Kelompok Mahasiswa</TableHead>
                     <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                   </TableRow>
@@ -1302,12 +1726,12 @@ export default function ScheduleManagePage() {
                 <TableBody>
                   {filteredSchedules.length === 0 ? (
                     <TableRow>
-                              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                                {searchQuery || dayFilter || buildingFilter || semesterFilter ? (
-                                  "Tidak ada jadwal yang sesuai dengan filter"
-                                ) : (
-                                  "Belum ada jadwal perkuliahan yang ditambahkan"
-                                )}
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        {searchQuery || dayFilter || buildingFilter || semesterFilter ? (
+                          "Tidak ada jadwal yang sesuai dengan filter"
+                        ) : (
+                          "Belum ada jadwal perkuliahan yang ditambahkan"
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1315,47 +1739,48 @@ export default function ScheduleManagePage() {
                       <TableRow key={schedule.id}>
                         <TableCell>{index + 1}</TableCell>
                         <TableCell className="font-medium">
-                                  {schedule.course_code}
+                          {schedule.course_code}
                         </TableCell>
                         <TableCell>
                           <div>
-                                    <p>{schedule.course_name}</p>
+                            <p>{schedule.course_name}</p>
                             <p className="text-xs text-muted-foreground">
-                                      Semester {schedule.semester} - {schedule.academic_year_name}
+                              Semester {schedule.semester} - {schedule.academic_year_name}
                             </p>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-col">
-                            <div className="flex items-center">
-                              <CalendarDays className="mr-1 h-4 w-4 text-muted-foreground" />
-                              <span>{schedule.day}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Clock className="mr-1 h-4 w-4 text-muted-foreground" />
-                                      <span>{schedule.start_time} - {schedule.end_time}</span>
-                            </div>
+                          <div className="font-medium">
+                            {schedule.lecturer_name 
+                              ? (schedule.lecturer_name === "Dosen" || schedule.lecturer_name.startsWith("Dosen (ID:")) 
+                                ? "Belum ada dosen" 
+                                : schedule.lecturer_name
+                              : "Belum ada dosen"}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <div className="flex items-center">
-                              <Building className="mr-1 h-4 w-4 text-muted-foreground" />
-                                      <span>{schedule.building_name}</span>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                                      {schedule.room_name}
-                            </span>
-                          </div>
-                        </TableCell>
-                                <TableCell>{schedule.lecturer_name}</TableCell>
                         <TableCell>
                           <div className="flex items-center">
-                            <Users className="mr-1 h-4 w-4 text-muted-foreground" />
-                                    <span>{schedule.student_group_name}</span>
+                            <Badge variant="outline" className="rounded-sm font-normal text-[#0687C9] border-[#0687C9] bg-[#0687C9]/5">
+                              {schedule.day}
+                            </Badge>
+                            <span className="mx-1.5">•</span>
+                            <div className="text-sm">
+                              {schedule.start_time.substring(0, 5)} - {schedule.end_time.substring(0, 5)}
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right space-x-2">
+                        <TableCell>
+                          <div className="flex items-center">
+                            <MapPin className="h-3.5 w-3.5 text-gray-500 mr-1.5" />
+                            <div>
+                              {schedule.room_name} <span className="text-xs text-muted-foreground">({schedule.building_name})</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {schedule.student_group_name}
+                        </TableCell>
+                        <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" className="h-8 w-8 p-0">
@@ -1364,15 +1789,15 @@ export default function ScheduleManagePage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
+                                onClick={() => setupEditSchedule(schedule)}
                                 className="cursor-pointer"
-                                        onClick={() => setupEditSchedule(schedule)}
                               >
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
+                                onClick={() => setupDeleteSchedule(schedule)}
                                 className="cursor-pointer text-red-600"
-                                        onClick={() => setupDeleteSchedule(schedule)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Hapus
@@ -1385,626 +1810,8 @@ export default function ScheduleManagePage() {
                   )}
                 </TableBody>
               </Table>
-                    )}
-                  </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="calendar">
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-4 border-b bg-white">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-3">
-                <div className="flex flex-wrap gap-2 flex-grow max-w-3xl">
-                  <div className="relative">
-                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      type="search"
-                      placeholder="Cari jadwal..."
-                      className="pl-9 w-full md:w-64 bg-white text-sm h-9 shadow-sm border-gray-200 focus-visible:ring-[#0687C9]"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 text-xs font-normal shadow-sm flex gap-1.5 bg-white border-gray-200">
-                        <Filter className="h-3.5 w-3.5 text-gray-500" />
-                        Filter
-                        {(buildingFilter || semesterFilter || lecturerFilter || academicYearFilter) && (
-                          <Badge className="ml-1 h-5 bg-[#0687C9]">{
-                            [buildingFilter, semesterFilter, lecturerFilter, academicYearFilter]
-                              .filter(Boolean).length
-                          }</Badge>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 p-4">
-                      <div className="grid gap-4">
-                        <div className="space-y-2">
-                          <h4 className="font-medium text-sm">Filter Jadwal</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <Label htmlFor="building" className="text-xs">Gedung</Label>
-                    <Select
-                      value={buildingFilter || "all"}
-                      onValueChange={(value) => setBuildingFilter(value === "all" ? null : value)}
-                    >
-                                <SelectTrigger id="building" className="bg-white h-8 text-xs">
-                                  <SelectValue placeholder="Semua Gedung" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Semua Gedung</SelectItem>
-                        {uniqueBuildings.map((building) => (
-                          <SelectItem key={building} value={building}>{building}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                            </div>
-                            <div>
-                              <Label htmlFor="semester" className="text-xs">Semester</Label>
-                    <Select
-                      value={semesterFilter?.toString() || "all"}
-                                onValueChange={(value) => setSemesterFilter(value === "all" ? null : Number(value))}
-                    >
-                                <SelectTrigger id="semester" className="bg-white h-8 text-xs">
-                                  <SelectValue placeholder="Semua Semester" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Semua Semester</SelectItem>
-                        {uniqueSemesters.map((semester) => (
-                                    <SelectItem key={semester} value={semester.toString()}>
-                                      Semester {semester}
-                                    </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                            </div>
-                            <div>
-                              <Label htmlFor="lecturer" className="text-xs">Dosen</Label>
-                              <Select
-                                value={lecturerFilter?.toString() || "all"}
-                                onValueChange={(value) => setLecturerFilter(value === "all" ? null : Number(value))}
-                              >
-                                <SelectTrigger id="lecturer" className="bg-white h-8 text-xs">
-                                  <SelectValue placeholder="Semua Dosen" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">Semua Dosen</SelectItem>
-                                  {uniqueLecturers.map(lecturer => (
-                                    <SelectItem key={lecturer} value={lecturer}>{lecturer}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label htmlFor="academic-year" className="text-xs">Tahun Akademik</Label>
-                              <Select
-                                value={academicYearFilter?.toString() || "all"}
-                                onValueChange={(value) => setAcademicYearFilter(value === "all" ? null : Number(value))}
-                              >
-                                <SelectTrigger id="academic-year" className="bg-white h-8 text-xs">
-                                  <SelectValue placeholder="Semua T.A." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">Semua Tahun Akademik</SelectItem>
-                                  {schedules.map(s => s.academic_year_id)
-                                    .filter((id, index, self) => self.indexOf(id) === index)
-                                    .map(id => {
-                                      const academicYear = schedules.find(s => s.academic_year_id === id);
-                                      return academicYear ? (
-                                        <SelectItem key={id} value={id.toString()}>
-                                          {academicYear.academic_year_name}
-                                        </SelectItem>
-                                      ) : null;
-                                    })
-                                  }
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex justify-between">
-                          <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-8">
-                            Reset Filter
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="text-xs h-8 bg-[#0687C9] hover:bg-[#0670a8]"
-                            onClick={fetchFilteredSchedules}
-                          >
-                            Terapkan
-                          </Button>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  </div>
-                  
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center rounded-md border bg-white p-1 shadow-sm">
-                    <Button 
-                      variant={calendarView === 'week' ? 'default' : 'ghost'} 
-                      size="sm"
-                      onClick={() => setCalendarView('week')}
-                      className={`text-xs rounded-sm ${calendarView === 'week' ? 'bg-[#0687C9] text-white' : 'text-gray-700'}`}
-                    >
-                      <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
-                      Minggu
-                    </Button>
-                    <Button 
-                      variant={calendarView === 'day' ? 'default' : 'ghost'} 
-                      size="sm"
-                      onClick={() => setCalendarView('day')}
-                      className={`text-xs rounded-sm ${calendarView === 'day' ? 'bg-[#0687C9] text-white' : 'text-gray-700'}`}
-                    >
-                      <Clock className="h-3.5 w-3.5 mr-1.5" />
-                      Hari
-                    </Button>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={goToToday}
-                    className="text-xs h-8 shadow-sm hover:bg-[#0687C9]/10"
-                  >
-                    <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
-                      Hari Ini
-                    </Button>
-                  <div className="flex items-center">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-gray-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                      onClick={goToPreviousWeek}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                    <div className="px-3 py-1.5 text-sm font-medium bg-white border rounded-md shadow-sm">
-                      {formattedWeekRange}
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-gray-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-                      onClick={goToNextWeek}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="p-0">
-              <div className="p-4 bg-gradient-to-b from-gray-50 to-white border-b">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <div className="w-3 h-3 rounded-sm bg-[#0687C9]"></div>
-                    <span>Teknik Informatika</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <div className="w-3 h-3 rounded-sm bg-purple-500"></div>
-                    <span>Sistem Informasi</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <div className="w-3 h-3 rounded-sm bg-amber-500"></div>
-                    <span>T. Elektro</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <div className="w-3 h-3 rounded-sm bg-emerald-500"></div>
-                    <span>Manajemen</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <div className="w-3 h-3 rounded-sm bg-rose-500"></div>
-                    <span>Akuntansi</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <div className="w-3 h-3 rounded-sm bg-gray-500"></div>
-                    <span>Lainnya</span>
-                    </div>
-                  </div>
-                </div>
-                
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-24">
-                  <Loader2 className="h-8 w-8 animate-spin text-[#0687C9] mb-2" />
-                  <p className="text-muted-foreground">Memuat data jadwal perkuliahan...</p>
-                </div>
-              ) : (
-                <div className="min-h-[700px]">
-                  {calendarView === 'week' ? (
-                    <>
-                      {/* Week View */}
-                      {/* Day headers */}
-                      <div className="grid grid-cols-7 border-b">
-                        {DAYS.map((day, index) => {
-                          const isToday = day === format(new Date(), 'EEEE', { locale: id }).charAt(0).toUpperCase() + 
-                            format(new Date(), 'EEEE', { locale: id }).slice(1);
-                          const currentDay = addDays(weekStart, index);
-                          
-                          return (
-                            <div key={day} className={`py-3 text-center ${index < 6 ? 'border-r' : ''} ${isToday ? 'bg-blue-50' : ''}`}>
-                              <div className={`text-sm font-bold ${isToday ? 'text-[#0687C9]' : 'text-gray-700'}`}>
-                      {day}
-                    </div>
-                              <div className={`text-xs mt-1 ${isToday ? 'text-[#0687C9] font-medium' : 'text-gray-500'}`}>
-                                {format(currentDay, 'd MMM')}
-                              </div>
-                            </div>
-                          );
-                        })}
-                </div>
-                
-                      {/* Calendar grid */}
-                      <div className="grid grid-cols-7 min-h-[650px]">
-                        {DAYS.map((day, i) => {
-                          const isToday = day === format(new Date(), 'EEEE', { locale: id }).charAt(0).toUpperCase() + 
-                            format(new Date(), 'EEEE', { locale: id }).slice(1);
-                          const daySchedules = schedulesByDay[day] || [];
-                          const sortedSchedules = daySchedules.sort((a, b) => 
-                            a.start_time.localeCompare(b.start_time)
-                          );
-                          
-                          // Group schedules by time blocks for better visualization
-                          const timeBlocks: Record<string, CourseSchedule[]> = {};
-                          sortedSchedules.forEach(schedule => {
-                            const timeKey = `${schedule.start_time}-${schedule.end_time}`;
-                            if (!timeBlocks[timeKey]) {
-                              timeBlocks[timeKey] = [];
-                            }
-                            timeBlocks[timeKey].push(schedule);
-                          });
-                          
-                          return (
-                            <div 
-                              key={`day-column-${day}`} 
-                              className={`relative border-r border-b min-h-full ${
-                                isToday ? 'bg-blue-50/40' : ''
-                              }`}
-                            >
-                              {/* Time blocks for this day */}
-                              <div className="absolute inset-0 p-1 overflow-y-auto pb-16">
-                                {Object.entries(timeBlocks).length > 0 ? (
-                                  Object.entries(timeBlocks).map(([timeKey, schedules], blockIndex) => (
-                                    <div 
-                                      key={`time-block-${day}-${timeKey}`} 
-                                      className="mb-3 px-1"
-                                    >
-                                      <div className="text-xs text-gray-500 font-medium mb-1.5 flex items-center bg-gray-50/80 py-1 px-1.5 rounded">
-                                        <Clock className="h-3 w-3 mr-1.5 text-[#0687C9]" />
-                                        {schedules[0].start_time} - {schedules[0].end_time}
-                                      </div>
-                        <div className="space-y-2">
-                                        {schedules.map((schedule, idx) => {
-                                          // Determine class color based on department or course type
-                                          let borderColor = 'border-[#0687C9]';
-                                          let hoverColor = 'hover:bg-blue-50';
-                                          let bgColor = 'bg-white';
-                                          let textColor = 'text-[#0687C9]';
-                                          
-                                          if (schedule.course_name?.includes('Informatika') || schedule.student_group_name?.includes('Informatika')) {
-                                            borderColor = 'border-[#0687C9]';
-                                            hoverColor = 'hover:bg-blue-50';
-                                            textColor = 'text-[#0687C9]';
-                                          } else if (schedule.course_name?.includes('Sistem') || schedule.student_group_name?.includes('Sistem Informasi')) {
-                                            borderColor = 'border-purple-500';
-                                            hoverColor = 'hover:bg-purple-50';
-                                            textColor = 'text-purple-500';
-                                          } else if (schedule.course_name?.includes('Elektro') || schedule.student_group_name?.includes('Elektro')) {
-                                            borderColor = 'border-amber-500';
-                                            hoverColor = 'hover:bg-amber-50';
-                                            textColor = 'text-amber-500';
-                                          } else if (schedule.course_name?.includes('Manajemen') || schedule.student_group_name?.includes('Manajemen')) {
-                                            borderColor = 'border-emerald-500';
-                                            hoverColor = 'hover:bg-emerald-50';
-                                            textColor = 'text-emerald-500';
-                                          } else if (schedule.course_name?.includes('Akuntansi') || schedule.student_group_name?.includes('Akuntansi')) {
-                                            borderColor = 'border-rose-500';
-                                            hoverColor = 'hover:bg-rose-50';
-                                            textColor = 'text-rose-500';
-                                          } else {
-                                            // Fallback to modulo-based coloring
-                                            if (schedule.course_id % 5 === 0) {
-                                              borderColor = 'border-purple-500';
-                                              hoverColor = 'hover:bg-purple-50';
-                                              textColor = 'text-purple-500';
-                                            } else if (schedule.course_id % 4 === 0) {
-                                              borderColor = 'border-amber-500';
-                                              hoverColor = 'hover:bg-amber-50';
-                                              textColor = 'text-amber-500';
-                                            } else if (schedule.course_id % 3 === 0) {
-                                              borderColor = 'border-emerald-500';
-                                              hoverColor = 'hover:bg-emerald-50';
-                                              textColor = 'text-emerald-500';
-                                            } else if (schedule.course_id % 2 === 0) {
-                                              borderColor = 'border-rose-500';
-                                              hoverColor = 'hover:bg-rose-50';
-                                              textColor = 'text-rose-500';
-                                            } else {
-                                              borderColor = 'border-[#0687C9]';
-                                              hoverColor = 'hover:bg-blue-50';
-                                              textColor = 'text-[#0687C9]';
-                                            }
-                                          }
-                                          
-                                          return (
-                                            <div
-                                              key={`schedule-${schedule.id}`}
-                                              onClick={() => setupEditSchedule(schedule)}
-                                              className={`p-2 rounded-md ${bgColor} border-l-4 shadow-sm ${hoverColor} transition-all cursor-pointer ${borderColor} group`}
-                                            >
-                                              <div className="flex flex-col">
-                                                <div className="font-semibold text-sm truncate mb-1 group-hover:text-gray-900">
-                                                  {schedule.course_name}
-                                </div>
-                                                <div className={`text-xs font-medium mb-1 ${textColor}`}>
-                                                  {schedule.course_code}
-                                </div>
-                                                
-                                                <div className="flex flex-col space-y-1.5 mt-1">
-                                                  <div className="flex items-center text-xs text-gray-600">
-                                                    <Users className="h-3 w-3 mr-1 text-gray-400" />
-                                                    <span className="truncate max-w-[120px]">{schedule.lecturer_name}</span>
-                                </div>
-                                                  <div className="flex items-center text-xs text-gray-600">
-                                                    <MapPin className="h-3 w-3 mr-1 text-gray-400" />
-                                                    <span className="truncate max-w-[150px]">{schedule.room_name}</span>
-                              </div>
-                                                  <div className="flex items-center text-xs text-gray-600">
-                                                    <BookOpen className="h-3 w-3 mr-1 text-gray-400" />
-                                                    <span className="truncate max-w-[150px]">{schedule.student_group_name}</span>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="flex items-center justify-center h-full">
-                                    <div className="text-xs text-gray-400 italic border border-dashed p-4 rounded-md w-full text-center">
-                              Tidak ada jadwal
-                                    </div>
-                            </div>
-                          )}
-                        </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    // Day View
-                    <div className="p-4 pb-6">
-                      <div className="mb-6 flex justify-between items-center">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-full bg-[#0687C9]/10 flex items-center justify-center mr-4">
-                            <CalendarDays className="h-5 w-5 text-[#0687C9]" />
-                          </div>
-                          <div>
-                            <div className="text-xl font-semibold text-gray-800">
-                              {format(currentDate, 'EEEE', { locale: id })}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {format(currentDate, 'd MMMM yyyy', { locale: id })}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8"
-                            onClick={() => {
-                              setCurrentDate(addDays(currentDate, -1));
-                            }}
-                          >
-                            <ChevronLeft className="h-4 w-4 mr-1" />
-                            Prev
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8"
-                            onClick={() => {
-                              setCurrentDate(addDays(currentDate, 1));
-                            }}
-                          >
-                            Next
-                            <ChevronRight className="h-4 w-4 ml-1" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        {(() => {
-                          const dayName = format(currentDate, 'EEEE', { locale: id });
-                          const capitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-                          const daySchedules = schedulesByDay[capitalized] || [];
-                          
-                          if (daySchedules.length === 0) {
-                            return (
-                              <div className="flex flex-col items-center justify-center py-20 bg-gradient-to-b from-blue-50/50 to-white rounded-lg border border-dashed">
-                                <CalendarDays className="h-16 w-16 text-gray-300 mb-3" />
-                                <p className="text-gray-600 font-medium">Tidak ada jadwal untuk hari ini</p>
-                                <p className="text-xs text-gray-500 mt-1">Pilih hari lain atau tambahkan jadwal baru</p>
-                                
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="mt-4 bg-white"
-                                  onClick={() => setShowAddDialog(true)}
-                                >
-                                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                                  Tambah Jadwal Baru
-                                </Button>
-                              </div>
-                            );
-                          }
-                          
-                          // Group by hour blocks for day view
-                          const hourBlocks: {[key: string]: CourseSchedule[]} = {};
-                          const timeSlots = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", 
-                                             "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
-                          
-                          timeSlots.forEach(timeSlot => {
-                            hourBlocks[timeSlot] = daySchedules.filter(schedule => {
-                              const start = schedule.start_time;
-                              return start.startsWith(timeSlot.slice(0, 2));
-                            });
-                          });
-                          
-                          return (
-                            <div className="relative border rounded-lg shadow-sm overflow-hidden">
-                              {/* Time guide */}
-                              <div className="absolute top-0 left-0 bottom-0 w-20 bg-gray-50 border-r z-10">
-                                {timeSlots.map((timeSlot, index) => (
-                                  <div key={`time-label-${timeSlot}`} className="relative">
-                                    <div className="h-16 flex items-center justify-center border-b last:border-b-0">
-                                      <div className="text-xs font-medium text-gray-500">{timeSlot}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                              
-                              {/* Main schedule content */}
-                              <div className="ml-20">
-                                {timeSlots.map((timeSlot, index) => {
-                                  const schedules = hourBlocks[timeSlot];
-                                  const hasSchedules = schedules.length > 0;
-                                  
-                                  return (
-                                    <div key={`hour-${timeSlot}`} className="relative">
-                                      <div className="h-16 border-b last:border-b-0 group flex">
-                                        {/* Hour background with grid lines */}
-                                        <div className="absolute inset-0 border-l border-dashed border-gray-100 grid grid-cols-4 w-full pointer-events-none">
-                                          <div className="border-r border-dashed border-gray-100"></div>
-                                          <div className="border-r border-dashed border-gray-100"></div>
-                                          <div className="border-r border-dashed border-gray-100"></div>
-                                          <div></div>
-              </div>
-                                        
-                                        {/* Schedule content */}
-                                        <div className={`w-full px-4 py-2 ${hasSchedules ? 'flex items-center' : ''}`}>
-                                          {schedules.length > 0 && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full">
-                                              {schedules.map(schedule => {
-                                                // Determine class color based on department or course type
-                                                let borderColor = 'border-l-[#0687C9]';
-                                                let bgColor = 'bg-blue-50/50';
-                                                let hoverBg = 'hover:bg-blue-50';
-                                                let textColor = 'text-[#0687C9]';
-                                                
-                                                if (schedule.course_name?.includes('Informatika') || schedule.student_group_name?.includes('Informatika')) {
-                                                  borderColor = 'border-l-[#0687C9]';
-                                                  bgColor = 'bg-blue-50/50';
-                                                  hoverBg = 'hover:bg-blue-100/70';
-                                                  textColor = 'text-[#0687C9]';
-                                                } else if (schedule.course_name?.includes('Sistem') || schedule.student_group_name?.includes('Sistem Informasi')) {
-                                                  borderColor = 'border-l-purple-500';
-                                                  bgColor = 'bg-purple-50/50';
-                                                  hoverBg = 'hover:bg-purple-100/70';
-                                                  textColor = 'text-purple-600';
-                                                } else if (schedule.course_name?.includes('Elektro') || schedule.student_group_name?.includes('Elektro')) {
-                                                  borderColor = 'border-l-amber-500';
-                                                  bgColor = 'bg-amber-50/50';
-                                                  hoverBg = 'hover:bg-amber-100/70';
-                                                  textColor = 'text-amber-600';
-                                                } else if (schedule.course_name?.includes('Manajemen') || schedule.student_group_name?.includes('Manajemen')) {
-                                                  borderColor = 'border-l-emerald-500';
-                                                  bgColor = 'bg-emerald-50/50';
-                                                  hoverBg = 'hover:bg-emerald-100/70';
-                                                  textColor = 'text-emerald-600';
-                                                } else if (schedule.course_name?.includes('Akuntansi') || schedule.student_group_name?.includes('Akuntansi')) {
-                                                  borderColor = 'border-l-rose-500';
-                                                  bgColor = 'bg-rose-50/50';
-                                                  hoverBg = 'hover:bg-rose-100/70';
-                                                  textColor = 'text-rose-600';
-                                                } else {
-                                                  // Fallback to modulo-based coloring
-                                                  if (schedule.course_id % 5 === 0) {
-                                                    borderColor = 'border-l-purple-500';
-                                                    bgColor = 'bg-purple-50/50';
-                                                    hoverBg = 'hover:bg-purple-100/70';
-                                                    textColor = 'text-purple-600';
-                                                  } else if (schedule.course_id % 4 === 0) {
-                                                    borderColor = 'border-l-amber-500';
-                                                    bgColor = 'bg-amber-50/50';
-                                                    hoverBg = 'hover:bg-amber-100/70';
-                                                    textColor = 'text-amber-600';
-                                                  } else if (schedule.course_id % 3 === 0) {
-                                                    borderColor = 'border-l-emerald-500';
-                                                    bgColor = 'bg-emerald-50/50';
-                                                    hoverBg = 'hover:bg-emerald-100/70';
-                                                    textColor = 'text-emerald-600';
-                                                  } else if (schedule.course_id % 2 === 0) {
-                                                    borderColor = 'border-l-rose-500';
-                                                    bgColor = 'bg-rose-50/50';
-                                                    hoverBg = 'hover:bg-rose-100/70';
-                                                    textColor = 'text-rose-600';
-                                                  } else {
-                                                    borderColor = 'border-l-[#0687C9]';
-                                                    bgColor = 'bg-blue-50/50';
-                                                    hoverBg = 'hover:bg-blue-100/70';
-                                                    textColor = 'text-[#0687C9]';
-                                                  }
-                                                }
-                                                
-                                                return (
-                                                  <div 
-                                                    key={`day-item-${schedule.id}`} 
-                                                    onClick={() => setupEditSchedule(schedule)}
-                                                    className={`p-2 rounded border ${bgColor} ${borderColor} border-l-4 ${hoverBg} transition-all cursor-pointer shadow-sm hover:shadow flex items-center gap-2 h-full`}
-                                                  >
-                                                    <div className="flex-grow min-w-0">
-                                                      <div className="flex items-center justify-between">
-                                                        <div className={`text-sm font-medium truncate ${textColor}`}>
-                                                          {schedule.course_code}
-                                                        </div>
-                                                        <div className="text-[10px] text-gray-500 whitespace-nowrap ml-1">
-                                                          {schedule.start_time} - {schedule.end_time}
-                                                        </div>
-                                                      </div>
-                                                      <div className="text-xs font-medium text-gray-800 truncate">
-                                                        {schedule.course_name}
-                                                      </div>
-                                                      <div className="flex flex-wrap gap-x-2 mt-1 text-[10px] text-gray-500">
-                                                        <div className="flex items-center">
-                                                          <Users className="h-2.5 w-2.5 mr-0.5" />
-                                                          <span className="truncate">{schedule.lecturer_name?.split(' ')[0]}</span>
-                                                        </div>
-                                                        <div className="flex items-center">
-                                                          <MapPin className="h-2.5 w-2.5 mr-0.5" />
-                                                          <span className="truncate">{schedule.room_name}</span>
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                );
-                                              })}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            )}
+          </div>
         </CardContent>
       </Card>
       
@@ -2031,7 +1838,6 @@ export default function ScheduleManagePage() {
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
-                          defaultValue={currentSchedule.course_id.toString()}
                         >
                           <FormControl>
                             <SelectTrigger className="w-full">
@@ -2066,7 +1872,6 @@ export default function ScheduleManagePage() {
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
-                          defaultValue={currentSchedule.day}
                         >
                           <FormControl>
                             <SelectTrigger className="w-full">
@@ -2096,7 +1901,6 @@ export default function ScheduleManagePage() {
                           <Input 
                             type="time" 
                             {...field} 
-                            defaultValue={currentSchedule.start_time}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2114,7 +1918,6 @@ export default function ScheduleManagePage() {
                           <Input 
                             type="time" 
                             {...field}
-                            defaultValue={currentSchedule.end_time}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2131,7 +1934,6 @@ export default function ScheduleManagePage() {
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
-                          defaultValue={currentSchedule.room_id.toString()}
                         >
                           <FormControl>
                             <SelectTrigger className="w-full">
@@ -2163,93 +1965,29 @@ export default function ScheduleManagePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Dosen</FormLabel>
-                        <div className="relative">
-                          <FormControl>
-                            <div className="flex flex-col space-y-2">
-                              {selectedLecturer ? (
-                                <div className="flex items-center space-x-2">
-                                  <Input 
-                                    value={lecturerSearchTerm}
-                                    className="w-full"
-                                    readOnly
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedLecturer(null);
-                                      setLecturerSearchTerm("");
-                                      field.onChange("");
-                                    }}
-                                  >
-                                    Ganti
-                                  </Button>
-                                </div>
-                              ) : (
+                        <FormControl>
+                          <div className="flex items-center">
                             <Input 
-                              placeholder="Cari dosen..." 
-                              value={lecturerSearchTerm}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setLecturerSearchTerm(value);
-                                searchLecturers(value);
-                              }}
-                              className="w-full"
+                              value={lecturerSearchTerm || ""}
+                              className="w-full bg-gray-50"
+                              readOnly
                             />
-                              )}
-                            </div>
-                          </FormControl>
-                          
-                          {showLecturerResults && !selectedLecturer && (
-                            <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto min-w-[300px]">
-                              {searchingLecturers ? (
-                                <div className="flex items-center justify-center p-4">
-                                  <Loader2 className="h-5 w-5 animate-spin text-gray-500 mr-2" />
-                                  <span className="text-sm text-gray-500">Mencari dosen...</span>
-                                </div>
-                              ) : searchedLecturers.length > 0 ? (
-                                <ul className="py-1">
-                                  {searchedLecturers.map((lecturer) => (
-                                    <li 
-                                      key={lecturer.id} 
-                                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                                      onClick={() => selectLecturer(lecturer)}
-                                    >
-                                      <div className="font-medium">{lecturer.full_name}</div>
-                                      <div className="text-xs text-gray-500 flex items-center">
-                                        <span className="mr-2">{lecturer.nidn || lecturer.nip || ""}</span>
-                                        {lecturer.program && (
-                                          <span>{lecturer.program}</span>
-                                        )}
-                                      </div>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : lecturerSearchTerm.length >= 2 ? (
-                                <div className="p-3 text-center text-sm text-gray-500">
-                                  Tidak ada dosen yang ditemukan.
-                                </div>
-                              ) : (
-                                <div className="p-3 text-center text-sm text-gray-500">
-                                  Ketik minimal 2 karakter untuk mencari dosen.
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Hidden input with the actual lecturer ID value */}
+                            {selectedLecturer && (
+                              <Badge className="ml-2 bg-[#0687C9]">
+                                {editForm.getValues().course_id !== currentSchedule?.course_id?.toString() ? "Otomatis" : "Tetap"}
+                              </Badge>
+                            )}
+                          </div>
+                        </FormControl>
                         <input 
                           type="hidden" 
                           name={field.name}
                           value={field.value || ""}
                           onChange={field.onChange}
                         />
-                        
-                        {!field.value && (
-                          <p className="text-xs text-red-500 mt-1">
-                            * Silakan pilih dosen dengan mencari dan memilih dari daftar
+                        {!lecturerSearchTerm && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Pilih mata kuliah untuk menentukan dosen
                           </p>
                         )}
                         <FormMessage />
@@ -2266,7 +2004,6 @@ export default function ScheduleManagePage() {
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
-                          defaultValue={currentSchedule.student_group_id.toString()}
                         >
                           <FormControl>
                             <SelectTrigger className="w-full">
@@ -2298,34 +2035,45 @@ export default function ScheduleManagePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Tahun Akademik</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          defaultValue={currentSchedule.academic_year_id.toString()}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Pilih tahun akademik" className="truncate" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {academicYears.length > 0 ? (
-                              academicYears.map(year => (
-                                <SelectItem key={year.id} value={year.id.toString()}>
-                                  {year.name} ({year.semester})
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem value={currentSchedule.academic_year_id.toString()}>
-                                {currentSchedule.academic_year_name}
-                              </SelectItem>
+                        <FormControl>
+                          <div className="flex items-center">
+                            <Input 
+                              value={
+                                field.value ? 
+                                  (academicYears.find(y => y.id.toString() === field.value)?.name || currentSchedule?.academic_year_name || "Tahun akademik akan ditentukan otomatis") 
+                                  : "Tahun akademik akan ditentukan berdasarkan mata kuliah"
+                              }
+                              className="w-full bg-gray-50"
+                              readOnly
+                            />
+                            {field.value && (
+                              <Badge className="ml-2 bg-[#0687C9]">
+                                {editForm.getValues().course_id !== currentSchedule?.course_id?.toString() ? "Otomatis" : "Tetap"}
+                              </Badge>
                             )}
-                          </SelectContent>
-                        </Select>
+                          </div>
+                        </FormControl>
+                        <input 
+                          type="hidden" 
+                          name={field.name}
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                        />
+                        {!field.value && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Pilih mata kuliah untuk menentukan tahun akademik
+                          </p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  
+                  <div className="col-span-2 mt-2">
+                    <p className="text-sm text-muted-foreground">
+                      <em>Tahun akademik ditentukan secara otomatis berdasarkan mata kuliah yang dipilih.</em>
+                    </p>
+                  </div>
                 </div>
                 
                 <DialogFooter>
@@ -2372,7 +2120,6 @@ export default function ScheduleManagePage() {
               <p><strong>Mata Kuliah:</strong> {currentSchedule.course_code} - {currentSchedule.course_name}</p>
               <p><strong>Jadwal:</strong> {currentSchedule.day}, {currentSchedule.start_time} - {currentSchedule.end_time}</p>
               <p><strong>Ruangan:</strong> {currentSchedule.room_name}, {currentSchedule.building_name}</p>
-              <p><strong>Dosen:</strong> {currentSchedule.lecturer_name}</p>
               <p><strong>Kelompok Mahasiswa:</strong> {currentSchedule.student_group_name}</p>
             </div>
           )}

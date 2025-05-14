@@ -90,7 +90,6 @@ interface Course {
     name: string;
     semester: string;
   };
-  semester_type: "ganjil" | "genap";
 }
 
 // Type for Study Program (Department)
@@ -115,10 +114,8 @@ export default function CoursesManagePage() {
   const [departmentFilter, setDepartmentFilter] = useState<string | null>(null);
   const [semesterFilter, setSemesterFilter] = useState<number | null>(null);
   const [academicYearFilter, setAcademicYearFilter] = useState<string | null>(null);
-  const [semesterTypeFilter, setSemesterTypeFilter] = useState<string | null>(null);
   const [uniqueSemesters, setUniqueSemesters] = useState<number[]>([]);
   const [uniqueAcademicYears, setUniqueAcademicYears] = useState<string[]>([]);
-  const [uniqueSemesterTypes, setUniqueSemesterTypes] = useState<string[]>([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -136,8 +133,7 @@ export default function CoursesManagePage() {
       credits: 0,
       semester: 1,
       course_type: "theory",
-      academic_year_id: "",
-      semester_type: "ganjil"
+      academic_year_id: ""
     }
   });
   
@@ -150,8 +146,7 @@ export default function CoursesManagePage() {
       credits: 0,
       semester: 1,
       course_type: "theory",
-      academic_year_id: "",
-      semester_type: "ganjil"
+      academic_year_id: ""
     }
   });
 
@@ -234,18 +229,19 @@ export default function CoursesManagePage() {
           const semesters = [...new Set(coursesData.map((course: Course) => course.semester))] as number[];
           setUniqueSemesters(semesters.sort((a, b) => a - b));
           
-          // Extract and set unique academic years
-          const years = [...new Set(coursesData
-            .filter((course: Course) => course.academic_year?.name)
-            .map((course: Course) => course.academic_year?.name))]
-            .filter(Boolean) as string[];
-          setUniqueAcademicYears(years.sort());
+          // Extract academic years with semester type
+          const yearLabels: string[] = [];
           
-          // Extract and set unique semester types
-          const types = [...new Set(coursesData
-            .filter((course: Course) => course.semester_type)
-            .map((course: Course) => course.semester_type))] as string[];
-          setUniqueSemesterTypes(types);
+          coursesData.forEach((course: Course) => {
+            if (course.academic_year?.name && course.academic_year?.semester) {
+              yearLabels.push(`${course.academic_year.name} - ${course.academic_year.semester}`);
+            }
+          });
+          
+          // Remove duplicates and sort
+          const uniqueYearLabels = [...new Set(yearLabels)].sort();
+          
+          setUniqueAcademicYears(uniqueYearLabels);
         }
       } else {
         toast.error("Gagal memuat data mata kuliah", {
@@ -339,85 +335,84 @@ export default function CoursesManagePage() {
     }
   };
 
-  // Add a new course
+  // Function to handle adding a new course
   const handleAddCourse = async (data: any) => {
     setIsSubmitting(true);
     
     try {
-      const payload = {
+      // Convert string values to numbers where needed
+      const formattedData = {
         ...data,
-        credits: parseInt(data.credits),
-        semester: parseInt(data.semester),
-        department_id: parseInt(data.department_id),
-        academic_year_id: parseInt(data.academic_year_id)
+        credits: Number(data.credits),
+        semester: Number(data.semester), 
+        department_id: Number(data.department_id),
+        academic_year_id: Number(data.academic_year_id)
       };
-    
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses`, payload, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
+      
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses`,
+        formattedData,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
       
       if (response.data.status === "success") {
-        toast.success("Mata kuliah berhasil ditambahkan", {
-          description: "Mata kuliah baru telah berhasil ditambahkan ke sistem"
-        });
+        toast.success("Mata kuliah berhasil ditambahkan");
         setShowAddDialog(false);
-        addForm.reset();
-        fetchCourses();
+        fetchCourses(); // Refresh courses list
+        addForm.reset(); // Reset form
       } else {
-        toast.error(response.data.message || "Gagal menambahkan mata kuliah", {
-          description: "Terjadi kesalahan saat menambahkan mata kuliah baru"
-        });
+        toast.error("Gagal menambahkan mata kuliah: " + response.data.message);
       }
     } catch (error: any) {
       console.error("Error adding course:", error);
-      toast.error(error.response?.data?.message || "Gagal menambahkan mata kuliah", {
-        description: "Terjadi kesalahan saat menambahkan mata kuliah baru"
-      });
+      toast.error(error.response?.data?.message || "Terjadi kesalahan saat menambahkan mata kuliah");
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Edit course
+  
+  // Function to handle editing a course
   const handleEditCourse = async (data: any) => {
     if (!currentCourse) return;
     
     setIsSubmitting(true);
     
     try {
-      const payload = {
+      // Convert string values to numbers where needed
+      const formattedData = {
         ...data,
-        credits: parseInt(data.credits),
-        semester: parseInt(data.semester),
-        department_id: parseInt(data.department_id),
-        academic_year_id: parseInt(data.academic_year_id)
+        credits: Number(data.credits),
+        semester: Number(data.semester),
+        department_id: Number(data.department_id), 
+        academic_year_id: Number(data.academic_year_id)
       };
-    
-      const response = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/${currentCourse.id}`, payload, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
+      
+      const response = await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/${currentCourse.id}`,
+        formattedData,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
       
       if (response.data.status === "success") {
-        toast.success("Mata kuliah berhasil diperbarui", {
-          description: "Informasi mata kuliah telah berhasil diperbarui"
-        });
+        toast.success("Mata kuliah berhasil diperbarui");
         setShowEditDialog(false);
-        setCurrentCourse(null);
-        fetchCourses();
+        fetchCourses(); // Refresh courses list
       } else {
-        toast.error(response.data.message || "Gagal memperbarui mata kuliah", {
-          description: "Terjadi kesalahan saat memperbarui mata kuliah"
-        });
+        toast.error("Gagal memperbarui mata kuliah: " + response.data.message);
       }
     } catch (error: any) {
       console.error("Error updating course:", error);
-      toast.error(error.response?.data?.message || "Gagal memperbarui mata kuliah", {
-        description: "Terjadi kesalahan saat memperbarui mata kuliah"
-      });
+      toast.error(error.response?.data?.message || "Terjadi kesalahan saat memperbarui mata kuliah");
     } finally {
       setIsSubmitting(false);
     }
@@ -471,7 +466,6 @@ export default function CoursesManagePage() {
       semester: course.semester,
       course_type: course.course_type,
       academic_year_id: course.academic_year?.id.toString() || "",
-      semester_type: course.semester_type
     });
     
     setShowEditDialog(true);
@@ -545,11 +539,7 @@ export default function CoursesManagePage() {
       !academicYearFilter ||
       course.academic_year?.name === academicYearFilter;
     
-    const matchesSemesterType =
-      !semesterTypeFilter ||
-      course.semester_type === semesterTypeFilter;
-    
-    return matchesSearch && matchesDepartment && matchesSemester && matchesAcademicYear && matchesSemesterType;
+    return matchesSearch && matchesDepartment && matchesSemester && matchesAcademicYear;
   });
 
   // Get course type label
@@ -599,22 +589,22 @@ export default function CoursesManagePage() {
             </Button>
           </div>
           
-          <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
+            <div className="w-full md:flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Cari mata kuliah berdasarkan nama atau kode..."
-                className="pl-10"
+                className="pl-10 w-full h-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
               <Select 
                 onValueChange={handleDepartmentFilter}
                 value={departmentFilter || "all"}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Program Studi" />
                 </SelectTrigger>
                 <SelectContent>
@@ -630,7 +620,7 @@ export default function CoursesManagePage() {
                 onValueChange={(value) => setSemesterFilter(value === "all" ? null : Number(value))}
                 value={semesterFilter?.toString() || "all"}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="Semester" />
                 </SelectTrigger>
                 <SelectContent>
@@ -646,32 +636,16 @@ export default function CoursesManagePage() {
                 onValueChange={(value) => setAcademicYearFilter(value === "all" ? null : value)}
                 value={academicYearFilter || "all"}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full sm:w-[200px]">
                   <SelectValue placeholder="Tahun Akademik" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Tahun</SelectItem>
-                  {uniqueAcademicYears.map((year) => (
-                    <SelectItem key={year} value={year}>
-                      {year}
+                  {academicYears && academicYears.length > 0 ? academicYears.map((year) => (
+                    <SelectItem key={year.id} value={year.name}>
+                      {year.name} - {year.semester}
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select 
-                onValueChange={(value) => setSemesterTypeFilter(value === "all" ? null : value)}
-                value={semesterTypeFilter || "all"}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Jenis Semester" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Jenis</SelectItem>
-                  {uniqueSemesterTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type === "ganjil" ? "Ganjil" : "Genap"}
-                    </SelectItem>
-                  ))}
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>
@@ -688,7 +662,6 @@ export default function CoursesManagePage() {
                   <TableHead className="text-center font-bold text-black">Semester</TableHead>
                   <TableHead className="font-bold text-black">Tipe</TableHead>
                   <TableHead className="text-center font-bold text-black">Tahun Akademik</TableHead>
-                  <TableHead className="text-center font-bold text-black">Semester</TableHead>
                   <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -715,8 +688,10 @@ export default function CoursesManagePage() {
                           {getCourseTypeLabel(course.course_type)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center">{course.academic_year?.name}</TableCell>
-                      <TableCell className="text-center capitalize">{course.semester_type}</TableCell>
+                      <TableCell className="text-center">
+                        {course.academic_year?.name} 
+                        {course.academic_year?.semester && ` - ${course.academic_year.semester}`}
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -936,39 +911,12 @@ export default function CoursesManagePage() {
                             {academicYears && academicYears.length > 0 ? academicYears.map((year) => (
                               year && year.id ? (
                                 <SelectItem key={year.id} value={year.id.toString()}>
-                                  {year.name}
+                                  {year.name} - {year.semester}
                                 </SelectItem>
                               ) : null
                             )) : (
                               <SelectItem value="no-data" disabled>Tidak ada data</SelectItem>
                             )}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </div>
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={addForm.control}
-                name="semester_type"
-                render={({ field }) => (
-                  <FormItem className="grid grid-cols-4 items-center gap-4">
-                    <FormLabel className="text-right">Tipe Semester</FormLabel>
-                    <div className="col-span-3">
-                      <FormControl>
-                        <Select 
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih tipe semester" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ganjil">Ganjil</SelectItem>
-                            <SelectItem value="genap">Genap</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>
@@ -1174,39 +1122,12 @@ export default function CoursesManagePage() {
                               {academicYears && academicYears.length > 0 ? academicYears.map((year) => (
                                 year && year.id ? (
                                   <SelectItem key={year.id} value={year.id.toString()}>
-                                    {year.name}
+                                    {year.name} - {year.semester}
                                   </SelectItem>
                                 ) : null
                               )) : (
                                 <SelectItem value="no-data" disabled>Tidak ada data</SelectItem>
                               )}
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={editForm.control}
-                  name="semester_type"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Tipe Semester</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <Select 
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih tipe semester" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ganjil">Ganjil</SelectItem>
-                              <SelectItem value="genap">Genap</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormControl>

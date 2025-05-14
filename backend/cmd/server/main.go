@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/delpresence/backend/internal/auth"
+	"github.com/delpresence/backend/internal/auth/campus"
 	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/handlers"
 	"github.com/delpresence/backend/internal/middleware"
@@ -71,7 +72,7 @@ func main() {
 
 	// Protected routes
 	authRequired := router.Group("/api")
-	authRequired.Use(middleware.AuthMiddleware())
+	authRequired.Use(campus.CampusAuthMiddleware())
 	{
 		// Current user
 		authRequired.GET("/auth/me", handlers.GetCurrentUser)
@@ -155,29 +156,42 @@ func main() {
 			adminRoutes.DELETE("/student-groups/:id/members/:student_id", studentGroupHandler.RemoveStudentFromGroup)
 			adminRoutes.POST("/student-groups/:id/members/remove-batch", studentGroupHandler.RemoveMultipleStudentsFromGroup)
 			
-			// Admin access to lecturer assignments
-			adminRoutes.GET("/lecturer-assignments", lecturerAssignmentHandler.GetAllLecturerAssignments)
-			adminRoutes.GET("/lecturer-assignments/:id", lecturerAssignmentHandler.GetLecturerAssignmentByID)
-			adminRoutes.POST("/lecturer-assignments", lecturerAssignmentHandler.CreateLecturerAssignment)
-			adminRoutes.PUT("/lecturer-assignments/:id", lecturerAssignmentHandler.UpdateLecturerAssignment)
-			adminRoutes.DELETE("/lecturer-assignments/:id", lecturerAssignmentHandler.DeleteLecturerAssignment)
-			adminRoutes.GET("/lecturer-assignments/lecturer/:lecturer_id", lecturerAssignmentHandler.GetAssignmentsByLecturer)
-			adminRoutes.GET("/lecturer-assignments/course/:course_id", lecturerAssignmentHandler.GetAssignmentsByCourse)
-			adminRoutes.GET("/lecturer-assignments/course/:course_id/available-lecturers", lecturerAssignmentHandler.GetAvailableLecturers)
-
 			// Admin access to course schedules
 			adminRoutes.GET("/schedules", courseScheduleHandler.GetAllSchedules)
 			adminRoutes.GET("/schedules/:id", courseScheduleHandler.GetScheduleByID)
 			adminRoutes.POST("/schedules", courseScheduleHandler.CreateSchedule)
 			adminRoutes.PUT("/schedules/:id", courseScheduleHandler.UpdateSchedule)
 			adminRoutes.DELETE("/schedules/:id", courseScheduleHandler.DeleteSchedule)
+			
+			// Admin access to lecturer assignments
+			adminRoutes.GET("/courses/assignments", lecturerAssignmentHandler.GetAllLecturerAssignments)
+			adminRoutes.GET("/courses/assignments/:id", lecturerAssignmentHandler.GetLecturerAssignmentByID)
+			adminRoutes.POST("/courses/assignments", lecturerAssignmentHandler.CreateLecturerAssignment)
+			adminRoutes.PUT("/courses/assignments/:id", lecturerAssignmentHandler.UpdateLecturerAssignment)
+			adminRoutes.DELETE("/courses/assignments/:id", lecturerAssignmentHandler.DeleteLecturerAssignment)
+			adminRoutes.GET("/courses/:id/lecturers", lecturerAssignmentHandler.GetAssignmentsByCourse)
+			adminRoutes.GET("/lecturers/:id/courses", lecturerAssignmentHandler.GetAssignmentsByLecturer)
+			adminRoutes.GET("/courses/:id/available-lecturers", lecturerAssignmentHandler.GetAvailableLecturers)
+			
+			// New endpoint to get lecturer for a course - use a more specific path to avoid conflict
+			adminRoutes.GET("/course-lecturers/course/:course_id", courseScheduleHandler.GetLecturerForCourse)
 		}
 
-		// Lecturer routes
+		// Lecturer routes - add lecturer-specific endpoints
 		lecturerRoutes := authRequired.Group("/lecturer")
-		lecturerRoutes.Use(middleware.RoleMiddleware("Dosen"))
+		lecturerRoutes.Use(middleware.RoleMiddleware("Dosen", "dosen"))
 		{
-			// Lecturer routes go here
+			// Get lecturer's own assignments
+			lecturerRoutes.GET("/assignments", lecturerAssignmentHandler.GetMyAssignments)
+			
+			// Get lecturer's course schedules
+			lecturerRoutes.GET("/schedules", courseScheduleHandler.GetMySchedules)
+			
+			// Get lecturer's courses (alias for assignments, more intuitive API endpoint)
+			lecturerRoutes.GET("/courses", lecturerAssignmentHandler.GetMyAssignments)
+			
+			// Get academic years (needed for filtering courses and schedules)
+			lecturerRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
 		}
 
 		// Employee routes (replacing assistant routes)
@@ -194,7 +208,7 @@ func main() {
 			// Student routes go here
 		}
 	}
-
+	
 	// Start the server
 	port := utils.GetEnvWithDefault("SERVER_PORT", "8080")
 	log.Printf("Server running on port %s", port)

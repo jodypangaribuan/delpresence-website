@@ -52,10 +52,10 @@ func RoleMiddleware(roles ...string) gin.HandlerFunc {
 			return
 		}
 
-		// Check if the user has one of the required roles
-		userRole := role.(string)
+		// Check if the user has one of the required roles (case-insensitive comparison)
+		userRole := strings.ToLower(role.(string))
 		for _, r := range roles {
-			if userRole == r {
+			if userRole == strings.ToLower(r) {
 				c.Next()
 				return
 			}

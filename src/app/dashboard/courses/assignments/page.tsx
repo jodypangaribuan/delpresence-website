@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -82,13 +82,26 @@ interface AcademicYear {
 // Interface for lecturer assignment
 interface Assignment {
   id: number;
-  title: string;
-  user_id: number;  // Changed back to user_id to match the API response
+  user_id: number;
   course_id: number;
   academic_year_id: number;
-  lecturer: Lecturer;
-  course: Course;
-  academic_year: AcademicYear;
+  created_at?: string;
+  updated_at?: string;
+  
+  // API response fields (from backend)
+  course_name?: string;
+  course_code?: string;
+  course_semester?: number;
+  academic_year_name?: string;
+  academic_year_semester?: string;
+  lecturer_name?: string;
+  lecturer_nip?: string;
+  lecturer_email?: string;
+  
+  // Optional nested objects (for backward compatibility)
+  lecturer?: Lecturer;
+  course?: Course;
+  academic_year?: AcademicYear;
 }
 
 // Fix for DeleteConfirmationModal props issue 
@@ -136,6 +149,77 @@ export default function LecturerAssignmentsPage() {
   const [formAcademicYearId, setFormAcademicYearId] = useState<string>("");
   const [formLecturerName, setFormLecturerName] = useState<string>("");
   
+  // Mock data for testing
+  const mockCourses: Course[] = [
+    { id: 1, uuid: "c1", code: "CS101", name: "Introduction to Computer Science", semester: 1 },
+    { id: 2, uuid: "c2", code: "CS102", name: "Data Structures", semester: 2 },
+    { id: 3, uuid: "c3", code: "CS201", name: "Algorithms", semester: 3 },
+    { id: 4, uuid: "c4", code: "CS202", name: "Database Systems", semester: 4 },
+    { id: 5, uuid: "c5", code: "CS301", name: "Computer Networks", semester: 5 },
+  ];
+  
+  const mockAcademicYears: AcademicYear[] = [
+    { id: 1, uuid: "ay1", name: "2023/2024", semester: "Ganjil", start_date: "2023-09-01", end_date: "2024-02-28" },
+    { id: 2, uuid: "ay2", name: "2023/2024", semester: "Genap", start_date: "2024-03-01", end_date: "2024-08-31" },
+    { id: 3, uuid: "ay3", name: "2024/2025", semester: "Ganjil", start_date: "2024-09-01", end_date: "2025-02-28" },
+  ];
+  
+  const mockLecturers: Lecturer[] = [
+    { id: 1, uuid: "l1", full_name: "Dr. John Smith", nip: "198001012010011001", email: "john.smith@example.com", user_id: 101 },
+    { id: 2, uuid: "l2", full_name: "Prof. Jane Doe", nip: "198103022011022002", email: "jane.doe@example.com", user_id: 102 },
+    { id: 3, uuid: "l3", full_name: "Dr. Robert Johnson", nip: "197905032012033003", email: "robert.johnson@example.com", user_id: 103 },
+    { id: 4, uuid: "l4", full_name: "Dr. Emily Williams", nip: "198207042013044004", email: "emily.williams@example.com", user_id: 104 },
+    { id: 5, uuid: "l5", full_name: "Prof. Michael Brown", nip: "197608052014055005", email: "michael.brown@example.com", user_id: 105 },
+  ];
+  
+  const mockAssignments: Assignment[] = [
+    { 
+      id: 1, 
+      user_id: 101, 
+      course_id: 1, 
+      academic_year_id: 1,
+      lecturer: mockLecturers[0],
+      course: mockCourses[0],
+      academic_year: mockAcademicYears[0]
+    },
+    { 
+      id: 2, 
+      user_id: 102, 
+      course_id: 2, 
+      academic_year_id: 1,
+      lecturer: mockLecturers[1],
+      course: mockCourses[1],
+      academic_year: mockAcademicYears[0]
+    },
+    { 
+      id: 3, 
+      user_id: 103, 
+      course_id: 3, 
+      academic_year_id: 1,
+      lecturer: mockLecturers[2],
+      course: mockCourses[2],
+      academic_year: mockAcademicYears[0]
+    },
+    { 
+      id: 4, 
+      user_id: 104, 
+      course_id: 4, 
+      academic_year_id: 2,
+      lecturer: mockLecturers[3],
+      course: mockCourses[3],
+      academic_year: mockAcademicYears[1]
+    },
+    { 
+      id: 5, 
+      user_id: 105, 
+      course_id: 5, 
+      academic_year_id: 2,
+      lecturer: mockLecturers[4],
+      course: mockCourses[4],
+      academic_year: mockAcademicYears[1]
+    },
+  ];
+  
   // Load data on initial render
   useEffect(() => {
     fetchInitialData();
@@ -144,149 +228,103 @@ export default function LecturerAssignmentsPage() {
   // Fetch all initial data
   const fetchInitialData = async () => {
     setIsInitialLoading(true);
-    // Fetch courses in parallel with academic years
-    fetchCourses();
-    await fetchAcademicYears();
-    setIsInitialLoading(false);
+    try {
+      // Fetch real data
+      await fetchAcademicYears();
+      await fetchCourses();
+      
+      setIsInitialLoading(false);
+    } catch (error) {
+      console.error("Error fetching initial data:", error);
+      setIsInitialLoading(false);
+      toast.error("Gagal memuat data awal. Silakan muat ulang halaman.");
+    }
   };
   
-  // Fetch assignments from API
+  // Fetch assignments based on academic year
   const fetchAssignments = async (specificAcademicYearId?: string) => {
-    // Don't set loading state if we're in initial loading
-    if (!isInitialLoading) {
-      setIsLoading(true);
-    }
-    
-    // If no academic year ID is provided, set empty assignments and return early
-    if (!specificAcademicYearId) {
-      setAssignments([]);
-      setIsLoading(false);
-      return;
-    }
+    setIsLoading(true);
     
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
+      // Clear existing assignments to prevent duplicates
+      setAssignments([]);
       
-      // Always use academic year parameter
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturer-assignments?academic_year_id=${specificAcademicYearId}`;
+      // Use specificAcademicYearId if provided, otherwise use the selected one
+      const academicYearId = specificAcademicYearId || selectedAcademicYearId;
       
-      const response = await axios.get(apiUrl, {
+      // Determine query parameter for academic year
+      const queryParam = academicYearId && academicYearId !== "all" 
+        ? `?academic_year_id=${academicYearId}` 
+        : "";
+      
+      // Fetch actual data from API
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments${queryParam}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
       });
       
       if (response.data.status === "success") {
-        const apiData = response.data.data || [];
-        
-        // Transform API response data to match the Assignment interface
-        const transformedAssignments = apiData.map((item: any) => ({
-          id: item.id,
-          title: "",
-          user_id: item.user_id,
-          course_id: item.course_id,
-          academic_year_id: item.academic_year_id,
-          lecturer: {
-            id: 0, // We don't have the actual lecturer ID from the flat response
-            uuid: "", // We don't have the UUID either
-            user_id: item.user_id,
-            full_name: item.lecturer_name || "",
-            nip: item.lecturer_nip || "",
-            email: item.lecturer_email || ""
-          },
-          course: {
-            id: item.course_id,
-            uuid: "",
-            code: item.course_code || "",
-            name: item.course_name || "",
-            semester: item.course_semester || 0 // Use course_semester from API response
-          },
-          academic_year: {
-            id: item.academic_year_id,
-            uuid: "",
-            name: item.academic_year || "",
-            semester: item.semester || "",
-            start_date: "",
-            end_date: ""
-          }
-        }));
-        
-        setAssignments(transformedAssignments);
+        setAssignments(Array.isArray(response.data.data) ? response.data.data : []);
       } else {
-        toast.error("Gagal memuat data penugasan");
-        setAssignments([]);
+        toast.error("Gagal memuat data penugasan dosen", {
+          description: response.data.message || "Terjadi kesalahan pada server"
+        });
       }
     } catch (error: any) {
       console.error("Error fetching assignments:", error);
-      // Set empty assignments for any error
-      setAssignments([]);
-      
-      if (error.response?.status === 404) {
-        toast.warning("Tidak ada data penugasan untuk tahun akademik yang dipilih");
-      } else {
-        toast.error("Gagal memuat data penugasan");
-      }
+      toast.error("Gagal memuat data penugasan dosen", {
+        description: error.response?.data?.message || error.message || "Terjadi kesalahan pada server"
+      });
     } finally {
-      // Only set isLoading to false if we're not in initial loading
-      if (!isInitialLoading) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   };
   
-  // Fetch courses from API
+  // Fetch courses
   const fetchCourses = async () => {
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
       const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
       });
       
       if (response.data.status === "success") {
-        const coursesData = response.data.data || [];
-        setCourses(coursesData);
-        
-        // Add a check for empty courses
-        if (coursesData.length === 0) {
-          toast.warning("Tidak ada mata kuliah tersedia", {
-            description: "Silakan tambahkan mata kuliah terlebih dahulu"
-          });
-        }
+        setCourses(response.data.data || []);
       } else {
-        toast.error("Gagal memuat data mata kuliah");
+        toast.error("Gagal memuat data mata kuliah. Silakan muat ulang halaman.");
+        setCourses([]);
       }
     } catch (error) {
       console.error("Error fetching courses:", error);
-      toast.error("Gagal memuat data mata kuliah");
+      toast.error("Gagal memuat data mata kuliah. Silakan muat ulang halaman.");
+      setCourses([]);
     }
   };
   
-  // Fetch academic years from API
+  // Fetch academic years
   const fetchAcademicYears = async () => {
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
-      
-      // Get all academic years first
-      const allResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years`, {
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
       });
       
-      if (allResponse.data.status === "success") {
-        const academicYearsData = allResponse.data.data;
+      if (response.data.status === "success") {
+        const academicYearsData = response.data.data || [];
         setAcademicYears(academicYearsData);
         
         // If we have academic years available, use the first one
-        if (academicYearsData && academicYearsData.length > 0) {
-          const firstYear = academicYearsData[0];
-          setFormAcademicYearId(firstYear.id.toString());
-          setSelectedAcademicYearId(firstYear.id.toString());
+        if (academicYearsData.length > 0) {
+          const firstYear = academicYearsData[0].academic_year || academicYearsData[0];
+          const yearId = firstYear.id.toString();
+          setFormAcademicYearId(yearId);
+          setSelectedAcademicYearId(yearId);
           
           // Fetch assignments for this academic year
-          await fetchAssignments(firstYear.id.toString());
+          await fetchAssignments(yearId);
         } else {
           toast.warning("Tidak ada tahun akademik tersedia", {
             description: "Silakan tambahkan tahun akademik terlebih dahulu"
@@ -294,15 +332,17 @@ export default function LecturerAssignmentsPage() {
           setAssignments([]);
         }
       } else {
-        toast.error("Gagal memuat data tahun akademik");
+        toast.error("Gagal memuat data tahun akademik. Silakan muat ulang halaman.");
+        setAcademicYears([]);
       }
     } catch (error) {
       console.error("Error fetching academic years:", error);
-      toast.error("Gagal memuat data tahun akademik");
+      toast.error("Gagal memuat data tahun akademik. Silakan muat ulang halaman.");
+      setAcademicYears([]);
     }
   };
   
-  // Fetch lecturers with search term from API
+  // Search lecturers
   const searchLecturers = async (searchTerm: string) => {
     if (!searchTerm || searchTerm.length < 2) {
       setSearchedLecturers([]);
@@ -315,22 +355,25 @@ export default function LecturerAssignmentsPage() {
     setSearchingLecturers(true);
     
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/search?q=${searchTerm}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/search?query=${encodeURIComponent(searchTerm)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
+          }
         }
-      });
+      );
       
       if (response.data.status === "success") {
-        setSearchedLecturers(response.data.data);
+        setSearchedLecturers(response.data.data || []);
       } else {
-        console.error("Failed to search lecturers:", response.data);
         setSearchedLecturers([]);
+        toast.error("Gagal mencari dosen", { duration: 2000 });
       }
     } catch (error) {
       console.error("Error searching lecturers:", error);
       setSearchedLecturers([]);
+      toast.error("Gagal mencari dosen", { duration: 2000 });
     } finally {
       setSearchingLecturers(false);
     }
@@ -356,132 +399,106 @@ export default function LecturerAssignmentsPage() {
   // Fetch lecturer by ID
   const fetchLecturerById = async (id: number) => {
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/${id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
+          }
         }
-      });
+      );
       
       if (response.data.status === "success") {
         return response.data.data;
       }
       return null;
     } catch (error) {
-      console.error("Error fetching lecturer by ID:", error);
+      console.error("Error fetching lecturer:", error);
       return null;
     }
   };
   
+  // Get available semesters from current assignments
+  const availableSemesters = useMemo(() => {
+    // Ensure assignments is an array before filtering
+    if (!assignments || !Array.isArray(assignments)) {
+      return [];
+    }
+    
+    const semesters = [...new Set(assignments
+      .filter(assignment => assignment.course?.semester !== undefined)
+      .map(assignment => assignment.course?.semester))]
+      .filter(Boolean)
+      .sort() as number[];
+    return semesters;
+  }, [assignments]);
+  
   // Filter assignments based on search query and semester filter
-  const filteredAssignments = assignments.filter((assignment) => {
+  const filteredAssignments = (assignments || []).filter((assignment) => {
+    // Ensure assignment is defined
+    if (!assignment) return false;
+    
     const matchesSearch = 
-      (assignment.lecturer?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || !assignment.lecturer) ||
-      (assignment.course?.name?.toLowerCase().includes(searchQuery.toLowerCase()) || !assignment.course) ||
-      (assignment.course?.code?.toLowerCase().includes(searchQuery.toLowerCase()) || !assignment.course);
+      ((assignment.lecturer_name?.toLowerCase() || assignment.lecturer?.full_name?.toLowerCase() || '').includes(searchQuery.toLowerCase())) ||
+      ((assignment.course_name?.toLowerCase() || assignment.course?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase())) ||
+      ((assignment.course_code?.toLowerCase() || assignment.course?.code?.toLowerCase() || '').includes(searchQuery.toLowerCase()));
     
     const matchesSemester = 
       semesterFilter === "all" || 
-      !assignment.course?.semester || // Include assignments with undefined semester
-      (semesterFilter && assignment.course?.semester === parseInt(semesterFilter));
+      (!assignment.course_semester && !assignment.course?.semester) || // Include assignments with undefined semester
+      (semesterFilter && (assignment.course_semester === parseInt(semesterFilter) || assignment.course?.semester === parseInt(semesterFilter)));
     
     return matchesSearch && matchesSemester;
   });
 
   // Handle add assignment
   const handleAddAssignment = async () => {
-    // Change error blocks to warnings
-    if (courses.length === 0) {
-      toast.warning("Tidak ada mata kuliah tersedia", {
-        description: "Silakan tambahkan mata kuliah terlebih dahulu"
+    // Validate form inputs
+    if (!formLecturerId || !formCourseId) {
+      toast.error("Form tidak lengkap", {
+        description: "Pilih dosen dan mata kuliah terlebih dahulu"
       });
-    }
-    
-    // Check if academic years are available
-    if (academicYears.length === 0) {
-      toast.warning("Tidak ada tahun akademik tersedia", {
-        description: "Silakan tambahkan tahun akademik terlebih dahulu"
-      });
-    }
-    
-    if (!formLecturerId || !formCourseId || !formAcademicYearId) {
-      toast.error("Mohon lengkapi semua field");
       return;
-    }
-    
-    const lecturerId = parseInt(formLecturerId);
-    const courseId = parseInt(formCourseId);
-    const academicYearId = parseInt(formAcademicYearId);
-    
-    // Change to warning but still allow the submission
-    if (selectedLecturer && selectedLecturer.user_id === undefined) {
-      toast.warning("Data dosen tidak lengkap", {
-        description: "Dosen belum disinkronisasi dengan pengguna sistem"
-      });
     }
     
     setIsSubmitting(true);
     
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturer-assignments`;
+      // Use the active academic year if available, otherwise use the first one
+      let academicYearId = formAcademicYearId;
+      if (!academicYearId && academicYears.length > 0) {
+        const activeYear = academicYears.find(year => year.name.includes("aktif"));
+        academicYearId = activeYear ? activeYear.id.toString() : academicYears[0].id.toString();
+      }
       
-      // Use user_id as the field name since that's what the backend expects now
-      const payload = {
-        user_id: lecturerId,
-        course_id: courseId,
-        academic_year_id: academicYearId
+      // Prepare request data
+      const requestData = {
+        user_id: parseInt(formLecturerId),
+        course_id: parseInt(formCourseId)
       };
       
-      // Debugging - log the data being sent
-      console.log("Sending payload:", payload);
-      
-      const response = await axios.post(
-        apiUrl,
-        payload,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+      // Send request to API
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments`, requestData, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
-      );
+      });
       
       if (response.data.status === "success") {
         toast.success("Penugasan dosen berhasil ditambahkan");
-        
-        // Fetch assignments to refresh the table, with a short delay to allow database to update
-        try {
-          // Short delay before fetching to ensure database is updated
-          await new Promise(resolve => setTimeout(resolve, 500));
-          // Make sure we fetch assignments with the academic year ID we just used
-          // and update the selected academic year ID to match
-          setSelectedAcademicYearId(formAcademicYearId);
-          await fetchAssignments(formAcademicYearId);
-        } catch (refreshError) {
-          console.error("Error refreshing assignments:", refreshError);
-        }
-        
-        setShowAddDialog(false);
         resetForm();
+        setShowAddDialog(false);
+        fetchAssignments(); // Refresh assignments list
       } else {
-        toast.error("Gagal menambahkan penugasan dosen: " + (response.data.error || "Unknown error"));
+        toast.error("Gagal menambahkan penugasan dosen", {
+          description: response.data.message || "Terjadi kesalahan pada server"
+        });
       }
     } catch (error: any) {
       console.error("Error adding assignment:", error);
-      if (error.response) {
-        // Check for 409 Conflict status specifically
-        if (error.response.status === 409) {
-          toast.error("Dosen sudah ditugaskan untuk mata kuliah ini pada tahun akademik yang dipilih");
-        } else {
-          const errorMessage = error.response.data?.error || "Gagal menambahkan penugasan dosen";
-          toast.error(errorMessage);
-        }
-      } else if (error.request) {
-        toast.error("Tidak ada respons dari server. Silakan coba lagi.");
-      } else {
-        toast.error("Terjadi kesalahan: " + error.message);
-      }
+      toast.error("Gagal menambahkan penugasan dosen", {
+        description: error.response?.data?.message || error.message || "Terjadi kesalahan pada server"
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -491,7 +508,7 @@ export default function LecturerAssignmentsPage() {
   const handleEditAssignment = (assignment: Assignment) => {
     setCurrentAssignment(assignment);
     setFormLecturerId(assignment.user_id.toString());
-    setFormLecturerName(assignment.lecturer?.full_name || 'Unknown Lecturer');
+    setFormLecturerName(assignment.lecturer_name || assignment.lecturer?.full_name || 'Unknown Lecturer');
     setFormCourseId(assignment.course_id.toString());
     setFormAcademicYearId(assignment.academic_year_id.toString());
     setShowEditDialog(true);
@@ -499,68 +516,55 @@ export default function LecturerAssignmentsPage() {
   
   // Handle update assignment
   const handleUpdateAssignment = async () => {
-    // Change error blocks to warnings
-    if (courses.length === 0) {
-      toast.warning("Tidak ada mata kuliah tersedia", {
-        description: "Silakan tambahkan mata kuliah terlebih dahulu"
+    // Validate form inputs
+    if (!formLecturerId || !formCourseId) {
+      toast.error("Form tidak lengkap", {
+        description: "Pilih dosen dan mata kuliah terlebih dahulu"
       });
-    }
-    
-    // Check if academic years are available
-    if (academicYears.length === 0) {
-      toast.warning("Tidak ada tahun akademik tersedia", {
-        description: "Silakan tambahkan tahun akademik terlebih dahulu"
-      });
-    }
-    
-    if (!currentAssignment || !formLecturerId || !formCourseId || !formAcademicYearId) {
-      toast.error("Mohon lengkapi semua field");
       return;
     }
     
-    // Change to warning but still allow the submission
-    if (selectedLecturer && selectedLecturer.user_id === undefined) {
-      toast.warning("Data dosen tidak lengkap", {
-        description: "Dosen belum disinkronisasi dengan pengguna sistem"
-      });
+    if (!currentAssignment) {
+      toast.error("Tidak ada penugasan yang sedang diedit");
+      return;
     }
     
     setIsSubmitting(true);
     
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
+      // Prepare request data
+      const requestData = {
+        user_id: parseInt(formLecturerId),
+        course_id: parseInt(formCourseId)
+        // No academic_year_id, will be handled by backend
+      };
+      
+      // Send request to API
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturer-assignments/${currentAssignment.id}`,
-        {
-          user_id: parseInt(formLecturerId),
-          course_id: parseInt(formCourseId),
-          academic_year_id: parseInt(formAcademicYearId)
-        },
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments/${currentAssignment.id}`, 
+        requestData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
           }
         }
       );
       
       if (response.data.status === "success") {
         toast.success("Penugasan dosen berhasil diperbarui");
-        
-        // Make sure we fetch assignments with the updated academic year ID
-        // and update the selected academic year to match
-        setSelectedAcademicYearId(formAcademicYearId);
-        fetchAssignments(formAcademicYearId);
-        
-        setShowEditDialog(false);
         resetForm();
+        setShowEditDialog(false);
+        fetchAssignments(); // Refresh assignments list
       } else {
-        toast.error("Gagal memperbarui penugasan dosen");
+        toast.error("Gagal memperbarui penugasan dosen", {
+          description: response.data.message || "Terjadi kesalahan pada server"
+        });
       }
     } catch (error: any) {
       console.error("Error updating assignment:", error);
-      const errorMessage = error.response?.data?.error || "Gagal memperbarui penugasan dosen";
-      toast.error(errorMessage);
+      toast.error("Gagal memperbarui penugasan dosen", {
+        description: error.response?.data?.message || error.message || "Terjadi kesalahan pada server"
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -570,7 +574,7 @@ export default function LecturerAssignmentsPage() {
   const confirmDeleteAssignment = (assignment: Assignment) => {
     setAssignmentToDelete({ 
       id: assignment.id, 
-      name: `${assignment.lecturer?.full_name || 'Unknown Lecturer'} - ${assignment.course?.code || ''} ${assignment.course?.name || ''}` 
+      name: `${assignment.lecturer_name || assignment.lecturer?.full_name || 'Unknown Lecturer'} - ${assignment.course_code || assignment.course?.code || ''} ${assignment.course_name || assignment.course?.name || ''}` 
     });
     setShowDeleteModal(true);
   };
@@ -580,37 +584,34 @@ export default function LecturerAssignmentsPage() {
     if (!assignmentToDelete) return;
     
     setIsDeleting(true);
+    
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
+      // Delete the assignment using API
       const response = await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturer-assignments/${assignmentToDelete.id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments/${assignmentToDelete.id}`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
           }
         }
       );
       
       if (response.data.status === "success") {
-        toast.success("Penugasan dosen berhasil dihapus");
+        // Remove the assignment from the list
+        setAssignments(prev => prev.filter(a => a.id !== assignmentToDelete.id));
         
-        // Make sure we have a valid academic year ID to fetch assignments with
-        if (selectedAcademicYearId) {
-          fetchAssignments(selectedAcademicYearId);
-        } else if (academicYears.length > 0) {
-          const firstYearId = academicYears[0].id.toString();
-          setSelectedAcademicYearId(firstYearId);
-          fetchAssignments(firstYearId);
-        }
-        
+        // Close modal
         setShowDeleteModal(false);
         setAssignmentToDelete(null);
+        
+        // Show success message
+        toast.success("Penugasan dosen berhasil dihapus");
       } else {
-        toast.error("Gagal menghapus penugasan dosen");
+        toast.error(response.data.message || "Gagal menghapus penugasan dosen");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting assignment:", error);
-      toast.error("Gagal menghapus penugasan dosen");
+      toast.error(error.response?.data?.message || "Gagal menghapus penugasan dosen");
     } finally {
       setIsDeleting(false);
     }
@@ -620,73 +621,30 @@ export default function LecturerAssignmentsPage() {
   const resetForm = () => {
     setFormLecturerId("");
     setFormCourseId("");
-    setLecturerSearchTerm("");
+    // Don't reset academic year ID to maintain context for multiple operations
     setFormLecturerName("");
-    setSearchedLecturers([]);
     setSelectedLecturer(null);
-    
-    // Use the first academic year from the list if available
-    if (academicYears.length > 0) {
-      setFormAcademicYearId(academicYears[0].id.toString());
-    } else {
-      setFormAcademicYearId("");
-    }
-    
     setCurrentAssignment(null);
   };
 
-  // Fetch assignment by ID to verify data
+  // Fetch assignment by ID
   const fetchAssignmentById = async (id: number) => {
     try {
-      const token = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturer-assignments/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments/${id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
+          }
         }
-      });
+      );
       
       if (response.data.status === "success") {
-        const item = response.data.data;
-        
-        // Transform API response data to match the Assignment interface
-        const transformedAssignment = {
-          id: item.id,
-          title: "",
-          user_id: item.user_id,
-          course_id: item.course_id,
-          academic_year_id: item.academic_year_id,
-          lecturer: {
-            id: 0,
-            uuid: "",
-            user_id: item.user_id,
-            full_name: item.lecturer_name || "",
-            nip: item.lecturer_nip || "",
-            email: item.lecturer_email || ""
-          },
-          course: {
-            id: item.course_id,
-            uuid: "",
-            code: item.course_code || "",
-            name: item.course_name || "",
-            semester: item.course_semester || 0 // Use course_semester from API response
-          },
-          academic_year: {
-            id: item.academic_year_id,
-            uuid: "",
-            name: item.academic_year || "",
-            semester: item.semester || "",
-            start_date: "",
-            end_date: ""
-          }
-        };
-        
-        console.log("Transformed assignment data:", transformedAssignment);
-        return transformedAssignment;
+        return response.data.data;
       }
-      console.error("Failed to fetch assignment details:", response.data);
       return null;
     } catch (error) {
-      console.error("Error fetching assignment by ID:", error);
+      console.error("Error fetching assignment:", error);
       return null;
     }
   };
@@ -729,35 +687,33 @@ export default function LecturerAssignmentsPage() {
             </Button>
           </div>
           
-          <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
+            <div className="w-full md:flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Cari dosen atau mata kuliah..."
-                className="pl-10"
+                className="pl-10 w-full h-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="w-full md:w-56">
+            <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
               <Select 
                 onValueChange={(value) => setSemesterFilter(value)}
                 value={semesterFilter || "all"}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter Semester" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Semester</SelectItem>
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((semester) => (
+                  {availableSemesters.map((semester) => (
                     <SelectItem key={semester} value={semester.toString()}>
                       Semester {semester}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="w-full md:w-72">
               <Select 
                 onValueChange={(value) => {
                   if (value) {
@@ -770,7 +726,7 @@ export default function LecturerAssignmentsPage() {
                 }}
                 value={selectedAcademicYearId}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full sm:w-[220px]">
                   <SelectValue placeholder="Pilih Tahun Akademik" />
                 </SelectTrigger>
                 <SelectContent>
@@ -818,22 +774,23 @@ export default function LecturerAssignmentsPage() {
                   </TableRow>
                 ) : filteredAssignments.length > 0 ? (
                   filteredAssignments.map((assignment, index) => (
-                    <TableRow key={assignment.id}>
+                      <TableRow key={`assignment-${assignment.id}-${assignment.course_id}-${assignment.user_id}-${index}`}>
                       <TableCell className="text-center font-medium">{index + 1}</TableCell>
                       <TableCell>
                         <div className="font-medium">
-                          {assignment.lecturer?.full_name || 'Unknown Lecturer'}
+                          {assignment.lecturer_name || assignment.lecturer?.full_name || 'Unknown Lecturer'}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{assignment.course?.code || 'N/A'}</TableCell>
+                      <TableCell className="font-medium">{assignment.course_code || assignment.course?.code || 'N/A'}</TableCell>
                       <TableCell>
                         <div className="font-medium">
-                          {assignment.course?.name || 'Unknown Course'}
+                          {assignment.course_name || assignment.course?.name || 'Unknown Course'}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center font-medium">{assignment.course?.semester || '-'}</TableCell>
+                      <TableCell className="text-center font-medium">{assignment.course_semester || assignment.course?.semester || '-'}</TableCell>
                       <TableCell className="font-medium">
-                        {assignment.academic_year?.name || 'N/A'} - {assignment.academic_year?.semester || 'N/A'}
+                        {assignment.academic_year_name || (typeof assignment.academic_year?.name === 'string' ? assignment.academic_year.name : 'N/A')} - 
+                        {assignment.academic_year_semester || (typeof assignment.academic_year?.semester === 'string' ? assignment.academic_year.semester : 'N/A')}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -962,23 +919,6 @@ export default function LecturerAssignmentsPage() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label className="text-sm font-medium text-right">Tahun Akademik</label>
-              <div className="col-span-3">
-                <Select value={formAcademicYearId} onValueChange={setFormAcademicYearId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih tahun akademik" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {academicYears.map((year) => (
-                      <SelectItem key={year.id} value={year.id.toString()}>
-                        {year.name} - {year.semester}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
           </div>
           
           <DialogFooter>
@@ -992,12 +932,10 @@ export default function LecturerAssignmentsPage() {
             >
               {isSubmitting ? (
                 <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Menyimpan...
                 </>
-              ) : (
-                "Simpan"
-              )}
+              ) : "Simpan"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1009,123 +947,102 @@ export default function LecturerAssignmentsPage() {
           <DialogHeader>
             <DialogTitle>Edit Penugasan Dosen</DialogTitle>
             <DialogDescription>
-              Ubah detail penugasan dosen untuk mata kuliah.
+              Ubah penugasan dosen untuk mata kuliah.
             </DialogDescription>
           </DialogHeader>
           
-          {currentAssignment && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label className="text-sm font-medium text-right">Dosen</label>
-                <div className="col-span-3">
-                  <div className="relative">
-                    <Input
-                      placeholder="Cari nama dosen..."
-                      value={formLecturerName}
-                      onChange={(e) => {
-                        setFormLecturerName(e.target.value);
-                        searchLecturers(e.target.value);
-                      }}
-                      onFocus={() => {
-                        if (lecturerSearchTerm.length >= 2) {
-                          setShowLecturerResults(true);
-                        }
-                      }}
-                      onBlur={() => {
-                        // Delay closing to allow for selection
-                        setTimeout(() => setShowLecturerResults(false), 150);
-                      }}
-                    />
-                    {showLecturerResults && (
-                      <div className="absolute z-10 mt-1 w-full bg-white rounded-md border border-gray-300 shadow-lg">
-                        <ul className="max-h-60 overflow-auto rounded-md py-1 text-base sm:text-sm">
-                          {searchingLecturers ? (
-                            <li className="px-4 py-2 text-gray-500 flex items-center">
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Mencari dosen...
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-sm font-medium text-right">Dosen</label>
+              <div className="col-span-3">
+                <div className="relative">
+                  <Input
+                    placeholder="Cari nama dosen..."
+                    value={formLecturerName}
+                    onChange={(e) => {
+                      setFormLecturerName(e.target.value);
+                      searchLecturers(e.target.value);
+                    }}
+                    onFocus={() => {
+                      if (formLecturerName.length >= 2) {
+                        setShowLecturerResults(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay closing to allow for selection
+                      setTimeout(() => setShowLecturerResults(false), 150);
+                    }}
+                  />
+                  {showLecturerResults && (
+                    <div className="absolute z-10 mt-1 w-full bg-white rounded-md border border-gray-300 shadow-lg">
+                      <ul className="max-h-60 overflow-auto rounded-md py-1 text-base sm:text-sm">
+                        {searchingLecturers ? (
+                          <li className="px-4 py-2 text-gray-500 flex items-center">
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Mencari dosen...
+                          </li>
+                        ) : searchedLecturers.length > 0 ? (
+                          searchedLecturers.map((lecturer) => (
+                            <li
+                              key={lecturer.id}
+                              onMouseDown={() => selectLecturer(lecturer)}
+                              className="cursor-pointer px-4 py-2 hover:bg-gray-100"
+                            >
+                              <div className="font-medium">{lecturer.full_name}</div>
+                              <div className="text-xs text-gray-500">
+                                {lecturer.nip && `NIP: ${lecturer.nip}`}
+                                {lecturer.nip && lecturer.email && " | "}
+                                {lecturer.email && `Email: ${lecturer.email}`}
+                                {(lecturer.nip || lecturer.email) && " | "}
+                                UserID: {lecturer.user_id || 'N/A'}
+                              </div>
                             </li>
-                          ) : searchedLecturers.length > 0 ? (
-                            searchedLecturers.map((lecturer) => (
-                              <li
-                                key={lecturer.id}
-                                onMouseDown={() => selectLecturer(lecturer)}
-                                className="cursor-pointer px-4 py-2 hover:bg-gray-100"
-                              >
-                                <div className="font-medium">{lecturer.full_name}</div>
-                                <div className="text-xs text-gray-500">
-                                  {lecturer.nip && `NIP: ${lecturer.nip}`}
-                                  {lecturer.nip && lecturer.email && " | "}
-                                  {lecturer.email && `Email: ${lecturer.email}`}
-                                  {(lecturer.nip || lecturer.email) && " | "}
-                                  UserID: {lecturer.user_id || 'N/A'}
-                                </div>
-                              </li>
-                            ))
-                          ) : lecturerSearchTerm.length >= 2 ? (
-                            <li className="px-4 py-2 text-gray-500">Tidak ada dosen yang sesuai</li>
-                          ) : (
-                            <li className="px-4 py-2 text-gray-500">Ketikkan minimal 2 karakter untuk mencari</li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label className="text-sm font-medium text-right">Mata Kuliah</label>
-                <div className="col-span-3">
-                  <Select value={formCourseId} onValueChange={setFormCourseId}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.map((course) => (
-                        <SelectItem key={course.id} value={course.id.toString()}>
-                          {course.code} - {course.name} (Semester {course.semester})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label className="text-sm font-medium text-right">Tahun Akademik</label>
-                <div className="col-span-3">
-                  <Select value={formAcademicYearId} onValueChange={setFormAcademicYearId}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {academicYears.map((year) => (
-                        <SelectItem key={year.id} value={year.id.toString()}>
-                          {year.name} - {year.semester}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                          ))
+                        ) : formLecturerName.length >= 2 ? (
+                          <li className="px-4 py-2 text-gray-500">Tidak ada dosen yang sesuai</li>
+                        ) : (
+                          <li className="px-4 py-2 text-gray-500">Ketikkan minimal 2 karakter untuk mencari</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-sm font-medium text-right">Mata Kuliah</label>
+              <div className="col-span-3">
+                <Select value={formCourseId} onValueChange={setFormCourseId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih mata kuliah" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courses.map((course) => (
+                      <SelectItem key={course.id} value={course.id.toString()}>
+                        {course.code} - {course.name} (Semester {course.semester})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isSubmitting}>
               Batal
             </Button>
-            <Button 
+            <Button
               className="bg-[#0687C9] hover:bg-[#0670a8]"
               onClick={handleUpdateAssignment}
               disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
-                  Menyimpan...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Memperbarui...
                 </>
-              ) : (
-                "Simpan Perubahan"
-              )}
+              ) : "Perbarui"}
             </Button>
           </DialogFooter>
         </DialogContent>

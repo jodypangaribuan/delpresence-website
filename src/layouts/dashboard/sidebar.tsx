@@ -396,7 +396,7 @@ export function Sidebar() {
                 Jadwal Mengajar
               </MenuLink>
               <MenuLink
-                href="/dashboard/lecturer/qrcode"
+                href="/dashboard/lecturer/attendance"
                 icon={<SidebarIcons.ClipboardList />}
               >
                 Kelola Presensi
@@ -428,16 +428,10 @@ export function Sidebar() {
                 Jadwal Mengajar
               </MenuLink>
               <MenuLink
-                href="/dashboard/assistant/qrcode"
+                href="/dashboard/assistant/attendance"
                 icon={<SidebarIcons.ClipboardList />}
               >
                 Kelola Presensi
-              </MenuLink>
-              <MenuLink
-                href="/dashboard/assistant/assignments"
-                icon={<SidebarIcons.UserCog />}
-              >
-                Penugasan Saya
               </MenuLink>
             </ul>
           </>

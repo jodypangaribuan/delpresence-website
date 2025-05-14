@@ -76,15 +76,6 @@ func (r *CourseRepository) GetBySemester(semester int) ([]models.Course, error) 
 	return courses, err
 }
 
-// GetBySemesterType returns courses by semester type (ganjil/genap)
-func (r *CourseRepository) GetBySemesterType(semesterType string) ([]models.Course, error) {
-	var courses []models.Course
-	err := r.db.Preload("Department").Preload("Faculty").Preload("AcademicYear").
-		Where("semester_type = ?", semesterType).
-		Find(&courses).Error
-	return courses, err
-}
-
 // GetByActiveAcademicYear returns courses from the active academic year
 func (r *CourseRepository) GetByActiveAcademicYear() ([]models.Course, error) {
 	var courses []models.Course

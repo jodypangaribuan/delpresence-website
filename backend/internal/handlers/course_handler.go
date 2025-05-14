@@ -27,7 +27,6 @@ func (h *CourseHandler) GetAllCourses(c *gin.Context) {
 	departmentID := c.Query("department_id")
 	academicYearID := c.Query("academic_year_id")
 	semester := c.Query("semester")
-	semesterType := c.Query("semester_type")
 	activeAcademicYear := c.Query("active_academic_year")
 	
 	var courses []models.Course
@@ -55,8 +54,6 @@ func (h *CourseHandler) GetAllCourses(c *gin.Context) {
 			return
 		}
 		courses, err = h.repo.GetBySemester(sem)
-	} else if semesterType != "" {
-		courses, err = h.repo.GetBySemesterType(semesterType)
 	} else if activeAcademicYear == "true" {
 		courses, err = h.repo.GetByActiveAcademicYear()
 	} else {

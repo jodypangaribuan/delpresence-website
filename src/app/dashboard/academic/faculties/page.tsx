@@ -160,7 +160,8 @@ export default function FacultyPage() {
         return;
       }
       
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/search?q=${searchQuery}`, {
+      // Use the new 'query' parameter name to match the updated backend API
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/search?query=${encodeURIComponent(searchQuery)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }

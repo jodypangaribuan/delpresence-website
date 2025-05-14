@@ -140,24 +140,28 @@ func (h *LecturerHandler) SyncLecturers(c *gin.Context) {
 
 // SearchLecturers searches for lecturers by name, nidn, or other criteria
 func (h *LecturerHandler) SearchLecturers(c *gin.Context) {
-	// Get query parameter for search
-	query := c.Query("q")
-	if query == "" {
+	// Get query parameter for search - support both 'query' (new) and 'q' (old) for backward compatibility
+	searchQuery := c.Query("query")
+	
+	// If the new parameter is empty, try the old one
+	if searchQuery == "" {
+		searchQuery = c.Query("q")
+	}
+	
+	if searchQuery == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status": "error", 
-			"error": "Search query is required",
-			"data": nil,
+			"message": "Search query is required",
 		})
 		return
 	}
 
 	// Search lecturers
-	lecturers, err := h.service.SearchLecturers(query)
+	lecturers, err := h.service.SearchLecturers(searchQuery)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status": "error",
-			"error": "Failed to search lecturers: " + err.Error(),
-			"data": nil,
+			"message": "Failed to search lecturers: " + err.Error(),
 		})
 		return
 	}
@@ -188,7 +192,6 @@ func (h *LecturerHandler) SearchLecturers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"error": "",
 		"data": options,
 	})
 } 

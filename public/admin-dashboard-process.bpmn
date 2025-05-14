@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_AdminDashboard" targetNamespace="http://bpmn.io/schema/bpmn" exporter="bpmn-js (https://demo.bpmn.io)" exporterVersion="12.0.0">
+  <bpmn:process id="AdminDashboardProcess" name="Admin Dashboard Process" isExecutable="false">
+    <bpmn:startEvent id="StartEvent_AdminDashboard" name="Admin Successfully Logged In">
+      <bpmn:outgoing>Flow_ToLoadDashboard</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_LoadDashboardData" name="Load Dashboard Data">
+      <bpmn:incoming>Flow_ToLoadDashboard</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRenderDashboard</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_DataLoadCheck" name="Data Load Successful?">
+      <bpmn:incoming>Flow_ToRenderDashboard</bpmn:incoming>
+      <bpmn:outgoing>Flow_DataLoadSuccess</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DataLoadError</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_DisplayError" name="Display Error Message">
+      <bpmn:incoming>Flow_DataLoadError</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRetryDataLoad</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_RenderDashboard" name="Render Dashboard UI">
+      <bpmn:incoming>Flow_DataLoadSuccess</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToDisplayDashboard</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_DisplayDashboard" name="Display Dashboard to Admin">
+      <bpmn:incoming>Flow_ToDisplayDashboard</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToInteractiveState</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:subProcess id="SubProcess_DashboardActions" name="Dashboard Interactive State">
+      <bpmn:incoming>Flow_ToInteractiveState</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndDashboardSession</bpmn:outgoing>
+      <bpmn:startEvent id="StartEvent_Interactive" name="Start Interactive State">
+        <bpmn:outgoing>Flow_ToWaitForAction</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:intermediateCatchEvent id="Event_WaitForAction" name="Wait for Admin Action">
+        <bpmn:incoming>Flow_ToWaitForAction</bpmn:incoming>
+        <bpmn:outgoing>Flow_ToActionGateway</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="MessageEventDefinition_1" />
+      </bpmn:intermediateCatchEvent>
+      <bpmn:exclusiveGateway id="Gateway_ActionType" name="Action Type?">
+        <bpmn:incoming>Flow_ToActionGateway</bpmn:incoming>
+        <bpmn:outgoing>Flow_ViewStats</bpmn:outgoing>
+        <bpmn:outgoing>Flow_ManageUsers</bpmn:outgoing>
+        <bpmn:outgoing>Flow_ConfigureSystem</bpmn:outgoing>
+        <bpmn:outgoing>Flow_Logout</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:task id="Task_ViewStats" name="View Statistics">
+        <bpmn:incoming>Flow_ViewStats</bpmn:incoming>
+        <bpmn:outgoing>Flow_BackToWaiting</bpmn:outgoing>
+      </bpmn:task>
+      <bpmn:task id="Task_ManageUsers" name="Manage Users">
+        <bpmn:incoming>Flow_ManageUsers</bpmn:incoming>
+        <bpmn:outgoing>Flow_BackToWaiting2</bpmn:outgoing>
+      </bpmn:task>
+      <bpmn:task id="Task_ConfigSystem" name="Configure System">
+        <bpmn:incoming>Flow_ConfigureSystem</bpmn:incoming>
+        <bpmn:outgoing>Flow_BackToWaiting3</bpmn:outgoing>
+      </bpmn:task>
+      <bpmn:endEvent id="EndEvent_Logout" name="Logout Selected">
+        <bpmn:incoming>Flow_Logout</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_ToWaitForAction" sourceRef="StartEvent_Interactive" targetRef="Event_WaitForAction" />
+      <bpmn:sequenceFlow id="Flow_ToActionGateway" sourceRef="Event_WaitForAction" targetRef="Gateway_ActionType" />
+      <bpmn:sequenceFlow id="Flow_ViewStats" name="View Stats" sourceRef="Gateway_ActionType" targetRef="Task_ViewStats" />
+      <bpmn:sequenceFlow id="Flow_ManageUsers" name="Manage Users" sourceRef="Gateway_ActionType" targetRef="Task_ManageUsers" />
+      <bpmn:sequenceFlow id="Flow_ConfigureSystem" name="Configure" sourceRef="Gateway_ActionType" targetRef="Task_ConfigSystem" />
+      <bpmn:sequenceFlow id="Flow_Logout" name="Logout" sourceRef="Gateway_ActionType" targetRef="EndEvent_Logout" />
+      <bpmn:sequenceFlow id="Flow_BackToWaiting" sourceRef="Task_ViewStats" targetRef="Event_WaitForAction" />
+      <bpmn:sequenceFlow id="Flow_BackToWaiting2" sourceRef="Task_ManageUsers" targetRef="Event_WaitForAction" />
+      <bpmn:sequenceFlow id="Flow_BackToWaiting3" sourceRef="Task_ConfigSystem" targetRef="Event_WaitForAction" />
+    </bpmn:subProcess>
+    <bpmn:endEvent id="EndEvent_DashboardSession" name="End Dashboard Session">
+      <bpmn:incoming>Flow_ToEndDashboardSession</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_ToLoadDashboard" sourceRef="StartEvent_AdminDashboard" targetRef="Task_LoadDashboardData" />
+    <bpmn:sequenceFlow id="Flow_ToRenderDashboard" sourceRef="Task_LoadDashboardData" targetRef="Gateway_DataLoadCheck" />
+    <bpmn:sequenceFlow id="Flow_DataLoadSuccess" name="Success" sourceRef="Gateway_DataLoadCheck" targetRef="Task_RenderDashboard" />
+    <bpmn:sequenceFlow id="Flow_DataLoadError" name="Error" sourceRef="Gateway_DataLoadCheck" targetRef="Task_DisplayError" />
+    <bpmn:sequenceFlow id="Flow_ToRetryDataLoad" sourceRef="Task_DisplayError" targetRef="Task_LoadDashboardData" />
+    <bpmn:sequenceFlow id="Flow_ToDisplayDashboard" sourceRef="Task_RenderDashboard" targetRef="Task_DisplayDashboard" />
+    <bpmn:sequenceFlow id="Flow_ToInteractiveState" sourceRef="Task_DisplayDashboard" targetRef="SubProcess_DashboardActions" />
+    <bpmn:sequenceFlow id="Flow_ToEndDashboardSession" sourceRef="SubProcess_DashboardActions" targetRef="EndEvent_DashboardSession" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="AdminDashboardProcess">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_1" bpmnElement="StartEvent_AdminDashboard">
+        <dc:Bounds x="152" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="127" y="275" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0g4v518_di" bpmnElement="Task_LoadDashboardData">
+        <dc:Bounds x="240" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1hzh46a_di" bpmnElement="Gateway_DataLoadCheck" isMarkerVisible="true">
+        <dc:Bounds x="395" y="225" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="390" y="284.5" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0zz1mw5_di" bpmnElement="Task_RenderDashboard">
+        <dc:Bounds x="500" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0hvlioh_di" bpmnElement="Task_DisplayDashboard">
+        <dc:Bounds x="660" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_03f4te2_di" bpmnElement="Task_DisplayError">
+        <dc:Bounds x="450" y="100" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0d9x01v_di" bpmnElement="SubProcess_DashboardActions" isExpanded="true">
+        <dc:Bounds x="270" y="440" width="680" height="300" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0ucc11u_di" bpmnElement="StartEvent_Interactive">
+        <dc:Bounds x="310" y="572" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="288" y="615" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0bv4dg5_di" bpmnElement="Event_WaitForAction">
+        <dc:Bounds x="392" y="572" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="370" y="615" width="80" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0umuhlz_di" bpmnElement="Gateway_ActionType" isMarkerVisible="true">
+        <dc:Bounds x="475" y="565" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="469" y="535" width="62" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0s9a4z7_di" bpmnElement="Task_ViewStats">
+        <dc:Bounds x="580" y="490" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1y5vxv6_di" bpmnElement="Task_ManageUsers">
+        <dc:Bounds x="580" y="580" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_12rkj2v_di" bpmnElement="Task_ConfigSystem">
+        <dc:Bounds x="580" y="670" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_03r9zt0_di" bpmnElement="EndEvent_Logout">
+        <dc:Bounds x="782" y="572" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="761" y="615" width="78" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0rbkb8j_di" bpmnElement="Flow_ToWaitForAction">
+        <di:waypoint x="346" y="590" />
+        <di:waypoint x="392" y="590" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06rjnr2_di" bpmnElement="Flow_ToActionGateway">
+        <di:waypoint x="428" y="590" />
+        <di:waypoint x="475" y="590" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1xk7xrx_di" bpmnElement="Flow_ViewStats">
+        <di:waypoint x="500" y="565" />
+        <di:waypoint x="500" y="530" />
+        <di:waypoint x="580" y="530" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="516" y="513" width="47" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_03a5io4_di" bpmnElement="Flow_ManageUsers">
+        <di:waypoint x="525" y="590" />
+        <di:waypoint x="580" y="590" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="518" y="572" width="69" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0b9okx0_di" bpmnElement="Flow_ConfigureSystem">
+        <di:waypoint x="500" y="615" />
+        <di:waypoint x="500" y="710" />
+        <di:waypoint x="580" y="710" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="519" y="693" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0q9pp27_di" bpmnElement="Flow_Logout">
+        <di:waypoint x="525" y="590" />
+        <di:waypoint x="782" y="590" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="634" y="572" width="33" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1wc3str_di" bpmnElement="Flow_BackToWaiting">
+        <di:waypoint x="630" y="490" />
+        <di:waypoint x="630" y="440" />
+        <di:waypoint x="410" y="440" />
+        <di:waypoint x="410" y="572" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0eek3pj_di" bpmnElement="Flow_BackToWaiting2">
+        <di:waypoint x="680" y="620" />
+        <di:waypoint x="710" y="620" />
+        <di:waypoint x="710" y="500" />
+        <di:waypoint x="410" y="500" />
+        <di:waypoint x="410" y="572" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1jzdvzd_di" bpmnElement="Flow_BackToWaiting3">
+        <di:waypoint x="630" y="670" />
+        <di:waypoint x="630" y="650" />
+        <di:waypoint x="470" y="650" />
+        <di:waypoint x="470" y="630" />
+        <di:waypoint x="428" y="630" />
+        <di:waypoint x="428" y="608" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Event_1yj4le7_di" bpmnElement="EndEvent_DashboardSession">
+        <dc:Bounds x="1002" y="572" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="983" y="615" width="74" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0j6pctr_di" bpmnElement="Flow_ToLoadDashboard">
+        <di:waypoint x="188" y="250" />
+        <di:waypoint x="240" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1t2syfm_di" bpmnElement="Flow_ToRenderDashboard">
+        <di:waypoint x="340" y="250" />
+        <di:waypoint x="395" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1kmc3xd_di" bpmnElement="Flow_DataLoadSuccess">
+        <di:waypoint x="445" y="250" />
+        <di:waypoint x="500" y="250" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="453" y="232" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1vycioi_di" bpmnElement="Flow_DataLoadError">
+        <di:waypoint x="420" y="225" />
+        <di:waypoint x="420" y="140" />
+        <di:waypoint x="450" y="140" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="424" y="117" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1cwhq1w_di" bpmnElement="Flow_ToRetryDataLoad">
+        <di:waypoint x="450" y="140" />
+        <di:waypoint x="290" y="140" />
+        <di:waypoint x="290" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0yccvbs_di" bpmnElement="Flow_ToDisplayDashboard">
+        <di:waypoint x="600" y="250" />
+        <di:waypoint x="660" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0a8wneg_di" bpmnElement="Flow_ToInteractiveState">
+        <di:waypoint x="710" y="290" />
+        <di:waypoint x="710" y="365" />
+        <di:waypoint x="610" y="365" />
+        <di:waypoint x="610" y="440" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13q4b3f_di" bpmnElement="Flow_ToEndDashboardSession">
+        <di:waypoint x="950" y="590" />
+        <di:waypoint x="1002" y="590" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

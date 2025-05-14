@@ -132,9 +132,24 @@ func (r *LecturerRepository) Search(query string) ([]models.Lecturer, error) {
 }
 
 // GetByUserID finds a lecturer by their UserID (external ID from campus API)
-func (r *LecturerRepository) GetByUserID(userID uint) (models.Lecturer, error) {
+func (r *LecturerRepository) GetByUserID(userID int) (models.Lecturer, error) {
 	var lecturer models.Lecturer
+	
 	err := r.db.Where("user_id = ?", userID).First(&lecturer).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return models.Lecturer{}, nil
+		}
+		return models.Lecturer{}, err
+	}
+	return lecturer, nil
+}
+
+// GetByID finds a lecturer by their ID
+func (r *LecturerRepository) GetByID(id uint) (models.Lecturer, error) {
+	var lecturer models.Lecturer
+	
+	err := r.db.Where("id = ?", id).First(&lecturer).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return models.Lecturer{}, nil

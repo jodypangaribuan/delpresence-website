@@ -20,7 +20,6 @@ type Course struct {
 	CourseType      string         `gorm:"not null" json:"course_type"` // theory, practice, or mixed
 	AcademicYearID  uint           `gorm:"not null" json:"academic_year_id"`
 	AcademicYear    AcademicYear   `gorm:"foreignKey:AcademicYearID" json:"academic_year"`
-	SemesterType    string         `gorm:"not null" json:"semester_type"` // ganjil or genap
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
