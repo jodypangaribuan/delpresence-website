@@ -1522,12 +1522,7 @@ export default function ScheduleManagePage() {
                           </FormItem>
                         )}
                       />
-                      
-                      <div className="col-span-2 mt-2">
-                        <p className="text-sm text-muted-foreground">
-                          <em>Tahun akademik ditentukan secara otomatis berdasarkan mata kuliah yang dipilih.</em>
-                        </p>
-                      </div>
+                    
                     </div>
                     
                     <DialogFooter>
@@ -2069,11 +2064,6 @@ export default function ScheduleManagePage() {
                     )}
                   />
                   
-                  <div className="col-span-2 mt-2">
-                    <p className="text-sm text-muted-foreground">
-                      <em>Tahun akademik ditentukan secara otomatis berdasarkan mata kuliah yang dipilih.</em>
-                    </p>
-                  </div>
                 </div>
                 
                 <DialogFooter>
