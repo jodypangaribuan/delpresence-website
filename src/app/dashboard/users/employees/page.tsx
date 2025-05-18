@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { API_URL } from "@/utils/env";
 
 // Interface untuk data pegawai
 interface Employee {
@@ -45,11 +46,8 @@ export default function EmployeesPage() {
         throw new Error("Anda harus login terlebih dahulu");
       }
       
-      // API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
       // Panggil API untuk mendapatkan daftar pegawai
-      const response = await fetch(`${apiUrl}/api/admin/employees`, {
+      const response = await fetch(`${API_URL}/api/admin/employees`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -84,11 +82,8 @@ export default function EmployeesPage() {
         throw new Error("Anda harus login terlebih dahulu");
       }
       
-      // API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
       // Panggil API untuk sinkronisasi pegawai
-      const response = await fetch(`${apiUrl}/api/admin/employees/sync`, {
+      const response = await fetch(`${API_URL}/api/admin/employees/sync`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

@@ -58,6 +58,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { API_URL } from "@/utils/env";
 
 // Type untuk building dengan stats
 interface BuildingWithStats {
@@ -106,7 +107,7 @@ export default function BuildingsPage() {
   const fetchBuildings = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/buildings?stats=true`, {
+      const response = await axios.get(`${API_URL}/api/admin/buildings?stats=true`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -182,7 +183,7 @@ export default function BuildingsPage() {
     setIsDeleting(true);
     try {
       const response = await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/buildings/${buildingToDelete.id}`, 
+        `${API_URL}/api/admin/buildings/${buildingToDelete.id}`, 
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
@@ -212,7 +213,7 @@ export default function BuildingsPage() {
   const onAddSubmit = async (data: any) => {
     try {
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/buildings`,
+        `${API_URL}/api/admin/buildings`,
         data,
         {
           headers: {
@@ -243,7 +244,7 @@ export default function BuildingsPage() {
     
     try {
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/buildings/${currentBuilding.id}`,
+        `${API_URL}/api/admin/buildings/${currentBuilding.id}`,
         data,
         {
           headers: {

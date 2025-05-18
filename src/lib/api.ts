@@ -1,13 +1,6 @@
-import { API_URL, TOKEN_EXPIRY_MS } from './env';
-
-type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-
-interface ApiOptions {
-  method?: RequestMethod;
-  body?: any;
-  headers?: Record<string, string>;
-  requiresAuth?: boolean;
-}
+import { API_CONFIG, AUTH_CONFIG, ROUTES } from '../config';
+import { ApiOptions, ApiError } from '../interfaces';
+import { getAuthToken, getRefreshToken, setAuthData, clearAuthData as clearStorage } from './auth/storage';
 
 /**
  * Secure API fetcher function
@@ -24,7 +17,7 @@ export async function api<T = any>(endpoint: string, options: ApiOptions = {}): 
   } = options;
 
   // Build request URL
-  const url = `${API_URL}/api${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const url = `${API_CONFIG.BASE_URL}${API_CONFIG.API_PREFIX}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   
   // Set up headers
   const requestHeaders: HeadersInit = {
@@ -34,10 +27,8 @@ export async function api<T = any>(endpoint: string, options: ApiOptions = {}): 
 
   // Add authorization if required
   if (requiresAuth) {
-    // Try to get token from different storages in order of preference
-    const token = typeof window !== 'undefined' 
-      ? (sessionStorage.getItem('access_token') || localStorage.getItem('access_token'))
-      : null;
+    // Get token from storage utility
+    const token = getAuthToken();
     
     if (!token) {
       throw new Error('Authentication required but no token found');
@@ -93,12 +84,9 @@ export async function api<T = any>(endpoint: string, options: ApiOptions = {}): 
       });
       
       // Throw error with more context
-      const error = new Error(errorMsg);
-      // @ts-ignore - Add additional properties to the error object
+      const error = new Error(errorMsg) as ApiError;
       error.status = response.status;
-      // @ts-ignore
       error.details = errorDetails;
-      // @ts-ignore
       error.rawResponse = data;
       throw error;
     }
@@ -116,15 +104,13 @@ export async function api<T = any>(endpoint: string, options: ApiOptions = {}): 
  */
 async function refreshAuthToken(): Promise<boolean> {
   try {
-    const refreshToken = typeof window !== 'undefined' 
-      ? (sessionStorage.getItem('refresh_token') || localStorage.getItem('refresh_token'))
-      : null;
+    const refreshToken = getRefreshToken();
       
     if (!refreshToken) {
       return false;
     }
     
-    const response = await fetch(`${API_URL}/api/auth/refresh`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.API_PREFIX}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -138,22 +124,8 @@ async function refreshAuthToken(): Promise<boolean> {
     
     const data = await response.json();
     
-    // Save new tokens
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('access_token', data.token);
-      sessionStorage.setItem('refresh_token', data.refresh_token);
-      sessionStorage.setItem('token_expiry', (Date.now() + TOKEN_EXPIRY_MS).toString());
-      sessionStorage.setItem('user', JSON.stringify(data.user));
-      
-      // For backward compatibility
-      localStorage.setItem('access_token', data.token);
-      localStorage.setItem('refresh_token', data.refresh_token);
-      localStorage.setItem('token_expiry', (Date.now() + TOKEN_EXPIRY_MS).toString());
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Update cookie
-      document.cookie = `auth_token=${data.token}; max-age=${TOKEN_EXPIRY_MS / 1000}; path=/; SameSite=Strict`;
-    }
+    // Save new tokens using storage utility
+    setAuthData(data);
     
     return true;
   } catch (error) {
@@ -163,26 +135,14 @@ async function refreshAuthToken(): Promise<boolean> {
 }
 
 /**
- * Clear all auth data from storage
+ * Clear all auth data from storage and redirect to login
  */
-function clearAuthData() {
+export function clearAuthData() {
+  // Use our new storage utility
+  clearStorage();
+  
+  // Redirect to login page if in browser context
   if (typeof window !== 'undefined') {
-    // Clear session storage
-    sessionStorage.removeItem('access_token');
-    sessionStorage.removeItem('refresh_token');
-    sessionStorage.removeItem('token_expiry');
-    sessionStorage.removeItem('user');
-    
-    // Clear local storage
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('token_expiry');
-    localStorage.removeItem('user');
-    
-    // Clear cookie
-    document.cookie = 'auth_token=; Max-Age=0; path=/; SameSite=Strict';
-    
-    // Redirect to login page
-    window.location.href = '/login';
+    window.location.href = ROUTES.LOGIN;
   }
 } 

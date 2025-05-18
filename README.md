@@ -35,7 +35,20 @@ npm install
 2. Create a `.env.local` file with:
 
 ```
+# API Configuration
 NEXT_PUBLIC_API_URL=http://localhost:8080
+
+# Frontend Configuration
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Authentication Configuration
+NEXT_PUBLIC_TOKEN_EXPIRY_HOURS=12
+
+# CORS Configuration
+NEXT_PUBLIC_CORS_ALLOWED_ORIGINS=http://localhost:3000
+
+# Development Configuration
+NEXT_PUBLIC_DEV_MODE=true
 ```
 
 3. Start the development server:

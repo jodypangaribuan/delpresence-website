@@ -66,6 +66,7 @@ import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DatePicker } from "@/components/ui/date-picker";
+import { API_URL } from "@/utils/env";
 
 export default function AcademicYearsPage() {
   const [academicYears, setAcademicYears] = useState<AcademicYearWithStats[]>([]);
@@ -107,7 +108,7 @@ export default function AcademicYearsPage() {
   const fetchAcademicYears = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years?stats=true`, {
+      const response = await axios.get(`${API_URL}/api/admin/academic-years?stats=true`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -129,7 +130,7 @@ export default function AcademicYearsPage() {
   // Add a new academic year
   const handleAddAcademicYear = async (data: any) => {
     try {
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years`, data, {
+      const response = await axios.post(`${API_URL}/api/admin/academic-years`, data, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -154,7 +155,7 @@ export default function AcademicYearsPage() {
     if (!currentAcademicYear) return;
     
     try {
-      const response = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years/${currentAcademicYear.id}`, data, {
+      const response = await axios.put(`${API_URL}/api/admin/academic-years/${currentAcademicYear.id}`, data, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -179,7 +180,7 @@ export default function AcademicYearsPage() {
     if (!currentAcademicYear) return;
     
     try {
-      const response = await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years/${currentAcademicYear.id}`, {
+      const response = await axios.delete(`${API_URL}/api/admin/academic-years/${currentAcademicYear.id}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }

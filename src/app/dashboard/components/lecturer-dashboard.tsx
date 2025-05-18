@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import axios from "axios";
 import { toast } from "sonner";
+import { API_URL } from "@/utils/env";
 import {
   BookOpen,
   Calendar,
@@ -44,9 +45,6 @@ export default function LecturerDashboard() {
       const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
       
       if (!token) return;
-
-      // Prepare API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
       
       // Configuration for API requests
       const config = {
@@ -55,7 +53,7 @@ export default function LecturerDashboard() {
         }
       };
       
-      const response = await axios.get(`${apiUrl}/api/auth/me`, config);
+      const response = await axios.get(`${API_URL}/api/auth/me`, config);
       
       if (response.data && response.data.status === "success") {
         setUserInfo({

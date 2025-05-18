@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -53,6 +52,7 @@ import {
 } from "@/components/ui/tooltip";
 import axios from "axios";
 import { toast } from "sonner";
+import { API_URL } from "@/utils/env";
 
 // Skema validasi untuk form
 const formSchema = z.object({
@@ -119,9 +119,6 @@ interface AcademicYear {
   is_active: boolean;
 }
 
-// Base API URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
 export default function StudentGroupsPage() {
   // State
   const [studentGroups, setStudentGroups] = useState<StudentGroup[]>([]);
@@ -175,7 +172,7 @@ export default function StudentGroupsPage() {
     try {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-      const response = await axios.get(`${API_BASE_URL}/api/admin/student-groups`, {
+      const response = await axios.get(`${API_URL}/api/admin/student-groups`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -199,7 +196,7 @@ export default function StudentGroupsPage() {
     try {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-      const response = await axios.get(`${API_BASE_URL}/api/admin/study-programs`, {
+      const response = await axios.get(`${API_URL}/api/admin/study-programs`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -228,7 +225,7 @@ export default function StudentGroupsPage() {
     try {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-      const response = await axios.get(`${API_BASE_URL}/api/admin/academic-years`, {
+      const response = await axios.get(`${API_URL}/api/admin/academic-years`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -257,7 +254,7 @@ export default function StudentGroupsPage() {
     try {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-      const response = await axios.get(`${API_BASE_URL}/api/admin/student-groups/${groupId}/available-students`, {
+      const response = await axios.get(`${API_URL}/api/admin/student-groups/${groupId}/available-students`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -283,7 +280,7 @@ export default function StudentGroupsPage() {
     try {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-      const response = await axios.get(`${API_BASE_URL}/api/admin/student-groups/${groupId}/members`, {
+      const response = await axios.get(`${API_URL}/api/admin/student-groups/${groupId}/members`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -355,7 +352,7 @@ export default function StudentGroupsPage() {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
       const response = await axios.post(
-        `${API_BASE_URL}/api/admin/student-groups`, 
+        `${API_URL}/api/admin/student-groups`, 
         values, 
         {
           headers: {
@@ -389,7 +386,7 @@ export default function StudentGroupsPage() {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
       const response = await axios.put(
-        `${API_BASE_URL}/api/admin/student-groups/${selectedGroup.id}`, 
+        `${API_URL}/api/admin/student-groups/${selectedGroup.id}`, 
         values, 
         {
           headers: {
@@ -423,7 +420,7 @@ export default function StudentGroupsPage() {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
       const response = await axios.delete(
-        `${API_BASE_URL}/api/admin/student-groups/${selectedGroup.id}`, 
+        `${API_URL}/api/admin/student-groups/${selectedGroup.id}`, 
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -674,7 +671,7 @@ export default function StudentGroupsPage() {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
       const response = await axios.post(
-        `${API_BASE_URL}/api/admin/student-groups/${selectedGroup.id}/members/batch`, 
+        `${API_URL}/api/admin/student-groups/${selectedGroup.id}/members/batch`, 
         { student_ids: selectedStudents }, 
         {
           headers: {
@@ -731,7 +728,7 @@ export default function StudentGroupsPage() {
       // Get token from sessionStorage first, fallback to localStorage
       const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
       const response = await axios.post(
-        `${API_BASE_URL}/api/admin/student-groups/${selectedGroup.id}/members/remove-batch`, 
+        `${API_URL}/api/admin/student-groups/${selectedGroup.id}/members/remove-batch`, 
         { student_ids: selectedStudents }, 
         {
           headers: {

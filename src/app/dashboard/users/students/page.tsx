@@ -1,3 +1,5 @@
+import { API_URL } from "@/utils/env";
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -70,11 +72,8 @@ export default function StudentsPage() {
         throw new Error("Anda harus login terlebih dahulu");
       }
       
-      // API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
       // Make the API request
-      const response = await fetch(`${apiUrl}/api/admin/students`, {
+      const response = await fetch(`${API_URL}/api/admin/students`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -163,9 +162,6 @@ export default function StudentsPage() {
         throw new Error("Anda harus login terlebih dahulu");
       }
       
-      // API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
       // Make the API request with a longer timeout warning
       const timeoutWarning = setTimeout(() => {
         toast.info("Sinkronisasi masih berlangsung...", {
@@ -175,7 +171,7 @@ export default function StudentsPage() {
       }, 15000); // Show a message if it takes more than 15 seconds
       
       // Make the API request
-      const response = await fetch(`${apiUrl}/api/admin/students/sync`, {
+      const response = await fetch(`${API_URL}/api/admin/students/sync`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,

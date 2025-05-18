@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from 'next/navigation';
 import { createRoot } from 'react-dom/client';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import { API_URL, TOKEN_EXPIRY_MS } from '@/utils/env';
 
 // User role enum
 export enum UserRole {
@@ -124,9 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("[AuthContext] Login attempt for:", username);
     
     try {
-      // Backend API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
       // Try campus login first for lecturers and assistants
       try {
         console.log("[AuthContext] Attempting campus login");
@@ -136,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         formData.append("password", password);
         
         // Call the campus login API 
-        const campusResponse = await fetch(`${apiUrl}/api/auth/campus/login`, {
+        const campusResponse = await fetch(`${API_URL}/api/auth/campus/login`, {
           method: "POST",
           body: formData,
           credentials: 'same-origin', // Include cookies
@@ -177,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // If campus login failed or returned invalid role, try admin login
       console.log("[AuthContext] Attempting admin login");
-      const adminResponse = await fetch(`${apiUrl}/api/auth/login`, {
+      const adminResponse = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -213,8 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Save auth data securely
   const saveAuthData = (token: string, refreshToken: string, userData: User) => {
     console.log("[AuthContext] Saving auth data for user:", userData.username);
-    // Calculate expiry time (12 hours from now)
-    const expiryTime = Date.now() + 12 * 60 * 60 * 1000;
+    // Calculate expiry time
+    const expiryTime = Date.now() + TOKEN_EXPIRY_MS;
     
     // Prefer session storage for better security (cleared when browser closes)
     sessionStorage.setItem('access_token', token);
@@ -229,10 +227,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(userData));
     
     // Set HTTP-only secure cookie for backend API requests
-    document.cookie = `auth_token=${token}; max-age=${60*60*12}; path=/; SameSite=Strict`;
+    document.cookie = `auth_token=${token}; max-age=${TOKEN_EXPIRY_MS / 1000}; path=/; SameSite=Strict`;
     
     // Also save user data in a cookie (URL-encoded) for middleware access
-    document.cookie = `user=${encodeURIComponent(JSON.stringify(userData))}; max-age=${60*60*12}; path=/; SameSite=Strict`;
+    document.cookie = `user=${encodeURIComponent(JSON.stringify(userData))}; max-age=${TOKEN_EXPIRY_MS / 1000}; path=/; SameSite=Strict`;
     
     // Update state
     setUser(userData);

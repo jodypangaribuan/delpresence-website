@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
+import { API_URL } from "@/utils/env";
 
 // Type untuk data dosen
 interface Lecturer {
@@ -47,11 +48,8 @@ export default function LecturersPage() {
         throw new Error("Anda harus login terlebih dahulu");
       }
       
-      // API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
       // Panggil API untuk mendapatkan daftar dosen
-      const response = await fetch(`${apiUrl}/api/admin/lecturers`, {
+      const response = await fetch(`${API_URL}/api/admin/lecturers`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -86,11 +84,8 @@ export default function LecturersPage() {
         throw new Error("Anda harus login terlebih dahulu");
       }
       
-      // API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
       // Panggil API untuk sinkronisasi dosen
-      const response = await fetch(`${apiUrl}/api/admin/lecturers/sync`, {
+      const response = await fetch(`${API_URL}/api/admin/lecturers/sync`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

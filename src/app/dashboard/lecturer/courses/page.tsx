@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { API_URL } from "@/utils/env";
 
 // Interface for academic year
 interface AcademicYear {
@@ -67,7 +68,7 @@ export default function LecturerCoursesPage() {
   const fetchAcademicYears = async () => {
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/lecturer/academic-years`,
+        `${API_URL}/api/lecturer/academic-years`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
@@ -119,7 +120,7 @@ export default function LecturerCoursesPage() {
     try {
       // Use the lecturer's courses endpoint
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/lecturer/courses${selectedAcademicYearId ? `?academic_year_id=${selectedAcademicYearId}` : ''}`,
+        `${API_URL}/api/lecturer/courses${selectedAcademicYearId ? `?academic_year_id=${selectedAcademicYearId}` : ''}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`

@@ -62,6 +62,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { API_URL } from "@/utils/env";
 
 // Type untuk data Fakultas
 interface Faculty {
@@ -130,7 +131,7 @@ export default function FacultyPage() {
   const fetchFaculties = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/faculties?stats=true`, {
+      const response = await axios.get(`${API_URL}/api/admin/faculties?stats=true`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -139,11 +140,11 @@ export default function FacultyPage() {
       if (response.data.status === "success") {
         setFaculties(response.data.data);
       } else {
-        toast.error("Gagal memuat fakultas");
+        toast.error("Gagal memuat data fakultas");
       }
     } catch (error) {
       console.error("Error fetching faculties:", error);
-      toast.error("Gagal memuat fakultas");
+      toast.error("Gagal memuat data fakultas");
     } finally {
       setIsLoading(false);
     }
@@ -161,7 +162,7 @@ export default function FacultyPage() {
       }
       
       // Use the new 'query' parameter name to match the updated backend API
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/search?query=${encodeURIComponent(searchQuery)}`, {
+      const response = await axios.get(`${API_URL}/api/admin/lecturers/search?query=${encodeURIComponent(searchQuery)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -214,7 +215,7 @@ export default function FacultyPage() {
   const onAddSubmit = async (data: any) => {
     try {
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/faculties`,
+        `${API_URL}/api/admin/faculties`,
         data,
         {
           headers: {
@@ -261,7 +262,7 @@ export default function FacultyPage() {
     
     try {
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/faculties/${currentFaculty.id}`,
+        `${API_URL}/api/admin/faculties/${currentFaculty.id}`,
         data,
         {
           headers: {
@@ -315,7 +316,7 @@ export default function FacultyPage() {
     setIsDeleting(true);
     try {
       const response = await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/faculties/${facultyToDelete.id}`, 
+        `${API_URL}/api/admin/faculties/${facultyToDelete.id}`, 
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import axios from "axios";
 import { toast } from "sonner";
+import { API_URL } from "@/utils/env";
 import {
   Users,
   GraduationCap,
@@ -104,9 +105,6 @@ export default function AdminDashboard() {
       
       if (!token) return;
 
-      // Prepare API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
       // Configuration for API requests
       const config = {
         headers: {
@@ -114,7 +112,7 @@ export default function AdminDashboard() {
         }
       };
       
-      const response = await axios.get(`${apiUrl}/api/auth/me`, config);
+      const response = await axios.get(`${API_URL}/api/auth/me`, config);
       
       if (response.data && response.data.status === "success") {
         setUserInfo({
@@ -138,9 +136,6 @@ export default function AdminDashboard() {
         toast.error("Anda harus login terlebih dahulu");
         return;
       }
-
-      // Prepare API URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
       
       // Configuration for API requests
       const config = {
@@ -162,16 +157,16 @@ export default function AdminDashboard() {
         coursesResponse,
         schedulesResponse
       ] = await Promise.all([
-        axios.get(`${apiUrl}/api/admin/study-programs?stats=true`, config),
-        axios.get(`${apiUrl}/api/admin/faculties?stats=true`, config),
-        axios.get(`${apiUrl}/api/admin/buildings?stats=true`, config),
-        axios.get(`${apiUrl}/api/admin/rooms`, config),
-        axios.get(`${apiUrl}/api/admin/lecturers?stats=true`, config),
-        axios.get(`${apiUrl}/api/admin/employees`, config),
-        axios.get(`${apiUrl}/api/admin/students`, config),
-        axios.get(`${apiUrl}/api/admin/student-groups`, config),
-        axios.get(`${apiUrl}/api/admin/courses`, config),
-        axios.get(`${apiUrl}/api/admin/schedules`, config)
+        axios.get(`${API_URL}/api/admin/study-programs?stats=true`, config),
+        axios.get(`${API_URL}/api/admin/faculties?stats=true`, config),
+        axios.get(`${API_URL}/api/admin/buildings?stats=true`, config),
+        axios.get(`${API_URL}/api/admin/rooms`, config),
+        axios.get(`${API_URL}/api/admin/lecturers?stats=true`, config),
+        axios.get(`${API_URL}/api/admin/employees`, config),
+        axios.get(`${API_URL}/api/admin/students`, config),
+        axios.get(`${API_URL}/api/admin/student-groups`, config),
+        axios.get(`${API_URL}/api/admin/courses`, config),
+        axios.get(`${API_URL}/api/admin/schedules`, config)
       ]);
       
       // Helper function to extract count from API response

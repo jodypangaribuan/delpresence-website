@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/authContext";
+import { TOKEN_EXPIRY_MS } from "@/utils/env";
 
 // Minimum delay between redirects to prevent loops (2 seconds)
 const REDIRECT_DELAY = 2000;
@@ -54,7 +55,7 @@ function saveAuthData(data: LoginResponse) {
   localStorage.setItem("access_token", data.token);
   localStorage.setItem("refresh_token", data.refresh_token);
   localStorage.setItem("user", JSON.stringify(data.user));
-  localStorage.setItem("token_expiry", (Date.now() + 12 * 60 * 60 * 1000).toString()); // 12 hours
+  localStorage.setItem("token_expiry", (Date.now() + TOKEN_EXPIRY_MS).toString());
 }
 
 export default function LoginPage() {

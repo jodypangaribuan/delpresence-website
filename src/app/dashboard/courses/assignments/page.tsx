@@ -49,6 +49,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
 import { cn } from "@/lib/utils";
+import { API_URL } from "@/utils/env";
 
 // Interface for lecturer
 interface Lecturer {
@@ -258,7 +259,7 @@ export default function LecturerAssignmentsPage() {
         : "";
       
       // Fetch actual data from API
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments${queryParam}`, {
+      const response = await axios.get(`${API_URL}/api/admin/courses/assignments${queryParam}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -284,7 +285,7 @@ export default function LecturerAssignmentsPage() {
   // Fetch courses
   const fetchCourses = async () => {
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses`, {
+      const response = await axios.get(`${API_URL}/api/admin/courses`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -306,7 +307,7 @@ export default function LecturerAssignmentsPage() {
   // Fetch academic years
   const fetchAcademicYears = async () => {
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years`, {
+      const response = await axios.get(`${API_URL}/api/admin/academic-years`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -356,7 +357,7 @@ export default function LecturerAssignmentsPage() {
     
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/search?query=${encodeURIComponent(searchTerm)}`,
+        `${API_URL}/api/admin/lecturers/search?query=${encodeURIComponent(searchTerm)}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
@@ -400,7 +401,7 @@ export default function LecturerAssignmentsPage() {
   const fetchLecturerById = async (id: number) => {
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/${id}`,
+        `${API_URL}/api/admin/lecturers/${id}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
@@ -478,7 +479,7 @@ export default function LecturerAssignmentsPage() {
       };
       
       // Send request to API
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments`, requestData, {
+      const response = await axios.post(`${API_URL}/api/admin/courses/assignments`, requestData, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -541,7 +542,7 @@ export default function LecturerAssignmentsPage() {
       
       // Send request to API
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments/${currentAssignment.id}`, 
+        `${API_URL}/api/admin/courses/assignments/${currentAssignment.id}`, 
         requestData,
         {
           headers: {
@@ -588,7 +589,7 @@ export default function LecturerAssignmentsPage() {
     try {
       // Delete the assignment using API
       const response = await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments/${assignmentToDelete.id}`,
+        `${API_URL}/api/admin/courses/assignments/${assignmentToDelete.id}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
@@ -631,7 +632,7 @@ export default function LecturerAssignmentsPage() {
   const fetchAssignmentById = async (id: number) => {
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/assignments/${id}`,
+        `${API_URL}/api/admin/courses/assignments/${id}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`

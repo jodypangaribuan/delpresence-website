@@ -60,6 +60,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { API_URL } from "@/utils/env";
 
 // Type for Faculty
 interface Faculty {
@@ -135,7 +136,7 @@ export default function DepartmentsPage() {
     code: "",
     name: "",
       faculty_id: "",  // Use string initially since Select returns string
-    degree: "S1",
+    degree: "D3",
     accreditation: "Unggul",
     head_of_department: "",
       establishment_year: undefined,
@@ -151,7 +152,7 @@ export default function DepartmentsPage() {
       code: "",
       name: "",
       faculty_id: "",  // Use string initially since Select returns string
-      degree: "S1",
+      degree: "D3",
       accreditation: "Unggul",
       head_of_department: "",
       establishment_year: undefined,
@@ -176,7 +177,7 @@ export default function DepartmentsPage() {
   const fetchStudyPrograms = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/study-programs?stats=true`, {
+      const response = await axios.get(`${API_URL}/api/admin/study-programs?stats=true`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -185,11 +186,11 @@ export default function DepartmentsPage() {
       if (response.data.status === "success") {
         setStudyPrograms(response.data.data);
       } else {
-        toast.error("Gagal memuat program studi");
+        toast.error("Gagal memuat data program studi");
       }
     } catch (error) {
       console.error("Error fetching study programs:", error);
-      toast.error("Gagal memuat program studi");
+      toast.error("Gagal memuat data program studi");
     } finally {
       setIsLoading(false);
     }
@@ -199,36 +200,27 @@ export default function DepartmentsPage() {
   const fetchFaculties = async () => {
     setIsFacultiesLoading(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/faculties`, {
+      const response = await axios.get(`${API_URL}/api/admin/faculties`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
       });
       
       if (response.data.status === "success") {
-        // Handle both formats - with or without the FacultyWithStats structure
-        const facultiesData = response.data.data.map((item: any) => {
-          // Check if the response has the FacultyWithStats structure or direct Faculty structure
-          const faculty = item.faculty || item;
-          return {
-            id: faculty.id,
-            name: faculty.name
-          };
-        });
-        setFaculties(facultiesData);
+        setFaculties(response.data.data.map((item: any) => item.faculty || item));
         
         // Check if faculties are available and show notification if empty
-        if (facultiesData.length === 0) {
+        if (response.data.data.length === 0) {
           toast.warning("Tidak ada fakultas tersedia", {
             description: "Silakan tambahkan fakultas terlebih dahulu sebelum membuat program studi"
           });
         }
       } else {
-        toast.error("Gagal memuat fakultas");
+        toast.error("Gagal memuat data fakultas");
       }
     } catch (error) {
       console.error("Error fetching faculties:", error);
-      toast.error("Gagal memuat fakultas");
+      toast.error("Gagal memuat data fakultas");
     } finally {
       setIsFacultiesLoading(false);
     }
@@ -246,7 +238,7 @@ export default function DepartmentsPage() {
       }
       
       // Use the new 'query' parameter name to match the updated backend API
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/lecturers/search?query=${encodeURIComponent(searchQuery)}`, {
+      const response = await axios.get(`${API_URL}/api/admin/lecturers/search?query=${encodeURIComponent(searchQuery)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -367,7 +359,7 @@ export default function DepartmentsPage() {
     setIsDeleting(true);
     try {
       const response = await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/study-programs/${programToDelete.id}`,
+        `${API_URL}/api/admin/study-programs/${programToDelete.id}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
@@ -397,7 +389,7 @@ export default function DepartmentsPage() {
   const onAddSubmit = async (data: any) => {
     try {
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/study-programs`,
+        `${API_URL}/api/admin/study-programs`,
         data,
         {
           headers: {
@@ -428,7 +420,7 @@ export default function DepartmentsPage() {
     
     try {
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/study-programs/${currentProgram.id}`,
+        `${API_URL}/api/admin/study-programs/${currentProgram.id}`,
         data,
         {
           headers: {

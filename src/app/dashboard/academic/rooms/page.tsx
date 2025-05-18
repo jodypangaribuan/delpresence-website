@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { API_URL } from "@/utils/env";
 import { 
   DoorClosed, 
   Plus, 
@@ -144,7 +145,7 @@ export default function RoomsPage() {
   const fetchRooms = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/rooms`, {
+      const response = await axios.get(`${API_URL}/api/admin/rooms`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -167,7 +168,7 @@ export default function RoomsPage() {
   const fetchBuildings = async () => {
     setIsBuildingsLoading(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/buildings`, {
+      const response = await axios.get(`${API_URL}/api/admin/buildings`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -245,7 +246,7 @@ export default function RoomsPage() {
     setIsDeleting(true);
     try {
       const response = await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/rooms/${roomToDelete.id}`, 
+        `${API_URL}/api/admin/rooms/${roomToDelete.id}`, 
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
@@ -275,7 +276,7 @@ export default function RoomsPage() {
   const onAddSubmit = async (data: any) => {
     try {
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/rooms`,
+        `${API_URL}/api/admin/rooms`,
         data,
         {
           headers: {
@@ -306,7 +307,7 @@ export default function RoomsPage() {
     
     try {
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/rooms/${currentRoom.id}`,
+        `${API_URL}/api/admin/rooms/${currentRoom.id}`,
         data,
         {
           headers: {

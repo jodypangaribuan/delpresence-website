@@ -59,6 +59,7 @@ import { useForm } from "react-hook-form";
 import axios from "axios";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { API_URL } from "@/utils/env";
 
 // Type untuk data Mata Kuliah
 interface Course {
@@ -213,7 +214,7 @@ export default function CoursesManagePage() {
   const fetchCourses = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses`, {
+      const response = await axios.get(`${API_URL}/api/admin/courses`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -271,7 +272,7 @@ export default function CoursesManagePage() {
   // Fetch departments from API
   const fetchDepartments = async () => {
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/study-programs`, {
+      const response = await axios.get(`${API_URL}/api/admin/study-programs`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -306,7 +307,7 @@ export default function CoursesManagePage() {
   // Fetch academic years from API
   const fetchAcademicYears = async () => {
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/academic-years`, {
+      const response = await axios.get(`${API_URL}/api/admin/academic-years`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
@@ -350,7 +351,7 @@ export default function CoursesManagePage() {
       };
       
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses`,
+        `${API_URL}/api/admin/courses`,
         formattedData,
         {
           headers: {
@@ -393,7 +394,7 @@ export default function CoursesManagePage() {
       };
       
       const response = await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/${currentCourse.id}`,
+        `${API_URL}/api/admin/courses/${currentCourse.id}`,
         formattedData,
         {
           headers: {
@@ -425,7 +426,7 @@ export default function CoursesManagePage() {
     setIsDeleting(true);
     
     try {
-      const response = await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/courses/${currentCourse.id}`, {
+      const response = await axios.delete(`${API_URL}/api/admin/courses/${currentCourse.id}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token') || sessionStorage.getItem('access_token')}`
         }
