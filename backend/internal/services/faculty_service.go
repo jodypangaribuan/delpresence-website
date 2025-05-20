@@ -21,13 +21,37 @@ func NewFacultyService() *FacultyService {
 
 // CreateFaculty creates a new faculty
 func (s *FacultyService) CreateFaculty(faculty *models.Faculty) error {
-	// Check if code already exists
-	existingFaculty, err := s.repository.FindByCode(faculty.Code)
+	// Check if code already exists (including soft-deleted records)
+	exists, err := s.repository.CheckCodeExists(faculty.Code, 0)
 	if err != nil {
 		return err
 	}
-	if existingFaculty != nil {
-		return errors.New("faculty with this code already exists")
+	
+	if exists {
+		// Try to find and restore a soft-deleted record with the same code
+		restoredFaculty, err := s.repository.RestoreByCode(faculty.Code)
+		if err != nil {
+			return err
+		}
+		
+		if restoredFaculty != nil {
+			// Update the restored faculty with new data
+			restoredFaculty.Name = faculty.Name
+			restoredFaculty.Dean = faculty.Dean
+			restoredFaculty.EstablishmentYear = faculty.EstablishmentYear
+			restoredFaculty.LecturerCount = faculty.LecturerCount
+			
+			// Update the restored faculty
+			if err := s.repository.Update(restoredFaculty); err != nil {
+				return err
+			}
+			
+			// Copy ID to the original faculty
+			faculty.ID = restoredFaculty.ID
+			return nil
+		}
+		
+		return errors.New("fakultas dengan kode ini sudah ada")
 	}
 
 	// Create faculty
@@ -42,17 +66,17 @@ func (s *FacultyService) UpdateFaculty(faculty *models.Faculty) error {
 		return err
 	}
 	if existingFaculty == nil {
-		return errors.New("faculty not found")
+		return errors.New("fakultas tidak ditemukan")
 	}
 
-	// If code is changed, check if new code already exists
+	// If code is changed, check if new code already exists (including soft-deleted records)
 	if faculty.Code != existingFaculty.Code {
-		existingWithCode, err := s.repository.FindByCode(faculty.Code)
+		exists, err := s.repository.CheckCodeExists(faculty.Code, faculty.ID)
 		if err != nil {
 			return err
 		}
-		if existingWithCode != nil && existingWithCode.ID != faculty.ID {
-			return errors.New("faculty with this code already exists")
+		if exists {
+			return errors.New("fakultas dengan kode ini sudah ada (termasuk yang sudah dihapus)")
 		}
 	}
 
@@ -78,7 +102,7 @@ func (s *FacultyService) DeleteFaculty(id uint) error {
 		return err
 	}
 	if faculty == nil {
-		return errors.New("faculty not found")
+		return errors.New("fakultas tidak ditemukan")
 	}
 
 	// Check if there are any associated study programs
@@ -87,7 +111,7 @@ func (s *FacultyService) DeleteFaculty(id uint) error {
 		return err
 	}
 	if programCount > 0 {
-		return errors.New("cannot delete faculty with associated study programs")
+		return errors.New("tidak dapat menghapus fakultas yang memiliki program studi")
 	}
 
 	// Delete faculty
@@ -109,7 +133,7 @@ func (s *FacultyService) GetFacultyWithStats(id uint) (*FacultyWithStats, error)
 		return nil, err
 	}
 	if faculty == nil {
-		return nil, errors.New("faculty not found")
+		return nil, errors.New("fakultas tidak ditemukan")
 	}
 
 	// Count programs

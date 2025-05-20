@@ -318,8 +318,8 @@ export default function DepartmentsPage() {
     if (message.includes("already exists")) {
       return "Data dengan kode tersebut sudah ada";
     }
-    if (message.includes("cannot delete")) {
-      return "Tidak dapat menghapus program studi yang masih memiliki data terkait";
+    if (message.includes("cannot delete") || message.includes("has associated records") || message.includes("memiliki data terkait")) {
+      return "Tidak dapat menghapus program studi yang masih memiliki data terkait. Harap hapus semua data terkait terlebih dahulu.";
     }
     
     // Return original message if no translation found
@@ -378,8 +378,19 @@ export default function DepartmentsPage() {
       }
     } catch (error: any) {
       console.error("Error deleting study program:", error);
-      const errorMsg = formatErrorMessage(error.response?.data?.error || "Gagal menghapus program studi");
-      toast.error(errorMsg);
+      
+      // Handle different error status codes
+      if (error.response) {
+        if (error.response.status === 409) {
+          toast.error(formatErrorMessage(error.response.data.error) || "Tidak dapat menghapus program studi yang memiliki data terkait");
+        } else if (error.response.status === 404) {
+          toast.error("Program studi tidak ditemukan");
+        } else {
+          toast.error(formatErrorMessage(error.response.data.error) || "Gagal menghapus program studi");
+        }
+      } else {
+        toast.error("Gagal menghapus program studi: Koneksi terputus");
+      }
     } finally {
       setIsDeleting(false);
     }

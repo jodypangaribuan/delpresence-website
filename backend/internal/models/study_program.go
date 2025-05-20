@@ -9,7 +9,7 @@ import (
 // StudyProgram represents a study program (program studi) in the system
 type StudyProgram struct {
 	ID                uint           `json:"id" gorm:"primaryKey"`
-	Code              string         `json:"code" gorm:"type:varchar(10);uniqueIndex;not null"`
+	Code              string         `json:"code" gorm:"type:varchar(10);uniqueIndex:idx_study_programs_code_deleted_at;not null"`
 	Name              string         `json:"name" gorm:"type:varchar(100);not null"`
 	FacultyID         uint           `json:"faculty_id" gorm:"not null"`
 	Faculty           Faculty        `json:"faculty" gorm:"foreignKey:FacultyID"`
@@ -20,7 +20,7 @@ type StudyProgram struct {
 	StudentCount      int            `json:"student_count" gorm:"type:int;default:0"`
 	CreatedAt         time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt         time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
+	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index;uniqueIndex:idx_study_programs_code_deleted_at"`
 }
 
 // TableName returns the table name for the StudyProgram model

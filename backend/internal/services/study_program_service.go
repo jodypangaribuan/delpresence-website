@@ -23,13 +23,40 @@ func NewStudyProgramService() *StudyProgramService {
 
 // CreateStudyProgram creates a new study program
 func (s *StudyProgramService) CreateStudyProgram(program *models.StudyProgram) error {
-	// Check if code already exists
-	existingProgram, err := s.repository.FindByCode(program.Code)
+	// Check if code already exists (including soft-deleted records)
+	exists, err := s.repository.CheckCodeExists(program.Code, 0)
 	if err != nil {
 		return err
 	}
-	if existingProgram != nil {
-		return errors.New("study program with this code already exists")
+	
+	if exists {
+		// Try to find and restore a soft-deleted record with the same code
+		restoredProgram, err := s.repository.RestoreByCode(program.Code)
+		if err != nil {
+			return err
+		}
+		
+		if restoredProgram != nil {
+			// Update the restored program with new data
+			restoredProgram.Name = program.Name
+			restoredProgram.FacultyID = program.FacultyID
+			restoredProgram.Degree = program.Degree
+			restoredProgram.Accreditation = program.Accreditation
+			restoredProgram.HeadOfDepartment = program.HeadOfDepartment
+			restoredProgram.LecturerCount = program.LecturerCount
+			restoredProgram.StudentCount = program.StudentCount
+			
+			// Update the restored program
+			if err := s.repository.Update(restoredProgram); err != nil {
+				return err
+			}
+			
+			// Copy ID to the original program
+			program.ID = restoredProgram.ID
+			return nil
+		}
+		
+		return errors.New("program studi dengan kode ini sudah ada")
 	}
 
 	// Check if faculty exists
@@ -38,7 +65,7 @@ func (s *StudyProgramService) CreateStudyProgram(program *models.StudyProgram) e
 		return err
 	}
 	if faculty == nil {
-		return errors.New("faculty not found")
+		return errors.New("fakultas tidak ditemukan")
 	}
 
 	// Create study program
@@ -53,17 +80,17 @@ func (s *StudyProgramService) UpdateStudyProgram(program *models.StudyProgram) e
 		return err
 	}
 	if existingProgram == nil {
-		return errors.New("study program not found")
+		return errors.New("program studi tidak ditemukan")
 	}
 
-	// If code is changed, check if new code already exists
+	// If code is changed, check if new code already exists (including soft-deleted records)
 	if program.Code != existingProgram.Code {
-		existingWithCode, err := s.repository.FindByCode(program.Code)
+		exists, err := s.repository.CheckCodeExists(program.Code, program.ID)
 		if err != nil {
 			return err
 		}
-		if existingWithCode != nil && existingWithCode.ID != program.ID {
-			return errors.New("study program with this code already exists")
+		if exists {
+			return errors.New("program studi dengan kode ini sudah ada (termasuk yang sudah dihapus)")
 		}
 	}
 
@@ -73,7 +100,7 @@ func (s *StudyProgramService) UpdateStudyProgram(program *models.StudyProgram) e
 		return err
 	}
 	if faculty == nil {
-		return errors.New("faculty not found")
+		return errors.New("fakultas tidak ditemukan")
 	}
 
 	// Update study program
@@ -98,7 +125,7 @@ func (s *StudyProgramService) GetStudyProgramsByFacultyID(facultyID uint) ([]mod
 		return nil, err
 	}
 	if faculty == nil {
-		return nil, errors.New("faculty not found")
+		return nil, errors.New("fakultas tidak ditemukan")
 	}
 
 	return s.repository.FindByFacultyID(facultyID)
@@ -112,7 +139,7 @@ func (s *StudyProgramService) DeleteStudyProgram(id uint) error {
 		return err
 	}
 	if program == nil {
-		return errors.New("study program not found")
+		return errors.New("program studi tidak ditemukan")
 	}
 
 	// Delete study program
@@ -134,7 +161,7 @@ func (s *StudyProgramService) GetStudyProgramWithStats(id uint) (*StudyProgramWi
 		return nil, err
 	}
 	if program == nil {
-		return nil, errors.New("study program not found")
+		return nil, errors.New("program studi tidak ditemukan")
 	}
 
 	// Build response

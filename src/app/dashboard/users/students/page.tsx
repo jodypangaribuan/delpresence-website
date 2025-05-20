@@ -1,6 +1,6 @@
-import { API_URL } from "@/utils/env";
-
 "use client";
+
+import { API_URL } from "@/utils/env";
 
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";

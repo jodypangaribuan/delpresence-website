@@ -51,6 +51,57 @@ func (r *FacultyRepository) FindByCode(code string) (*models.Faculty, error) {
 	return &faculty, nil
 }
 
+// FindDeletedByCode finds a soft-deleted faculty by code
+func (r *FacultyRepository) FindDeletedByCode(code string) (*models.Faculty, error) {
+	var faculty models.Faculty
+	err := r.db.Unscoped().Where("code = ? AND deleted_at IS NOT NULL", code).First(&faculty).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &faculty, nil
+}
+
+// RestoreByCode restores a soft-deleted faculty by code
+func (r *FacultyRepository) RestoreByCode(code string) (*models.Faculty, error) {
+	// Find the deleted record
+	deletedFaculty, err := r.FindDeletedByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if deletedFaculty == nil {
+		return nil, nil
+	}
+	
+	// Restore the record
+	if err := r.db.Unscoped().Model(&models.Faculty{}).Where("id = ?", deletedFaculty.ID).Update("deleted_at", nil).Error; err != nil {
+		return nil, err
+	}
+	
+	// Return the restored record
+	return r.FindByID(deletedFaculty.ID)
+}
+
+// CheckCodeExists checks if a code exists, including soft-deleted records
+func (r *FacultyRepository) CheckCodeExists(code string, excludeID uint) (bool, error) {
+	var count int64
+	query := r.db.Unscoped().Model(&models.Faculty{}).Where("code = ?", code)
+	
+	// Exclude the current record if updating
+	if excludeID > 0 {
+		query = query.Where("id != ?", excludeID)
+	}
+	
+	err := query.Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	
+	return count > 0, nil
+}
+
 // FindAll finds all faculties
 func (r *FacultyRepository) FindAll() ([]models.Faculty, error) {
 	var faculties []models.Faculty
@@ -63,8 +114,8 @@ func (r *FacultyRepository) FindAll() ([]models.Faculty, error) {
 
 // DeleteByID deletes a faculty by ID
 func (r *FacultyRepository) DeleteByID(id uint) error {
-	// Use Unscoped() to permanently delete the record instead of a soft delete
-	return r.db.Unscoped().Delete(&models.Faculty{}, id).Error
+	// Use Delete() without Unscoped() to perform a soft delete
+	return r.db.Delete(&models.Faculty{}, id).Error
 }
 
 // GetFacultyStats gets statistics for a faculty including study program count

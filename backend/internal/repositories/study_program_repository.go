@@ -51,6 +51,57 @@ func (r *StudyProgramRepository) FindByCode(code string) (*models.StudyProgram, 
 	return &program, nil
 }
 
+// FindDeletedByCode finds a soft-deleted study program by code
+func (r *StudyProgramRepository) FindDeletedByCode(code string) (*models.StudyProgram, error) {
+	var program models.StudyProgram
+	err := r.db.Unscoped().Preload("Faculty").Where("code = ? AND deleted_at IS NOT NULL", code).First(&program).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &program, nil
+}
+
+// RestoreByCode restores a soft-deleted study program by code
+func (r *StudyProgramRepository) RestoreByCode(code string) (*models.StudyProgram, error) {
+	// Find the deleted record
+	deletedProgram, err := r.FindDeletedByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if deletedProgram == nil {
+		return nil, nil
+	}
+	
+	// Restore the record
+	if err := r.db.Unscoped().Model(&models.StudyProgram{}).Where("id = ?", deletedProgram.ID).Update("deleted_at", nil).Error; err != nil {
+		return nil, err
+	}
+	
+	// Return the restored record
+	return r.FindByID(deletedProgram.ID)
+}
+
+// CheckCodeExists checks if a code exists, including soft-deleted records
+func (r *StudyProgramRepository) CheckCodeExists(code string, excludeID uint) (bool, error) {
+	var count int64
+	query := r.db.Unscoped().Model(&models.StudyProgram{}).Where("code = ?", code)
+	
+	// Exclude the current record if updating
+	if excludeID > 0 {
+		query = query.Where("id != ?", excludeID)
+	}
+	
+	err := query.Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	
+	return count > 0, nil
+}
+
 // FindAll finds all study programs
 func (r *StudyProgramRepository) FindAll() ([]models.StudyProgram, error) {
 	var programs []models.StudyProgram
@@ -73,8 +124,8 @@ func (r *StudyProgramRepository) FindByFacultyID(facultyID uint) ([]models.Study
 
 // DeleteByID deletes a study program by ID
 func (r *StudyProgramRepository) DeleteByID(id uint) error {
-	// Use Unscoped() to permanently delete the record instead of a soft delete
-	return r.db.Unscoped().Delete(&models.StudyProgram{}, id).Error
+	// Use Delete() without Unscoped() to perform a soft delete
+	return r.db.Delete(&models.StudyProgram{}, id).Error
 }
 
 // GetStudyProgramStats gets statistics for a study program

@@ -299,6 +299,9 @@ export default function FacultyPage() {
     if (message.includes("already exists")) {
       return "Data dengan kode tersebut sudah ada";
     }
+    if (message.includes("associated study programs") || message.includes("program studi")) {
+      return "Tidak dapat menghapus fakultas yang memiliki program studi. Harap hapus semua program studi terlebih dahulu.";
+    }
     
     // Return original message if no translation found
     return message;
@@ -330,11 +333,23 @@ export default function FacultyPage() {
         setShowDeleteModal(false);
         setFacultyToDelete(null);
       } else {
-        toast.error(response.data.error || "Gagal menghapus fakultas");
+        toast.error(formatErrorMessage(response.data.error) || "Gagal menghapus fakultas");
       }
     } catch (error: any) {
       console.error("Error deleting faculty:", error);
-      toast.error(error.response?.data?.error || "Gagal menghapus fakultas");
+      
+      // Handle different error status codes
+      if (error.response) {
+        if (error.response.status === 409) {
+          toast.error(formatErrorMessage(error.response.data.error) || "Tidak dapat menghapus fakultas yang memiliki program studi");
+        } else if (error.response.status === 404) {
+          toast.error("Fakultas tidak ditemukan");
+        } else {
+          toast.error(formatErrorMessage(error.response.data.error) || "Gagal menghapus fakultas");
+        }
+      } else {
+        toast.error("Gagal menghapus fakultas: Koneksi terputus");
+      }
     } finally {
       setIsDeleting(false);
     }

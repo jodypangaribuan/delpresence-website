@@ -181,58 +181,6 @@ func Initialize() {
 	log.Println("CourseSchedule table migrated successfully")
 	
 	log.Println("Database schema migrated successfully")
-	
-	// Seed initial data for academic years if they don't exist
-	SeedAcademicYears()
-}
-
-// SeedAcademicYears seeds initial academic years data if no records exist
-func SeedAcademicYears() {
-	// Check if academic years already exist
-	var count int64
-	DB.Model(&models.AcademicYear{}).Count(&count)
-	
-	if count > 0 {
-		log.Println("Academic years already exist, skipping seed")
-		return
-	}
-	
-	log.Println("Seeding academic years data...")
-	
-	// Create academic years for the current and next year
-	currentYear := time.Now().Year()
-	
-	academicYears := []models.AcademicYear{
-		{
-			Name:      fmt.Sprintf("%d/%d", currentYear, currentYear+1),
-			StartDate: time.Date(currentYear, 9, 1, 0, 0, 0, 0, time.UTC),
-			EndDate:   time.Date(currentYear+1, 2, 28, 23, 59, 59, 0, time.UTC),
-			Semester:  "Ganjil",
-		},
-		{
-			Name:      fmt.Sprintf("%d/%d", currentYear, currentYear+1),
-			StartDate: time.Date(currentYear+1, 3, 1, 0, 0, 0, 0, time.UTC),
-			EndDate:   time.Date(currentYear+1, 8, 31, 23, 59, 59, 0, time.UTC),
-			Semester:  "Genap",
-		},
-		{
-			Name:      fmt.Sprintf("%d/%d", currentYear+1, currentYear+2),
-			StartDate: time.Date(currentYear+1, 9, 1, 0, 0, 0, 0, time.UTC),
-			EndDate:   time.Date(currentYear+2, 2, 28, 23, 59, 59, 0, time.UTC),
-			Semester:  "Ganjil",
-		},
-	}
-	
-	for _, year := range academicYears {
-		result := DB.Create(&year)
-		if result.Error != nil {
-			log.Printf("Error seeding academic year %s-%s: %v\n", year.Name, year.Semester, result.Error)
-		} else {
-			log.Printf("Seeded academic year: %s-%s\n", year.Name, year.Semester)
-		}
-	}
-	
-	log.Println("Academic years seeding completed")
 }
 
 // Close closes the database connection
