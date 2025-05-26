@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/repositories"
@@ -99,8 +100,26 @@ func (s *RoomService) UpdateRoom(room *models.Room) error {
 		return errors.New("gedung tidak ditemukan")
 	}
 
+	// Check if capacity has changed
+	capacityChanged := existingRoom.Capacity != room.Capacity
+	
 	// Update room
-	return s.repository.Update(room)
+	if err := s.repository.Update(room); err != nil {
+		return err
+	}
+	
+	// If capacity changed, update all course schedules that use this room
+	if capacityChanged {
+		scheduleRepo := repositories.NewCourseScheduleRepository()
+		if err := scheduleRepo.UpdateSchedulesForRoom(room.ID, room.Capacity); err != nil {
+			// Log error but don't fail the operation
+			// This is to prevent updates to rooms from failing due to schedule update issues
+			// The schedules will eventually be updated when they're accessed
+			fmt.Printf("Error updating course schedules for room ID %d: %v\n", room.ID, err)
+		}
+	}
+	
+	return nil
 }
 
 // GetRoomByID gets a room by ID

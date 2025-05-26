@@ -76,6 +76,15 @@ func (r *AttendanceRepository) GetActiveSessionForSchedule(courseScheduleID uint
 	return &session, err
 }
 
+// GetActiveSessionsForSchedule gets all active attendance sessions for a schedule
+func (r *AttendanceRepository) GetActiveSessionsForSchedule(courseScheduleID uint) ([]models.AttendanceSession, error) {
+	var sessions []models.AttendanceSession
+	err := r.db.Preload("CourseSchedule").Preload("CourseSchedule.Course").Preload("CourseSchedule.Room").
+		Where("course_schedule_id = ? AND status = ?", courseScheduleID, models.AttendanceStatusActive).
+		Find(&sessions).Error
+	return sessions, err
+}
+
 // CreateStudentAttendance records a student's attendance
 func (r *AttendanceRepository) CreateStudentAttendance(attendance *models.StudentAttendance) error {
 	return r.db.Create(attendance).Error

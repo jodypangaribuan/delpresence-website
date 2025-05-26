@@ -224,6 +224,37 @@ func (s *AttendanceService) GetActiveSessionsForLecturer(lecturerID uint) ([]mod
 	return responses, nil
 }
 
+// GetActiveSessionsByCourse gets all active attendance sessions for a specific course
+func (s *AttendanceService) GetActiveSessionsByCourse(courseID uint) ([]models.AttendanceSessionResponse, error) {
+	// Get all course schedules for this course
+	schedules, err := s.scheduleRepo.GetByCourse(courseID)
+	if err != nil {
+		return nil, err
+	}
+	
+	var allResponses []models.AttendanceSessionResponse
+	
+	// For each schedule, get active attendance sessions
+	for _, schedule := range schedules {
+		sessions, err := s.attendanceRepo.GetActiveSessionsForSchedule(schedule.ID)
+		if err != nil {
+			fmt.Printf("Error getting active sessions for schedule %d: %v\n", schedule.ID, err)
+			continue
+		}
+		
+		// Transform to response objects
+		for _, session := range sessions {
+			response, err := s.mapSessionToResponse(&session)
+			if err != nil {
+				continue
+			}
+			allResponses = append(allResponses, *response)
+		}
+	}
+	
+	return allResponses, nil
+}
+
 // GetSessionsByDateRange gets attendance sessions for a lecturer within a date range
 func (s *AttendanceService) GetSessionsByDateRange(lecturerID uint, startDate, endDate time.Time) ([]models.AttendanceSessionResponse, error) {
 	sessions, err := s.attendanceRepo.ListSessionsByDateRange(lecturerID, startDate, endDate)

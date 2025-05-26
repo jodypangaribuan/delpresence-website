@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Suspense } from "react";
+import { Loader2 } from "lucide-react";
 import "./globals.css";
 import { siteConfig } from "@/shared/utils/siteConfig";
 import ClickSparkProvider from "@/components/ui/ClickSpark/ClickSparkProvider";
@@ -49,6 +51,15 @@ export const metadata: Metadata = {
   }
 };
 
+// Loading component for Suspense fallback
+function PageLoader() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center">
+      <Loader2 className="h-10 w-10 animate-spin text-[#0687C9]" />
+    </div>
+  );
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -72,7 +83,9 @@ export default function RootLayout({
         <AuthProvider>
           <LoadingProvider>
             <ClickSparkProvider>
-              {children}
+              <Suspense fallback={<PageLoader />}>
+                {children}
+              </Suspense>
               <Toaster 
                 position="bottom-right"
                 expand={true}

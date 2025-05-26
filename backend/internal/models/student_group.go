@@ -12,7 +12,6 @@ type StudentGroup struct {
 	Name          string         `gorm:"not null" json:"name"`
 	DepartmentID  uint           `json:"department_id"`
 	Department    StudyProgram   `gorm:"foreignKey:DepartmentID" json:"department"`
-	Semester      int            `json:"semester"`
 	Students      []*Student     `gorm:"many2many:student_to_groups;" json:"students,omitempty"`
 	StudentCount  int            `gorm:"-" json:"student_count"`
 	CreatedAt     time.Time      `json:"created_at"`

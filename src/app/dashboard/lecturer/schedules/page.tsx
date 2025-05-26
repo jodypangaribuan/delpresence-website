@@ -385,35 +385,6 @@ export default function LecturerSchedulePage() {
                     <p className="text-sm text-muted-foreground">{selectedSchedule.enrolled}/{selectedSchedule.capacity} mahasiswa</p>
                   </div>
                 </div>
-                
-                <div className="flex items-start space-x-3">
-                  <Clock className="h-5 w-5 text-[#0687C9] mt-0.5" />
-                  <div>
-                    <p className="font-medium text-sm">Status</p>
-                    <div className="mt-1">
-                      {selectedSchedule.status === "upcoming" && (
-                        <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
-                          Akan Datang
-                        </Badge>
-                      )}
-                      {selectedSchedule.status === "today" && (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          Hari Ini
-                        </Badge>
-                      )}
-                      {selectedSchedule.status === "active" && (
-                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                          Sedang Berlangsung
-                        </Badge>
-                      )}
-                      {selectedSchedule.status === "completed" && (
-                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                          Selesai
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
               </div>
               
               <div className="mt-6 pt-4 border-t border-gray-100">

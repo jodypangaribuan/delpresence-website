@@ -27,7 +27,6 @@ func NewStudentGroupHandler() *StudentGroupHandler {
 func (h *StudentGroupHandler) GetAllStudentGroups(c *gin.Context) {
 	// Parse query parameters for filtering
 	departmentID := c.Query("department_id")
-	semesterStr := c.Query("semester")
 	
 	var groups []models.StudentGroup
 	var err error
@@ -40,13 +39,6 @@ func (h *StudentGroupHandler) GetAllStudentGroups(c *gin.Context) {
 			return
 		}
 		groups, err = h.repo.GetByDepartment(uint(deptID))
-	} else if semesterStr != "" {
-		semester, convErr := strconv.Atoi(semesterStr)
-		if convErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Invalid semester value"})
-			return
-		}
-		groups, err = h.repo.GetBySemester(semester)
 	} else {
 		groups, err = h.repo.GetAll()
 	}
@@ -81,7 +73,6 @@ func (h *StudentGroupHandler) CreateStudentGroup(c *gin.Context) {
 	var request struct {
 		Name           string `json:"name" binding:"required"`
 		DepartmentID   uint   `json:"department_id" binding:"required"`
-		Semester       int    `json:"semester" binding:"required,min=1,max=8"`
 	}
 	
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -93,7 +84,6 @@ func (h *StudentGroupHandler) CreateStudentGroup(c *gin.Context) {
 	group := models.StudentGroup{
 		Name:          request.Name,
 		DepartmentID:  request.DepartmentID,
-		Semester:      request.Semester,
 		StudentCount:  0,
 	}
 	
@@ -124,7 +114,6 @@ func (h *StudentGroupHandler) UpdateStudentGroup(c *gin.Context) {
 	var request struct {
 		Name           string `json:"name" binding:"required"`
 		DepartmentID   uint   `json:"department_id" binding:"required"`
-		Semester       int    `json:"semester" binding:"required,min=1,max=8"`
 	}
 	
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -135,7 +124,6 @@ func (h *StudentGroupHandler) UpdateStudentGroup(c *gin.Context) {
 	// Update the group
 	existingGroup.Name = request.Name
 	existingGroup.DepartmentID = request.DepartmentID
-	existingGroup.Semester = request.Semester
 	
 	updatedGroup, err := h.repo.Update(*existingGroup)
 	if err != nil {
@@ -201,7 +189,7 @@ func (h *StudentGroupHandler) GetGroupMembers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": students})
 }
 
-// GetAvailableStudents returns students that can be added to a group based on department and semester
+// GetAvailableStudents returns students that can be added to a group based on department
 func (h *StudentGroupHandler) GetAvailableStudents(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -209,7 +197,7 @@ func (h *StudentGroupHandler) GetAvailableStudents(c *gin.Context) {
 		return
 	}
 	
-	// Verify student group exists and get its department and semester
+	// Verify student group exists and get its department
 	group, err := h.repo.GetByID(uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": "Student group not found"})
@@ -217,7 +205,7 @@ func (h *StudentGroupHandler) GetAvailableStudents(c *gin.Context) {
 	}
 	
 	// Get available students
-	students, err := h.repo.GetAvailableStudents(uint(id), group.DepartmentID, group.Semester)
+	students, err := h.repo.GetAvailableStudents(uint(id), group.DepartmentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})
 		return

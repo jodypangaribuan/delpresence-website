@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
@@ -58,7 +58,16 @@ function saveAuthData(data: LoginResponse) {
   localStorage.setItem("token_expiry", (Date.now() + TOKEN_EXPIRY_MS).toString());
 }
 
-export default function LoginPage() {
+// Loader component for Suspense
+function PageLoader() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center">
+      <Loader2 className="h-10 w-10 animate-spin text-[#0687C9]" />
+    </div>
+  );
+}
+
+function LoginContent() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -265,12 +274,12 @@ export default function LoginPage() {
                   className="pl-10 pr-10 border-[#E5E7EB] bg-white h-11 focus:border-[#0687C9] focus:ring-1 focus:ring-[#0687C9]/20"
                   disabled={isLoading}
                 />
-                <BsLock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B]" size={18} />
+                <BsLock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B]" size={16} />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#0687C9]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#0687C9] transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading}
+                  tabIndex={-1}
                 >
                   {showPassword ? <BsEyeSlash size={18} /> : <BsEye size={18} />}
                 </button>
@@ -280,26 +289,26 @@ export default function LoginPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div
-                  className={`h-5 w-5 border rounded flex items-center justify-center transition-colors cursor-pointer ${
+                  className={`w-4 h-4 border ${
                     remember
                       ? "bg-[#0687C9] border-[#0687C9]"
-                      : "border-[#D1D5DB]"
-                  }`}
+                      : "border-[#CBD5E1] bg-white"
+                  } rounded flex items-center justify-center cursor-pointer transition-colors`}
                   onClick={() => setRemember(!remember)}
                 >
-                  {remember && <BsCheck className="text-white" size={16} />}
+                  {remember && <BsCheck className="text-white" size={14} />}
                 </div>
-                <Label
+                <label
                   htmlFor="remember"
-                  className="text-sm text-[#4B5563] select-none cursor-pointer"
+                  className="text-[#475569] text-sm cursor-pointer"
                   onClick={() => setRemember(!remember)}
                 >
                   Ingat saya
-                </Label>
+                </label>
               </div>
               <a
                 href="#"
-                className="text-sm text-[#0687C9] hover:text-[#0466a2] font-medium"
+                className="text-[#0687C9] hover:text-[#046293] text-sm font-medium transition-colors"
               >
                 Lupa password?
               </a>
@@ -307,26 +316,54 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              disabled={isLoading || !username || !password}
-              className={`w-full h-11 bg-[#0687C9] hover:bg-[#0466a2] text-white font-medium rounded-lg text-sm ${
-                isLoading ? "btn-loading-pulse" : ""
+              className={`w-full h-11 text-white font-medium bg-[#0687C9] hover:bg-[#046293] transition-colors ${
+                isLoading ? "btn-loading-pulse opacity-90" : ""
               }`}
+              disabled={isLoading}
             >
               {isLoading ? (
-                <div className="flex items-center justify-center">
+                <span className="flex items-center justify-center">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  <span>Login...</span>
-                </div>
+                  Memproses...
+                </span>
               ) : (
-                <div className="flex items-center justify-center">
-                  <span>Login</span>
-                  <BsArrowRight className="ml-2" size={16} />
-                </div>
+                <span className="flex items-center justify-center">
+                  Masuk
+                  <BsArrowRight className="ml-2" />
+                </span>
               )}
             </Button>
           </form>
+
+          <div className="mt-8 text-center text-[#64748B] text-sm">
+            <p>
+              Dengan login, Anda menyetujui{" "}
+              <a
+                href="/terms-of-use"
+                className="text-[#0687C9] hover:text-[#046293] font-medium"
+              >
+                Ketentuan Layanan
+              </a>{" "}
+              dan{" "}
+              <a
+                href="/privacy-policy"
+                className="text-[#0687C9] hover:text-[#046293] font-medium"
+              >
+                Kebijakan Privasi
+              </a>{" "}
+              kami.
+            </p>
+          </div>
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <LoginContent />
+    </Suspense>
   );
 } 

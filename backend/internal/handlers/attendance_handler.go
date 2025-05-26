@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/services"
+	"github.com/delpresence/backend/internal/repositories"
 	"github.com/gin-gonic/gin"
 )
 
@@ -84,14 +86,74 @@ func (h *AttendanceHandler) CreateAttendanceSession(c *gin.Context) {
 // GetActiveAttendanceSessions gets all active attendance sessions for the authenticated lecturer
 func (h *AttendanceHandler) GetActiveAttendanceSessions(c *gin.Context) {
 	// Extract lecturer ID from authenticated user
-	userID := c.MustGet("userID").(uint)
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in token"})
+		return
+	}
+	
+	// Convert to appropriate type
+	var userIDInt int
+	switch v := userID.(type) {
+	case float64:
+		userIDInt = int(v)
+	case int:
+		userIDInt = v
+	case uint:
+		userIDInt = int(v)
+	case string:
+		id, err := strconv.Atoi(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+			return
+		}
+		userIDInt = id
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+		return
+	}
+	
+	// Debug log
+	fmt.Printf("Getting active attendance sessions for userID=%d\n", userIDInt)
 	
 	// Get active sessions
-	sessions, err := h.attendanceService.GetActiveSessionsForLecturer(userID)
+	sessions, err := h.attendanceService.GetActiveSessionsForLecturer(uint(userIDInt))
+	if err != nil {
+		// Try alternative approaches
+		fmt.Printf("Error getting active sessions directly: %v\n", err)
+		
+		// Try to get lecturer first
+		lecturerRepo := repositories.NewLecturerRepository()
+		lecturer, err := lecturerRepo.GetByUserID(userIDInt)
+		if err == nil && lecturer.ID > 0 {
+			fmt.Printf("Found lecturer, trying with lecturer.UserID=%d\n", lecturer.UserID)
+			sessions, err = h.attendanceService.GetActiveSessionsForLecturer(uint(lecturer.UserID))
+		}
+		
+		// If still no sessions, try with lecturer assignments
+		if (err != nil || len(sessions) == 0) && lecturer.ID > 0 {
+			fmt.Printf("Still no sessions found, checking assignments\n")
+			assignmentRepo := repositories.NewLecturerAssignmentRepository()
+			assignments, err := assignmentRepo.GetByLecturerID(lecturer.UserID, 0)
+			if err == nil && len(assignments) > 0 {
+				fmt.Printf("Found %d assignments\n", len(assignments))
+				// Try to get sessions for these courses
+				for _, assignment := range assignments {
+					courseSessions, err := h.attendanceService.GetActiveSessionsByCourse(assignment.CourseID)
+					if err == nil {
+						sessions = append(sessions, courseSessions...)
+					}
+				}
+			}
+		}
+	}
+	
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	
+	fmt.Printf("Found %d active sessions\n", len(sessions))
 	
 	// Return sessions
 	c.JSON(http.StatusOK, sessions)

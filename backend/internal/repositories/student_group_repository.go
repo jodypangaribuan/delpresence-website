@@ -67,9 +67,10 @@ func (r *StudentGroupRepository) GetByDepartment(departmentID uint) ([]models.St
 }
 
 // GetBySemester returns student groups filtered by semester
+// This function is deprecated and will be removed
 func (r *StudentGroupRepository) GetBySemester(semester int) ([]models.StudentGroup, error) {
 	var groups []models.StudentGroup
-	result := r.db.Where("semester = ?", semester).Preload("Department").Find(&groups)
+	result := r.db.Preload("Department").Find(&groups)
 	
 	// Calculate student count for each group
 	for i := range groups {
@@ -218,7 +219,7 @@ func (r *StudentGroupRepository) GetStudentGroups(studentID uint) ([]models.Stud
 }
 
 // GetAvailableStudents returns all students that are not in the group
-func (r *StudentGroupRepository) GetAvailableStudents(groupID uint, departmentID uint, semester int) ([]models.Student, error) {
+func (r *StudentGroupRepository) GetAvailableStudents(groupID uint, departmentID uint) ([]models.Student, error) {
 	var students []models.Student
 	
 	// Find all students who are not in the group by UserID rather than StudentID

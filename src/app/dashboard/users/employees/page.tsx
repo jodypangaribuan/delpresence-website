@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +28,17 @@ interface Employee {
   employment_type: string;
 }
 
-export default function EmployeesPage() {
+// Loading component
+function PageLoader() {
+  return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <Loader2 className="h-10 w-10 animate-spin text-[#0687C9]" />
+    </div>
+  );
+}
+
+// Main content component
+function EmployeesContent() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -265,38 +275,6 @@ export default function EmployeesPage() {
             </Button>
           </div>
           
-          {/* Total count display */}
-          <div className="flex justify-end mb-2">
-            <div className="text-sm font-medium text-gray-800">
-              Total: <span>{filteredEmployees.length}</span> pegawai
-            </div>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-4">
-            {/* Search */}
-            <div className="relative w-full sm:max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Cari pegawai..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setSearchQuery("");
-                }}
-                className="h-8 px-2 text-[#0687C9]"
-              >
-                Reset
-              </Button>
-            )}
-          </div>
-
           {isLoading ? (
             <div className="flex justify-center items-center py-16">
               <div className="text-center">
@@ -305,15 +283,46 @@ export default function EmployeesPage() {
               </div>
             </div>
           ) : (
-            <DataTable 
-              columns={columns} 
-              data={filteredEmployees}
-              pageSize={10}
-              dataType="pegawai"
-            />
+            <div>
+              {/* Total count display */}
+              <div className="flex justify-end mb-2">
+                <div className="text-sm font-medium text-gray-800">
+                  Total: <span>{filteredEmployees.length}</span> pegawai
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-4">
+                {/* Search */}
+                <div className="relative w-full sm:max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input 
+                    placeholder="Cari pegawai berdasarkan nama, NIP, atau posisi..." 
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <DataTable
+                columns={columns}
+                data={filteredEmployees}
+                pageSize={10}
+                dataType="pegawai"
+              />
+            </div>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Export the page component with Suspense boundary
+export default function EmployeesPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <EmployeesContent />
+    </Suspense>
   );
 } 

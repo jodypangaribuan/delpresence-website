@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"regexp"
+	"errors"
 
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/services"
@@ -376,6 +377,15 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 		schedule.RoomID = request.RoomID
 	}
 
+	if request.StudentGroupID != 0 {
+		schedule.StudentGroupID = request.StudentGroupID
+		fmt.Printf("Updating student group ID to: %d\n", request.StudentGroupID)
+	}
+
+	if request.AcademicYearID != 0 {
+		schedule.AcademicYearID = request.AcademicYearID
+	}
+
 	if request.Day != "" {
 		// Validate day of week
 		validDays := map[string]bool{
@@ -490,14 +500,6 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 
 	if endTimeProvided {
 		schedule.EndTime = request.EndTime
-	}
-
-	if request.StudentGroupID != 0 {
-		schedule.StudentGroupID = request.StudentGroupID
-	}
-
-	if request.AcademicYearID != 0 {
-		schedule.AcademicYearID = request.AcademicYearID
 	}
 
 	if request.Capacity != 0 {
@@ -683,15 +685,38 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 		return
 	}
 	
+	// Debug log to check userID
+	fmt.Printf("Looking up lecturer with userID: %d\n", userIDInt)
+	
 	// Get the lecturer by userID from authentication
 	lecturer, err := lecturerRepo.GetByUserID(userIDInt)
+	
+	// Variables to track which ID we finally use
+	var finalUserID uint
+	var idSource string
+	
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status": "error",
-			"message": "Lecturer not found: " + err.Error(),
-		})
-		return
+		// Try alternative method to find lecturer
+		fmt.Printf("Error finding lecturer by userID %d: %v\n", userIDInt, err)
+		// Try to find lecturer by ID directly
+		lecturer, err = lecturerRepo.GetByID(uint(userIDInt))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"status": "error",
+				"message": "Lecturer not found: " + err.Error(),
+			})
+			return
+		}
+		finalUserID = lecturer.ID
+		idSource = "lecturer.ID"
+	} else {
+		finalUserID = uint(lecturer.UserID)
+		idSource = "lecturer.UserID"
 	}
+	
+	// Log lecturer found
+	fmt.Printf("Found lecturer: ID=%d, UserID=%d, Name=%s, using %s=%d for queries\n", 
+		lecturer.ID, lecturer.UserID, lecturer.FullName, idSource, finalUserID)
 	
 	// Check for academic year filter
 	var academicYearID uint = 0
@@ -717,22 +742,96 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 				return academicYears[i].ID > academicYears[j].ID
 			})
 			academicYearID = academicYears[0].ID
+			fmt.Printf("Using academicYearID: %d\n", academicYearID)
 		}
 	}
 	
 	// Get schedules for the lecturer, filtered by academic year if specified
 	var schedules []models.CourseSchedule
-	
-	if academicYearID > 0 {
-		schedules, err = h.service.GetSchedulesByLecturerAndAcademicYear(uint(lecturer.UserID), academicYearID)
-	} else {
-		schedules, err = h.service.GetSchedulesByLecturer(uint(lecturer.UserID))
+	var tryMethods = []struct {
+		name   string
+		tryFn  func() ([]models.CourseSchedule, error)
+	}{
+		{
+			name: "by lecturer UserID",
+			tryFn: func() ([]models.CourseSchedule, error) {
+				if academicYearID > 0 {
+					return h.service.GetSchedulesByLecturerAndAcademicYear(uint(lecturer.UserID), academicYearID)
+				}
+				return h.service.GetSchedulesByLecturer(uint(lecturer.UserID))
+			},
+		},
+		{
+			name: "by lecturer ID",
+			tryFn: func() ([]models.CourseSchedule, error) {
+				if academicYearID > 0 {
+					return h.service.GetSchedulesByLecturerAndAcademicYear(lecturer.ID, academicYearID)
+				}
+				return h.service.GetSchedulesByLecturer(lecturer.ID)
+			},
+		},
+		{
+			name: "by user ID from token",
+			tryFn: func() ([]models.CourseSchedule, error) {
+				if academicYearID > 0 {
+					return h.service.GetSchedulesByLecturerAndAcademicYear(uint(userIDInt), academicYearID)
+				}
+				return h.service.GetSchedulesByLecturer(uint(userIDInt))
+			},
+		},
+		{
+			name: "by lecturer assignments",
+			tryFn: func() ([]models.CourseSchedule, error) {
+				assignmentRepo := repositories.NewLecturerAssignmentRepository()
+				var allSchedules []models.CourseSchedule
+				
+				// Try multiple lecturer IDs for assignments
+				lecturerIDs := []int{lecturer.UserID, int(lecturer.ID), userIDInt}
+				
+				for _, lid := range lecturerIDs {
+					assignments, err := assignmentRepo.GetByLecturerID(lid, academicYearID)
+					if err == nil && len(assignments) > 0 {
+						fmt.Printf("Found %d assignments for lecturer ID %d\n", len(assignments), lid)
+						
+						for _, assignment := range assignments {
+							var courseSchedules []models.CourseSchedule
+							if academicYearID > 0 {
+								courseSchedules, _ = h.service.GetSchedulesByCourseAndAcademicYear(assignment.CourseID, academicYearID)
+							} else {
+								courseSchedules, _ = h.service.GetSchedulesByCourse(assignment.CourseID)
+							}
+							allSchedules = append(allSchedules, courseSchedules...)
+						}
+					}
+				}
+				
+				if len(allSchedules) > 0 {
+					return allSchedules, nil
+				}
+				return nil, errors.New("no assignments found")
+			},
+		},
 	}
 	
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"message": err.Error(),
+	// Try each method until we find schedules
+	var methodUsed string
+	for _, method := range tryMethods {
+		fmt.Printf("Trying to get schedules %s\n", method.name)
+		foundSchedules, err := method.tryFn()
+		if err == nil && len(foundSchedules) > 0 {
+			schedules = foundSchedules
+			methodUsed = method.name
+			break
+		}
+	}
+	
+	fmt.Printf("Found %d schedules for lecturer using method: %s\n", len(schedules), methodUsed)
+	
+	// If still no schedules found, return an empty array rather than an error
+	if len(schedules) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "success",
+			"data": []map[string]interface{}{}, // Empty array
 		})
 		return
 	}

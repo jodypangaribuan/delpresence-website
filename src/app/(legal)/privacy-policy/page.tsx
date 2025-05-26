@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { BsShieldLock, BsArrowLeft } from "react-icons/bs";
 import { LegalSection } from "@/shared/types/legal";
 import Link from "next/link";
@@ -8,8 +8,19 @@ import { motion } from "framer-motion";
 import { siteConfig } from "@/shared/utils/siteConfig";
 import LegalListItem from "@/components/legal/LegalListItem";
 import LegalContentCard from "@/components/legal/LegalContentCard";
+import { Loader2 } from "lucide-react";
 
-export default function PrivacyPolicyPage() {
+// Loader component
+function PageLoader() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center">
+      <Loader2 className="h-10 w-10 animate-spin text-[#0687C9]" />
+    </div>
+  );
+}
+
+// The main content component
+function PrivacyPolicyContent() {
   // Use useMemo to prevent recreating sections on each render
   const sections: LegalSection[] = useMemo(() => [
     {
@@ -247,30 +258,71 @@ export default function PrivacyPolicyPage() {
         </motion.div>
       </div>
 
-      {/* Content with modern design */}
-      <LegalContentCard sections={sections} defaultOpen="info-collected" />
+      {/* Table of Contents */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="mb-8"
+      >
+        <LegalContentCard 
+          title="Daftar Isi" 
+          className="shadow-sm bg-white/80 backdrop-blur border border-slate-200"
+        >
+          <ul className="space-y-2">
+            {sections.map((section) => (
+              <li key={section.id}>
+                <a
+                  href={`#${section.id}`}
+                  className="flex items-center text-slate-600 hover:text-[#0687C9] py-1 px-2 rounded-md hover:bg-[#0687C9]/5 transition-colors"
+                >
+                  <span className="mr-2 opacity-70">{section.icon}</span>
+                  {section.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </LegalContentCard>
+      </motion.div>
+
+      {/* Sections */}
+      <div className="space-y-8">
+        {sections.map((section, index) => (
+          <motion.div
+            key={section.id}
+            id={section.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
+          >
+            <LegalContentCard 
+              title={
+                <div className="flex items-center">
+                  <span className="mr-2 opacity-80">{section.icon}</span>
+                  {section.title}
+                </div>
+              }
+              className="shadow-sm hover:shadow-md transition-shadow bg-white border border-slate-200"
+            >
+              {section.content}
+            </LegalContentCard>
+          </motion.div>
+        ))}
+      </div>
 
       {/* Footer */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.8 }}
-        className="mt-8 text-center text-sm text-slate-500"
-      >
-        <p>
-          Jika Anda memiliki pertanyaan, silakan hubungi{" "}
-          <a
-            href="mailto:delpresence@del.ac.id"
-            style={{ color: colors.primary }}
-            className="hover:underline"
-          >
-            delpresence@del.ac.id
-          </a>
-        </p>
-        <p className="mt-2">
-          {siteConfig.copyright}. Semua hak dilindungi.
-        </p>
-      </motion.div>
+      <div className="mt-12 pt-8 border-t border-slate-200 text-center text-slate-500 text-sm">
+        <p>© 2024 {siteConfig.shortName}. Semua hak dilindungi.</p>
+      </div>
     </div>
+  );
+}
+
+// Export the page with Suspense boundary
+export default function PrivacyPolicyPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <PrivacyPolicyContent />
+    </Suspense>
   );
 } 

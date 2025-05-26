@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { 
   Card, 
   CardContent, 
@@ -134,7 +134,6 @@ interface StudentGroup {
     id: number;
     name: string;
   };
-  semester: number;
   student_count: number;
 }
 
@@ -255,7 +254,17 @@ const getAcademicYearDisplay = (
   return "Tahun akademik akan ditentukan berdasarkan mata kuliah";
 };
 
-export default function ScheduleManagePage() {
+// Loading component
+function PageLoader() {
+  return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <Loader2 className="h-10 w-10 animate-spin text-[#0687C9]" />
+    </div>
+  );
+}
+
+// Main content component
+function SchedulesContent() {
   // State for schedules data
   const [schedules, setSchedules] = useState<CourseSchedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2356,5 +2365,14 @@ export default function ScheduleManagePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Export the page component with Suspense boundary
+export default function ScheduleManagePage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <SchedulesContent />
+    </Suspense>
   );
 } 

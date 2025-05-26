@@ -35,7 +35,7 @@ import {
   LucideProps,
   DoorClosed
 } from "lucide-react";
-import { getUserRole, UserRole } from "@/app/dashboard/page";
+import { getUserRole, UserRole } from "@/utils/auth";
 import { useEffect, useState } from "react";
 import LoadingLink from "@/components/ui/LoadingLink";
 

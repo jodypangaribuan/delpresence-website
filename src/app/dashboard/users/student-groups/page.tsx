@@ -61,9 +61,6 @@ const formSchema = z.object({
   }),
   department_id: z.coerce.number().min(1, {
     message: "Program studi harus dipilih.",
-  }),
-  semester: z.coerce.number().min(1, {
-    message: "Semester harus dipilih.",
   })
 });
 
@@ -75,7 +72,6 @@ interface StudentGroup {
     id: number;
     name: string;
   };
-  semester: number;
   student_count: number;
   created_at: string;
   updated_at: string;
@@ -124,7 +120,6 @@ export default function StudentGroupsPage() {
   const [selectedGroup, setSelectedGroup] = useState<StudentGroup | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
-  const [semesterFilter, setSemesterFilter] = useState("");
   const [studentSearchTerm, setStudentSearchTerm] = useState("");
   const [studentDeptFilter, setStudentDeptFilter] = useState("all");
   const [studentYearFilter, setStudentYearFilter] = useState("all");
@@ -144,7 +139,6 @@ export default function StudentGroupsPage() {
     defaultValues: {
       name: "",
       department_id: 0,
-      semester: 0,
     },
   });
 
@@ -249,17 +243,18 @@ export default function StudentGroupsPage() {
       });
       
       if (response.data.status === "success") {
+        // Add selected property to each student
         const studentsWithSelected = response.data.data.map((student: Student) => ({
           ...student,
           selected: false
         }));
         setAvailableStudents(studentsWithSelected);
       } else {
-        toast.error("Gagal memuat data mahasiswa yang tersedia");
+        toast.error("Gagal memuat data mahasiswa tersedia");
       }
     } catch (error) {
       console.error("Error fetching available students:", error);
-      toast.error("Terjadi kesalahan saat memuat data mahasiswa yang tersedia");
+      toast.error("Terjadi kesalahan saat memuat data mahasiswa tersedia");
     }
   };
 
@@ -289,19 +284,16 @@ export default function StudentGroupsPage() {
     }
   };
 
-  // Filter untuk mencari grup
-  const filteredGroups = studentGroups.filter((group) => {
+  // Filter untuk student groups
+  const filteredGroups = studentGroups.filter(group => {
     const matchesSearch = searchTerm 
       ? group.name.toLowerCase().includes(searchTerm.toLowerCase())
       : true;
     const matchesDept = deptFilter && deptFilter !== "all" 
       ? group.department.id === parseInt(deptFilter) 
       : true;
-    const matchesSemester = semesterFilter && semesterFilter !== "all" 
-      ? group.semester === parseInt(semesterFilter) 
-      : true;
     
-    return matchesSearch && matchesDept && matchesSemester;
+    return matchesSearch && matchesDept;
   });
 
   // Calculate pagination
@@ -433,7 +425,6 @@ export default function StudentGroupsPage() {
     setSelectedGroup(group);
     form.setValue("name", group.name);
     form.setValue("department_id", group.department.id);
-    form.setValue("semester", group.semester);
     setIsEditDialogOpen(true);
   };
 
@@ -820,20 +811,6 @@ export default function StudentGroupsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                
-                <Select value={semesterFilter || "all"} onValueChange={setSemesterFilter}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Semester" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Semester</SelectItem>
-                    {Array.from({ length: 8 }, (_, i) => (
-                      <SelectItem key={i + 1} value={(i + 1).toString()}>
-                        Semester {i + 1}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
@@ -850,7 +827,6 @@ export default function StudentGroupsPage() {
                       <TableHead className="w-[50px] font-bold text-black">No</TableHead>
                       <TableHead className="font-bold text-black">Nama Kelompok</TableHead>
                       <TableHead className="font-bold text-black">Program Studi</TableHead>
-                      <TableHead className="font-bold text-black">Semester</TableHead>
                       <TableHead className="font-bold text-black">Jumlah Mahasiswa</TableHead>
                       <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                     </TableRow>
@@ -860,7 +836,7 @@ export default function StudentGroupsPage() {
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-10">
                           <div className="mt-2 text-sm text-gray-500">
-                            {searchTerm || deptFilter !== "all" || semesterFilter !== "all"
+                            {searchTerm || deptFilter !== "all"
                               ? "Tidak ada data kelompok yang sesuai dengan filter"
                               : "Belum ada data kelompok mahasiswa"}
                           </div>
@@ -875,7 +851,6 @@ export default function StudentGroupsPage() {
                             <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
                             <TableCell className="font-medium">{group.name}</TableCell>
                             <TableCell>{department?.name || group.department?.name}</TableCell>
-                            <TableCell>Semester {group.semester}</TableCell>
                             <TableCell>{group.student_count} Mahasiswa</TableCell>
                             <TableCell className="text-right">
                               <DropdownMenu>
@@ -982,95 +957,54 @@ export default function StudentGroupsPage() {
             </DialogHeader>
             
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmitAdd)} className="space-y-4 py-2">
+              <form onSubmit={form.handleSubmit(onSubmitAdd)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="name"
                   render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Nama Kelompok</FormLabel>
-                      <div className="col-span-3">
-                        <FormControl>
-                          <Input placeholder="e.g., Kelas A, Kelompok Belajar 1, dll." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </div>
+                    <FormItem>
+                      <FormLabel>Nama Kelompok</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Nama kelompok mahasiswa" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
-                
                 <FormField
                   control={form.control}
                   name="department_id"
                   render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Program Studi</FormLabel>
-                      <div className="col-span-3">
-                        <Select 
-                          value={field.value.toString()} 
-                          onValueChange={(val) => field.onChange(parseInt(val))}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih program studi" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {departments.map((dept) => (
-                              <SelectItem key={dept.id} value={dept.id.toString()}>
-                                {dept.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </div>
+                    <FormItem>
+                      <FormLabel>Program Studi</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={field.value > 0 ? field.value.toString() : ""}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pilih program studi" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id.toString()}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
-                
-                <FormField
-                  control={form.control}
-                  name="semester"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Semester</FormLabel>
-                      <div className="col-span-3">
-                        <Select 
-                          value={field.value.toString()} 
-                          onValueChange={(val) => field.onChange(parseInt(val))}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih semester" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {Array.from({ length: 8 }, (_, i) => (
-                              <SelectItem key={i + 1} value={(i + 1).toString()}>
-                                Semester {i + 1}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                
-                <DialogFooter>
+                <div className="flex justify-end space-x-2">
                   <Button type="button" variant="outline" onClick={() => {
                     setIsAddDialogOpen(false);
                     form.reset();
-                  }}>
-                    Batal
-                  </Button>
+                  }}>Batal</Button>
                   <Button type="submit" className="bg-[#0687C9] hover:bg-[#0670a8]" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Simpan
                   </Button>
-                </DialogFooter>
+                </div>
               </form>
             </Form>
           </DialogContent>
@@ -1127,36 +1061,6 @@ export default function StudentGroupsPage() {
                             {departments.map((dept) => (
                               <SelectItem key={dept.id} value={dept.id.toString()}>
                                 {dept.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-               
-                <FormField
-                  control={form.control}
-                  name="semester"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Semester</FormLabel>
-                      <div className="col-span-3">
-                        <Select 
-                          value={field.value.toString()} 
-                          onValueChange={(val) => field.onChange(parseInt(val))}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih semester" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {Array.from({ length: 8 }, (_, i) => (
-                              <SelectItem key={i + 1} value={(i + 1).toString()}>
-                                Semester {i + 1}
                               </SelectItem>
                             ))}
                           </SelectContent>

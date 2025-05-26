@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 
@@ -9,17 +9,20 @@ type LoadingContextType = {
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-const LoadingContext = createContext<LoadingContextType | undefined>(undefined);
+const LoadingContext = createContext<LoadingContextType>({
+  isLoading: false,
+  setIsLoading: () => {},
+});
 
-export function useLoading() {
-  const context = useContext(LoadingContext);
-  if (context === undefined) {
-    throw new Error("useLoading must be used within a LoadingProvider");
-  }
-  return context;
+export const useLoading = () => useContext(LoadingContext);
+
+// Loading component
+function LoaderComponent() {
+  return <div className="h-1 w-full bg-gray-100"></div>;
 }
 
-export function LoadingProvider({ children }: { children: React.ReactNode }) {
+// Main content provider component
+function LoadingProviderContent({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -92,7 +95,20 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LoadingContext.Provider value={{ isLoading, setIsLoading }}>
+      {isLoading && (
+        <div className="fixed top-0 left-0 right-0 z-50">
+          <div className="h-1 bg-[#0687C9] animate-pulse"></div>
+        </div>
+      )}
       {children}
     </LoadingContext.Provider>
+  );
+}
+
+export function LoadingProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<LoaderComponent />}>
+      <LoadingProviderContent>{children}</LoadingProviderContent>
+    </Suspense>
   );
 } 

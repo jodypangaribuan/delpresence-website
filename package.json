@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "build-no-prerender": "NEXT_DISABLE_PRERENDERING=1 next build",
     "start": "next start",
     "lint": "next lint",
     "cy:open": "cypress open",
@@ -40,6 +41,7 @@
     "bcrypt": "^5.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^11.18.2",
     "jsonwebtoken": "^9.0.2",
