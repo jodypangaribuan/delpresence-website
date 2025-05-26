@@ -1,0 +1,182 @@
+.html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Login Flow - BPMN Diagram</title>
+
+    <!-- BPMN.io Dependencies -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/bpmn-js@9.0.3/dist/assets/diagram-js.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/bpmn-js@9.0.3/dist/assets/bpmn-font/css/bpmn.css"
+    />
+
+    <style>
+      body {
+        font-family: "Arial", sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: #f8fafc;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+        color: #0687c9;
+      }
+
+      #canvas {
+        background: white;
+        border: 2px solid #0687c9;
+        border-radius: 8px;
+        height: 600px;
+        margin-bottom: 20px;
+      }
+
+      .description {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .description h2 {
+        color: #0687c9;
+        margin-top: 0;
+      }
+
+      .description ul {
+        list-style-type: none;
+        padding: 0;
+      }
+
+      .description li {
+        margin: 10px 0;
+        padding-left: 20px;
+        position: relative;
+      }
+
+      .description li:before {
+        content: "•";
+        color: #0687c9;
+        position: absolute;
+        left: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Admin Login Flow - BPMN Process Diagram</h1>
+      </div>
+
+      <div id="canvas"></div>
+
+      <div class="description">
+        <h2>Process Description</h2>
+        <ul>
+          <li>
+            Admin initiates login process by entering credentials
+            (username/password)
+          </li>
+          <li>System validates the credentials against the database</li>
+          <li>
+            If credentials are valid, system generates authentication token
+          </li>
+          <li>System checks admin role and permissions</li>
+          <li>
+            System redirects to admin dashboard upon successful authentication
+          </li>
+          <li>If credentials are invalid, system shows error message</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- BPMN.io Scripts -->
+    <script src="https://unpkg.com/bpmn-js@9.0.3/dist/bpmn-navigated-viewer.development.js"></script>
+    <script>
+      // BPMN XML content
+      const bpmnXML = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="AdminPool" name="Admin" processRef="AdminProcess" />
+    <bpmn:participant id="SystemPool" name="System" processRef="SystemProcess" />
+    <bpmn:messageFlow id="Flow_1" sourceRef="EnterCredentials" targetRef="ValidateCredentials" />
+    <bpmn:messageFlow id="Flow_2" sourceRef="ShowError" targetRef="ViewError" />
+    <bpmn:messageFlow id="Flow_3" sourceRef="RedirectDashboard" targetRef="AccessDashboard" />
+  </bpmn:collaboration>
+  
+  <bpmn:process id="AdminProcess" isExecutable="false">
+    <bpmn:startEvent id="StartEvent" name="Start Login">
+      <bpmn:outgoing>Flow_Start</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="EnterCredentials" name="Enter Login Credentials">
+      <bpmn:incoming>Flow_Start</bpmn:incoming>
+    </bpmn:task>
+    <bpmn:task id="ViewError" name="View Error Message">
+      <bpmn:outgoing>Flow_RetryLogin</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="AccessDashboard" name="Access Admin Dashboard" />
+    <bpmn:sequenceFlow id="Flow_Start" sourceRef="StartEvent" targetRef="EnterCredentials" />
+    <bpmn:sequenceFlow id="Flow_RetryLogin" sourceRef="ViewError" targetRef="EnterCredentials" />
+  </bpmn:process>
+
+  <bpmn:process id="SystemProcess" isExecutable="false">
+    <bpmn:task id="ValidateCredentials" name="Validate Credentials">
+      <bpmn:outgoing>Flow_ToGateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="ValidationGateway" name="Credentials Valid?">
+      <bpmn:incoming>Flow_ToGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Valid</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Invalid</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="GenerateToken" name="Generate Auth Token">
+      <bpmn:incoming>Flow_Valid</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCheck</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="CheckRole" name="Check Admin Role">
+      <bpmn:incoming>Flow_ToCheck</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRedirect</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="ShowError" name="Show Error Message">
+      <bpmn:incoming>Flow_Invalid</bpmn:incoming>
+    </bpmn:task>
+    <bpmn:task id="RedirectDashboard" name="Redirect to Dashboard">
+      <bpmn:incoming>Flow_ToRedirect</bpmn:incoming>
+    </bpmn:task>
+    <bpmn:sequenceFlow id="Flow_ToGateway" sourceRef="ValidateCredentials" targetRef="ValidationGateway" />
+    <bpmn:sequenceFlow id="Flow_Valid" name="Yes" sourceRef="ValidationGateway" targetRef="GenerateToken" />
+    <bpmn:sequenceFlow id="Flow_Invalid" name="No" sourceRef="ValidationGateway" targetRef="ShowError" />
+    <bpmn:sequenceFlow id="Flow_ToCheck" sourceRef="GenerateToken" targetRef="CheckRole" />
+    <bpmn:sequenceFlow id="Flow_ToRedirect" sourceRef="CheckRole" targetRef="RedirectDashboard" />
+  </bpmn:process>
+</bpmn:definitions>`;
+
+      // Initialize BPMN Viewer
+      const viewer = new BpmnJS({
+        container: "#canvas",
+      });
+
+      // Load BPMN diagram
+      viewer
+        .importXML(bpmnXML)
+        .then(() => {
+          const canvas = viewer.get("canvas");
+          canvas.zoom("fit-viewport");
+        })
+        .catch((err) => {
+          console.error("Error loading BPMN diagram:", err);
+        });
+    </script>
+  </body>
+</html>

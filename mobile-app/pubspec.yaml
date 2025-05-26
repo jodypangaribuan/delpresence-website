@@ -1,0 +1,73 @@
+name: delpresence
+description: "A new Flutter project."
+
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  iconsax: ^0.0.8
+  provider: ^6.1.2
+  shared_preferences: ^2.5.2
+  flutter_secure_storage: ^9.2.4
+  permission_handler: ^12.0.0+1
+  sqflite: ^2.4.1
+  path: ^1.9.0
+  flutter_bloc: ^9.1.0
+  bloc: ^9.0.0
+  equatable: ^2.0.7
+  http: ^1.3.0
+  flutter_svg: ^2.0.17
+  intl: ^0.19.0
+  dartz: ^0.10.1
+  internet_connection_checker: ^3.0.1
+  floating_bottom_navigation_bar: ^1.5.2
+  stylish_bottom_bar: ^1.1.1
+  animated_bottom_navigation_bar: ^1.4.0
+  delightful_toast: ^1.1.0
+  toastification: ^3.0.2
+  camera: ^0.11.1
+  google_mlkit_face_detection: ^0.13.1
+  flutter_face_api: ^6.4.875
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.10
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/background/
+    - assets/images/background/background-header.png
+    - assets/icons/
+
+  fonts:
+    - family: Mulish
+      fonts:
+        - asset: assets/fonts/Mulish-Light.ttf
+        - asset: assets/fonts/Mulish-SemiBold.ttf
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Poppins-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
