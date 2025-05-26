@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   api:
@@ -21,7 +21,7 @@ services:
       - CORS_ALLOWED_ORIGINS=http://localhost:3000
     networks:
       - delpresence-network
-    command: ["/wait-for-it.sh", "db", "5432", "./delpresence-server"]
+    command: ./delpresence-server
 
   db:
     image: postgres:15-alpine
@@ -47,4 +47,4 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data: 
+  postgres_data:

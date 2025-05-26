@@ -31,10 +31,6 @@ COPY --from=builder /app/delpresence-server .
 # Copy environment file
 COPY .env .
 
-# Copy wait-for-it script
-COPY wait-for-it.sh /wait-for-it.sh
-RUN chmod +x /wait-for-it.sh
-
 # Expose port
 EXPOSE 8080
 
