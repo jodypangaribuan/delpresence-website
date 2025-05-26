@@ -69,6 +69,7 @@ func main() {
 	studentGroupHandler := handlers.NewStudentGroupHandler()
 	lecturerAssignmentHandler := handlers.NewLecturerAssignmentHandler()
 	courseScheduleHandler := handlers.NewCourseScheduleHandler()
+	attendanceHandler := handlers.NewAttendanceHandler()
 
 	// Protected routes
 	authRequired := router.Group("/api")
@@ -192,6 +193,18 @@ func main() {
 			
 			// Get academic years (needed for filtering courses and schedules)
 			lecturerRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
+			
+			// Attendance management routes for lecturers
+			lecturerRoutes.POST("/attendance/sessions", attendanceHandler.CreateAttendanceSession)
+			lecturerRoutes.GET("/attendance/sessions/active", attendanceHandler.GetActiveAttendanceSessions)
+			lecturerRoutes.GET("/attendance/sessions", attendanceHandler.GetAttendanceSessions)
+			lecturerRoutes.GET("/attendance/sessions/:id", attendanceHandler.GetAttendanceSessionDetails)
+			lecturerRoutes.PUT("/attendance/sessions/:id/close", attendanceHandler.CloseAttendanceSession)
+			lecturerRoutes.PUT("/attendance/sessions/:id/cancel", attendanceHandler.CancelAttendanceSession)
+			lecturerRoutes.GET("/attendance/sessions/:id/students", attendanceHandler.GetStudentAttendances)
+			lecturerRoutes.PUT("/attendance/sessions/:id/students/:studentId", attendanceHandler.MarkStudentAttendance)
+			lecturerRoutes.GET("/attendance/statistics/course/:courseScheduleId", attendanceHandler.GetAttendanceStatistics)
+			lecturerRoutes.GET("/attendance/qrcode/:id", attendanceHandler.GetQRCode)
 		}
 
 		// Employee routes (replacing assistant routes)

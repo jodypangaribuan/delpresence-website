@@ -282,7 +282,6 @@ export default function LecturerSchedulePage() {
                         <TableHead className="font-bold text-black">Jam</TableHead>
                         <TableHead className="font-bold text-black">Ruangan</TableHead>
                         <TableHead className="font-bold text-black">Kelas</TableHead>
-                        <TableHead className="font-bold text-black">Status</TableHead>
                         <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -296,28 +295,6 @@ export default function LecturerSchedulePage() {
                           <TableCell>{formatTimeRange(schedule.start_time, schedule.end_time)}</TableCell>
                           <TableCell>{schedule.room_name} ({schedule.building_name})</TableCell>
                           <TableCell>{schedule.student_group_name}</TableCell>
-                          <TableCell>
-                            {schedule.status === "upcoming" && (
-                              <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
-                                Akan Datang
-                              </Badge>
-                            )}
-                            {schedule.status === "today" && (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                Hari Ini
-                              </Badge>
-                            )}
-                            {schedule.status === "active" && (
-                              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                                Sedang Berlangsung
-                              </Badge>
-                            )}
-                            {schedule.status === "completed" && (
-                              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                                Selesai
-                              </Badge>
-                            )}
-                          </TableCell>
                           <TableCell className="text-right">
                             <Button 
                               variant="outline" 
@@ -333,7 +310,7 @@ export default function LecturerSchedulePage() {
                       ))}
                       {filteredSchedules.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={9} className="h-32 text-center">
+                          <TableCell colSpan={8} className="h-32 text-center">
                             <div className="flex flex-col items-center justify-center text-muted-foreground">
                               <Calendar className="h-10 w-10 text-gray-300 mb-2" />
                               <p>Tidak ada jadwal yang tersedia</p>

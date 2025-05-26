@@ -33,6 +33,8 @@ import { Slider } from "@/components/ui/slider";
 import { api } from "@/utils/api";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import * as attendanceApi from "@/utils/attendance-api";
+import { AttendanceSession, AttendanceSettings } from "@/utils/attendance-api";
 
 interface Schedule {
   id: number;
@@ -46,44 +48,13 @@ interface Schedule {
   totalStudents: number;
 }
 
-interface AttendanceSettings {
-  type: "QR Code" | "Face Recognition" | "Manual";
-  autoClose: boolean;
-  duration: number; // in minutes
-  allowLate: boolean;
-  lateThreshold: number; // in minutes
-  notes: string;
-}
-
-interface ActiveSession {
-  id: number;
-  courseCode: string;
-  courseName: string;
-  startTime: string;
-  endTime: string;
-  room: string;
-  attendanceType: string;
-  startedAt: string;
-  status: string;
-  attendedCount: number;
-  totalStudents: number;
-  settings: AttendanceSettings;
+// Modified to match the API format
+interface ActiveSession extends AttendanceSession {
   remainingTime?: number; // in seconds
 }
 
-interface PastSession {
-  id: number;
-  courseCode: string;
-  courseName: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  room: string;
-  attendanceType: string;
-  attendedCount: number;
-  totalStudents: number;
-  settings?: AttendanceSettings;
-  duration?: number; // in minutes
+interface PastSession extends AttendanceSession {
+  // No additional fields needed
 }
 
 export default function AttendancePage() {
@@ -103,103 +74,98 @@ export default function AttendancePage() {
     notes: ""
   });
 
-  // Mock data for development
+  // Load data from API
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setSchedules([
-        {
-          id: 1,
-          courseCode: "IF210",
-          courseName: "Algoritma & Pemrograman",
-          day: "Senin",
-          startTime: "08:00",
-          endTime: "10:30",
-          room: "Ruang Lab 3",
-          date: "2023-10-16",
-          totalStudents: 42
-        },
-        {
-          id: 2,
-          courseCode: "IF310",
-          courseName: "Basis Data",
-          day: "Selasa",
-          startTime: "13:00",
-          endTime: "15:30",
-          room: "Ruang Lab 1",
-          date: "2023-10-17",
-          totalStudents: 38
-        },
-        {
-          id: 3,
-          courseCode: "IF402",
-          courseName: "Pemrograman Mobile",
-          day: "Rabu",
-          startTime: "10:00",
-          endTime: "12:30",
-          room: "Ruang Lab 2",
-          date: "2023-10-18",
-          totalStudents: 25
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch lecturer schedules
+        const response = await api<{status: string, data: any[]}>('lecturer/schedules');
+        
+        if (response.status === 'success' && response.data) {
+          const mappedSchedules = response.data.map((schedule: any) => ({
+            id: schedule.id,
+            courseCode: schedule.course_code,
+            courseName: schedule.course_name,
+            day: schedule.day,
+            startTime: schedule.start_time,
+            endTime: schedule.end_time,
+            room: `${schedule.room_name} (${schedule.building_name})`,
+            date: new Date().toISOString().split('T')[0], // Today's date as default
+            totalStudents: schedule.enrolled || 0
+          }));
+          setSchedules(mappedSchedules);
+        } else {
+          // Fallback to old method
+          const schedulesResponse = await api<any>('/lecturer/schedules');
+          const schedulesData = Array.isArray(schedulesResponse) ? schedulesResponse : 
+                          schedulesResponse?.data || schedulesResponse?.schedules || [];
+          
+          // Filter out null or undefined items before mapping
+          const validSchedules = schedulesData.filter((schedule: any) => schedule && schedule.id);
+          
+          const mappedSchedules = validSchedules.map((schedule: any) => ({
+            id: schedule.id || 0,
+            courseCode: schedule.course?.code || "N/A",
+            courseName: schedule.course?.name || "Mata Kuliah Tidak Ditemukan",
+            day: schedule.day || "N/A",
+            startTime: schedule.start_time || "--:--",
+            endTime: schedule.end_time || "--:--",
+            room: schedule.room?.name || "N/A",
+            date: new Date().toISOString().split('T')[0], // Today's date as default
+            totalStudents: schedule.enrolled || 0
+          }));
+          setSchedules(mappedSchedules);
         }
-      ]);
 
-      setActiveSessions([
-        {
-          id: 101,
-          courseCode: "IF240",
-          courseName: "Struktur Data",
-          startTime: "09:00",
-          endTime: "11:30",
-          room: "Ruang Lab 4",
-          attendanceType: "QR Code",
-          startedAt: "09:05",
-          status: "active",
-          attendedCount: 23,
-          totalStudents: 30,
-          settings: {
-            type: "QR Code",
-            autoClose: true,
-            duration: 15,
-            allowLate: true,
-            lateThreshold: 10,
-            notes: ""
-          },
-          remainingTime: 300 // 5 minutes remaining
-        }
-      ]);
+        // Fetch active sessions
+        const activeSessionsResponse = await attendanceApi.getActiveAttendanceSessions();
+        // Add remainingTime to active sessions
+        const activeWithTime = activeSessionsResponse.map(session => {
+          const remainingTime = calculateRemainingTime(session);
+          return { ...session, remainingTime };
+        });
+        setActiveSessions(activeWithTime);
 
-      setPastSessions([
-        {
-          id: 201,
-          courseCode: "IF210",
-          courseName: "Algoritma & Pemrograman",
-          date: "2023-10-09",
-          startTime: "08:00",
-          endTime: "10:30",
-          room: "Ruang Lab 3",
-          attendanceType: "QR Code",
-          attendedCount: 28,
-          totalStudents: 30,
-          duration: 15
-        },
-        {
-          id: 202,
-          courseCode: "IF310",
-          courseName: "Basis Data",
-          date: "2023-10-10",
-          startTime: "13:00",
-          endTime: "15:30",
-          room: "Ruang Lab 1",
-          attendanceType: "Face Recognition",
-          attendedCount: 25,
-          totalStudents: 28,
-          duration: 20
-        }
-      ]);
+        // Fetch past sessions (last 30 days)
+        const today = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        
+        const pastSessionsResponse = await attendanceApi.getAttendanceSessions(
+          thirtyDaysAgo.toISOString().split('T')[0],
+          today.toISOString().split('T')[0]
+        );
+        
+        // Filter to only closed or canceled sessions
+        const closedSessions = pastSessionsResponse.filter(
+          session => session.status === 'closed' || session.status === 'canceled'
+        );
+        
+        setPastSessions(closedSessions);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast.error("Gagal memuat data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-      setIsLoading(false);
-    }, 1000);
+    fetchData();
   }, []);
+
+  // Calculate remaining time for a session in seconds
+  const calculateRemainingTime = (session: AttendanceSession): number => {
+    if (session.status !== 'active') return 0;
+    
+    const startTime = new Date(session.startTime).getTime();
+    const durationMs = session.duration * 60 * 1000;
+    const endTime = startTime + durationMs;
+    const now = Date.now();
+    
+    const remainingMs = endTime - now;
+    return remainingMs > 0 ? Math.floor(remainingMs / 1000) : 0;
+  };
 
   // Update remaining time for active sessions
   useEffect(() => {
@@ -210,7 +176,7 @@ export default function AttendancePage() {
             return { ...session, remainingTime: session.remainingTime - 1 };
           } else if (session.remainingTime === 0) {
             // Auto close session when time expires
-            if (session.settings.autoClose) {
+            if (session.autoClose) {
               endAttendanceSession(session.id);
               return session;
             }
@@ -242,59 +208,53 @@ export default function AttendancePage() {
     if (!selectedSchedule) return;
 
     try {
-      // In a real implementation, you would call the API to start a session
-      toast.success("Sesi presensi berhasil dimulai");
+      setIsLoading(true);
+      const today = new Date().toISOString().split('T')[0];
       
-      // Calculate remaining time in seconds
-      const remainingTimeInSeconds = attendanceSettings.duration * 60;
+      const newSession = await attendanceApi.createAttendanceSession(
+        selectedSchedule.id,
+        today,
+        attendanceSettings.type,
+        attendanceSettings
+      );
       
-      // Create new session
-      const newSession: ActiveSession = {
-        id: Date.now(),
-        courseCode: selectedSchedule.courseCode,
-        courseName: selectedSchedule.courseName,
-        startTime: selectedSchedule.startTime,
-        endTime: selectedSchedule.endTime,
-        room: selectedSchedule.room,
-        attendanceType: attendanceSettings.type,
-        startedAt: new Date().toLocaleTimeString(),
-        status: "active",
-        attendedCount: 0,
-        totalStudents: selectedSchedule.totalStudents,
-        settings: attendanceSettings,
-        remainingTime: remainingTimeInSeconds
+      // Add remaining time for frontend display
+      const sessionWithTime: ActiveSession = {
+        ...newSession,
+        remainingTime: attendanceSettings.duration * 60
       };
       
-      setActiveSessions([...activeSessions, newSession]);
+      setActiveSessions([...activeSessions, sessionWithTime]);
       setShowSettingsDialog(false);
       setActiveTab("active");
+      toast.success("Sesi presensi berhasil dimulai");
     } catch (error) {
       console.error("Error starting attendance session:", error);
       toast.error("Gagal memulai sesi presensi");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Function to end an active attendance session
   const endAttendanceSession = async (sessionId: number) => {
     try {
-      // In a real implementation, you would call the API to end a session
-      toast.success("Sesi presensi berhasil diakhiri");
+      setIsLoading(true);
+      await attendanceApi.closeAttendanceSession(sessionId);
+      
+      // Get updated session details
+      const updatedSession = await attendanceApi.getAttendanceSessionDetails(sessionId);
       
       // Move from active to past sessions
-      const session = activeSessions.find(s => s.id === sessionId);
-      if (session) {
-        const pastSession: PastSession = {
-          ...session,
-          date: new Date().toISOString().split('T')[0],
-          duration: session.settings.duration
-        };
-        
-        setPastSessions([pastSession, ...pastSessions]);
-        setActiveSessions(activeSessions.filter(s => s.id !== sessionId));
-      }
+      setPastSessions([updatedSession, ...pastSessions]);
+      setActiveSessions(activeSessions.filter(s => s.id !== sessionId));
+      
+      toast.success("Sesi presensi berhasil diakhiri");
     } catch (error) {
       console.error("Error ending attendance session:", error);
       toast.error("Gagal mengakhiri sesi presensi");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -474,7 +434,7 @@ export default function AttendancePage() {
                                           </div>
                                         </Badge>
                                         <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
-                                          {session.attendanceType}
+                                          {session.type}
                                         </Badge>
                                       </div>
                                       
@@ -485,11 +445,11 @@ export default function AttendancePage() {
                                         <div className="text-sm text-muted-foreground mt-1 space-y-1">
                                           <div className="flex items-center">
                                             <Clock className="h-4 w-4 mr-2" />
-                                            <span>{session.startTime} - {session.endTime}</span>
+                                            <span>{session.startTime} - {session.endTime || session.scheduleEndTime}</span>
                                           </div>
                                           <div className="flex items-center">
                                             <QrCode className="h-4 w-4 mr-2" />
-                                            <span>Tipe: {session.attendanceType}</span>
+                                            <span>Tipe: {session.type}</span>
                                           </div>
                                         </div>
                                       </div>
@@ -497,17 +457,17 @@ export default function AttendancePage() {
                                       <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
                                         <div className="w-full sm:w-48">
                                           <div className="text-sm mb-1">
-                                            Kehadiran: <span className="font-medium">{session.attendedCount}/{session.totalStudents}</span>
+                                            Kehadiran: <span className="font-medium">{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2.5">
                                             <div 
                                               className="bg-[#0687C9] h-2.5 rounded-full" 
-                                              style={{ width: `${(session.attendedCount / session.totalStudents) * 100}%` }}
+                                              style={{ width: `${((session.attendedCount + session.lateCount) / session.totalStudents) * 100}%` }}
                                             ></div>
                                           </div>
                                         </div>
                                         
-                                        {session.remainingTime !== undefined && (
+                                        {session.remainingTime !== undefined && session.remainingTime > 0 && (
                                           <div className="flex items-center gap-2 bg-[#E6F3FB] px-3 py-2 rounded-md">
                                             <TimerIcon className="h-4 w-4 text-[#0687C9]" />
                                             <div>
@@ -522,7 +482,11 @@ export default function AttendancePage() {
                                     </div>
                                     
                                     <div className="flex flex-row sm:flex-col gap-2 sm:w-44">
-                                      <Button variant="default" className="flex-1 bg-[#0687C9] hover:bg-[#0572aa]">
+                                      <Button 
+                                        variant="default" 
+                                        className="flex-1 bg-[#0687C9] hover:bg-[#0572aa]"
+                                        onClick={() => window.open(attendanceApi.getQRCodeUrl(session.id), '_blank')}
+                                      >
                                         <QrCode className="h-4 w-4 mr-2" />
                                         Lihat QR
                                       </Button>
@@ -568,8 +532,10 @@ export default function AttendancePage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">Semua Mata Kuliah</SelectItem>
-                            <SelectItem value="if210">IF210 - Algoritma</SelectItem>
-                            <SelectItem value="if310">IF310 - Basis Data</SelectItem>
+                            {/* Generate course filter dynamically */}
+                            {Array.from(new Set(pastSessions.map(s => s.courseCode))).map(code => (
+                              <SelectItem key={code} value={code.toLowerCase()}>{code}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -603,27 +569,31 @@ export default function AttendancePage() {
                                 <TableCell>{session.courseName}</TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className={
-                                    session.attendanceType === "QR Code" 
+                                    session.type === "QR Code" 
                                       ? "bg-blue-50 text-[#0687C9] border-[#0687C9]/20" 
                                       : "bg-purple-50 text-purple-700 border-purple-200"
                                   }>
-                                    {session.attendanceType}
+                                    {session.type}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>{session.duration} menit</TableCell>
                                 <TableCell>
                                   <div className="flex items-center">
-                                    <span>{session.attendedCount}/{session.totalStudents}</span>
+                                    <span>{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
                                     <div className="w-20 bg-gray-200 rounded-full h-2 ml-2">
                                       <div 
                                         className="bg-[#0687C9] h-2 rounded-full" 
-                                        style={{ width: `${(session.attendedCount / session.totalStudents) * 100}%` }}
+                                        style={{ width: `${((session.attendedCount + session.lateCount) / session.totalStudents) * 100}%` }}
                                       ></div>
                                     </div>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Button variant="ghost" size="sm">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => window.location.href = `/dashboard/lecturer/attendance/detail/${session.id}`}
+                                  >
                                     <FileText className="h-4 w-4 mr-2" />
                                     Detail
                                   </Button>
@@ -657,16 +627,17 @@ export default function AttendancePage() {
               <DialogHeader>
                 <DialogTitle className="text-xl font-semibold text-black">Pengaturan Sesi Presensi</DialogTitle>
                 <DialogDescription>
-                  {selectedSchedule && (
-                    <div className="mt-2">
-                      <p className="font-medium">{selectedSchedule.courseCode}: {selectedSchedule.courseName}</p>
-                      <div className="flex items-center text-sm text-muted-foreground mt-1">
-                        <Calendar className="h-4 w-4 mr-1" />
-                        <span>{selectedSchedule.day}, {selectedSchedule.startTime} - {selectedSchedule.endTime}</span>
-                      </div>
-                    </div>
-                  )}
+                  Atur parameter untuk sesi presensi yang akan dimulai
                 </DialogDescription>
+                {selectedSchedule && (
+                  <div className="mt-3 text-left">
+                    <div className="font-medium">{selectedSchedule.courseCode}: {selectedSchedule.courseName}</div>
+                    <div className="flex items-center text-sm text-muted-foreground mt-1">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      <span>{selectedSchedule.day}, {selectedSchedule.startTime} - {selectedSchedule.endTime}</span>
+                    </div>
+                  </div>
+                )}
               </DialogHeader>
               
               <div className="grid gap-5 py-4">
@@ -692,10 +663,10 @@ export default function AttendancePage() {
                           Pengenalan Wajah
                         </div>
                       </SelectItem>
-                      <SelectItem value="Manual">
+                      <SelectItem value="Keduanya">
                         <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-2" />
-                          Manual
+                          <Sliders className="h-4 w-4 mr-2" />
+                          QR Code & Pengenalan Wajah
                         </div>
                       </SelectItem>
                     </SelectContent>

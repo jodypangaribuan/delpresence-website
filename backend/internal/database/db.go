@@ -197,6 +197,13 @@ func Initialize() {
 	}
 	log.Println("CourseSchedule table migrated successfully")
 	
+	// Then migrate the attendance models
+	err = DB.AutoMigrate(&models.AttendanceSession{}, &models.StudentAttendance{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating Attendance models: %v\n", err)
+	}
+	log.Println("Attendance tables migrated successfully")
+	
 	log.Println("Database schema migrated successfully")
 }
 

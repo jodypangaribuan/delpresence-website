@@ -1,0 +1,436 @@
+package services
+
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/delpresence/backend/internal/models"
+	"github.com/delpresence/backend/internal/repositories"
+	"github.com/delpresence/backend/internal/database"
+	"gorm.io/gorm"
+)
+
+// AttendanceService handles attendance-related business logic
+type AttendanceService struct {
+	attendanceRepo *repositories.AttendanceRepository
+	scheduleRepo   *repositories.CourseScheduleRepository
+	studentRepo    *repositories.StudentRepository
+	db             *gorm.DB
+}
+
+// NewAttendanceService creates a new attendance service
+func NewAttendanceService() *AttendanceService {
+	return &AttendanceService{
+		attendanceRepo: repositories.NewAttendanceRepository(),
+		scheduleRepo:   repositories.NewCourseScheduleRepository(),
+		studentRepo:    repositories.NewStudentRepository(),
+		db:             database.GetDB(),
+	}
+}
+
+// CreateAttendanceSession creates a new attendance session for a course schedule
+func (s *AttendanceService) CreateAttendanceSession(lecturerID uint, courseScheduleID uint, date time.Time, attendanceType models.AttendanceType, settings map[string]interface{}) (*models.AttendanceSession, error) {
+	// Check if there's already an active session for this schedule and date
+	existingSession, err := s.attendanceRepo.GetActiveSessionForSchedule(courseScheduleID, date)
+	if err == nil && existingSession.ID != 0 {
+		return nil, errors.New("there is already an active attendance session for this schedule")
+	}
+
+	// Get the course schedule to validate
+	schedule, err := s.scheduleRepo.GetByID(courseScheduleID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify that the lecturer is assigned to this schedule
+	if schedule.UserID != uint(lecturerID) {
+		return nil, errors.New("lecturer is not assigned to this schedule")
+	}
+
+	// Create a new attendance session
+	session := &models.AttendanceSession{
+		CourseScheduleID: courseScheduleID,
+		LecturerID:       lecturerID,
+		Date:             date,
+		StartTime:        time.Now(),
+		Type:             attendanceType,
+		Status:           models.AttendanceStatusActive,
+		AutoClose:        true,
+		Duration:         15, // Default 15 minutes
+		AllowLate:        true,
+		LateThreshold:    10, // Default 10 minutes
+	}
+
+	// Apply custom settings if provided
+	if settings != nil {
+		if val, ok := settings["autoClose"].(bool); ok {
+			session.AutoClose = val
+		}
+		if val, ok := settings["duration"].(int); ok && val > 0 {
+			session.Duration = val
+		}
+		if val, ok := settings["allowLate"].(bool); ok {
+			session.AllowLate = val
+		}
+		if val, ok := settings["lateThreshold"].(int); ok && val > 0 {
+			session.LateThreshold = val
+		}
+		if val, ok := settings["notes"].(string); ok {
+			session.Notes = val
+		}
+	}
+
+	// For QR code type, generate a unique code
+	if attendanceType == models.AttendanceTypeQRCode || attendanceType == models.AttendanceTypeBoth {
+		qrData, err := generateQRCodeData()
+		if err != nil {
+			return nil, err
+		}
+		session.QRCodeData = qrData
+	}
+
+	// Save the session
+	if err := s.attendanceRepo.CreateAttendanceSession(session); err != nil {
+		return nil, err
+	}
+
+	// Initialize absent records for all students in the course
+	if err := s.initializeStudentAttendances(session.ID, courseScheduleID); err != nil {
+		// Log the error but continue
+		fmt.Printf("Error initializing student attendances: %v\n", err)
+	}
+
+	return session, nil
+}
+
+// CloseAttendanceSession closes an active attendance session
+func (s *AttendanceService) CloseAttendanceSession(sessionID uint, lecturerID uint) error {
+	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
+	if err != nil {
+		return err
+	}
+
+	// Verify that the lecturer owns this session
+	if session.LecturerID != lecturerID {
+		return errors.New("lecturer does not own this attendance session")
+	}
+
+	// Verify that the session is active
+	if session.Status != models.AttendanceStatusActive {
+		return errors.New("attendance session is not active")
+	}
+
+	// Update session status and end time
+	now := time.Now()
+	session.Status = models.AttendanceStatusClosed
+	session.EndTime = &now
+
+	return s.attendanceRepo.UpdateAttendanceSession(session)
+}
+
+// CancelAttendanceSession cancels an active attendance session
+func (s *AttendanceService) CancelAttendanceSession(sessionID uint, lecturerID uint) error {
+	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
+	if err != nil {
+		return err
+	}
+
+	// Verify that the lecturer owns this session
+	if session.LecturerID != lecturerID {
+		return errors.New("lecturer does not own this attendance session")
+	}
+
+	// Verify that the session is active
+	if session.Status != models.AttendanceStatusActive {
+		return errors.New("attendance session is not active")
+	}
+
+	// Update session status
+	session.Status = models.AttendanceStatusCanceled
+
+	return s.attendanceRepo.UpdateAttendanceSession(session)
+}
+
+// MarkStudentAttendance marks a student's attendance for a session
+func (s *AttendanceService) MarkStudentAttendance(sessionID uint, studentID uint, status models.StudentAttendanceStatus, verificationMethod string, notes string, verifiedByID *uint) error {
+	// Check if the session exists and is active
+	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
+	if err != nil {
+		return err
+	}
+
+	if session.Status != models.AttendanceStatusActive {
+		return errors.New("attendance session is not active")
+	}
+
+	// Check if the student already has an attendance record
+	attendance, err := s.attendanceRepo.GetStudentAttendance(sessionID, studentID)
+	isNewRecord := err != nil
+
+	// Determine if the student is late based on session settings
+	if status == models.StudentAttendanceStatusPresent && session.AllowLate {
+		elapsed := time.Since(session.StartTime)
+		if int(elapsed.Minutes()) > session.LateThreshold {
+			// Student is late, change status to late
+			status = models.StudentAttendanceStatusLate
+		}
+	}
+
+	now := time.Now()
+
+	if isNewRecord {
+		// Create a new attendance record
+		attendance = &models.StudentAttendance{
+			AttendanceSessionID: sessionID,
+			StudentID:           studentID,
+			Status:              status,
+			CheckInTime:         &now,
+			Notes:               notes,
+			VerificationMethod:  verificationMethod,
+			VerifiedByID:        verifiedByID,
+		}
+		return s.attendanceRepo.CreateStudentAttendance(attendance)
+	} else {
+		// Update existing record
+		attendance.Status = status
+		attendance.CheckInTime = &now
+		attendance.Notes = notes
+		attendance.VerificationMethod = verificationMethod
+		attendance.VerifiedByID = verifiedByID
+		return s.attendanceRepo.UpdateStudentAttendance(attendance)
+	}
+}
+
+// GetActiveSessionsForLecturer gets all active attendance sessions for a lecturer
+func (s *AttendanceService) GetActiveSessionsForLecturer(lecturerID uint) ([]models.AttendanceSessionResponse, error) {
+	sessions, err := s.attendanceRepo.ListActiveSessions(lecturerID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Transform to response objects
+	var responses []models.AttendanceSessionResponse
+	for _, session := range sessions {
+		response, err := s.mapSessionToResponse(&session)
+		if err != nil {
+			continue
+		}
+		responses = append(responses, *response)
+	}
+
+	return responses, nil
+}
+
+// GetSessionsByDateRange gets attendance sessions for a lecturer within a date range
+func (s *AttendanceService) GetSessionsByDateRange(lecturerID uint, startDate, endDate time.Time) ([]models.AttendanceSessionResponse, error) {
+	sessions, err := s.attendanceRepo.ListSessionsByDateRange(lecturerID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Transform to response objects
+	var responses []models.AttendanceSessionResponse
+	for _, session := range sessions {
+		response, err := s.mapSessionToResponse(&session)
+		if err != nil {
+			continue
+		}
+		responses = append(responses, *response)
+	}
+
+	return responses, nil
+}
+
+// GetSessionDetails gets detailed information for an attendance session
+func (s *AttendanceService) GetSessionDetails(sessionID uint, lecturerID uint) (*models.AttendanceSessionResponse, error) {
+	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify that the lecturer has access to this session
+	if session.LecturerID != lecturerID {
+		return nil, errors.New("lecturer does not have access to this session")
+	}
+
+	return s.mapSessionToResponse(session)
+}
+
+// GetStudentAttendances gets student attendance records for a session
+func (s *AttendanceService) GetStudentAttendances(sessionID uint, lecturerID uint) ([]models.StudentAttendanceResponse, error) {
+	// Verify the session exists and lecturer has access
+	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if session.LecturerID != lecturerID {
+		return nil, errors.New("lecturer does not have access to this session")
+	}
+
+	// Get all student attendances for this session
+	attendances, err := s.attendanceRepo.ListStudentAttendances(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Transform to response objects
+	var responses []models.StudentAttendanceResponse
+	for _, attendance := range attendances {
+		checkInTime := ""
+		if attendance.CheckInTime != nil {
+			checkInTime = attendance.CheckInTime.Format("15:04:05")
+		}
+
+		responses = append(responses, models.StudentAttendanceResponse{
+			ID:                  attendance.ID,
+			AttendanceSessionID: attendance.AttendanceSessionID,
+			StudentID:           attendance.StudentID,
+			StudentName:         attendance.Student.FullName,
+			StudentNIM:          attendance.Student.NIM,
+			Status:              string(attendance.Status),
+			CheckInTime:         checkInTime,
+			Notes:               attendance.Notes,
+			VerificationMethod:  attendance.VerificationMethod,
+		})
+	}
+
+	return responses, nil
+}
+
+// GetAttendanceStatistics gets attendance statistics for a course
+func (s *AttendanceService) GetAttendanceStatistics(courseScheduleID uint, lecturerID uint) (*models.AttendanceStatistics, error) {
+	// Verify the course schedule exists and lecturer has access
+	schedule, err := s.scheduleRepo.GetByID(courseScheduleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if schedule.UserID != uint(lecturerID) {
+		return nil, errors.New("lecturer does not have access to this course schedule")
+	}
+
+	return s.attendanceRepo.GetAttendanceStats(courseScheduleID)
+}
+
+// Helper functions
+
+// initializeStudentAttendances creates initial "absent" records for all students
+func (s *AttendanceService) initializeStudentAttendances(sessionID uint, courseScheduleID uint) error {
+	// For simplicity, we'll use a placeholder implementation
+	// In a real system, you'd query students enrolled in the course schedule
+	
+	// Get the course schedule to find the student group ID
+	schedule, err := s.scheduleRepo.GetByID(courseScheduleID)
+	if err != nil {
+		return err
+	}
+	
+	// If there's no student group, return early
+	if schedule.StudentGroupID == 0 {
+		return nil
+	}
+	
+	// Find all students in this group using the student_to_groups table
+	var students []models.Student
+	err = s.db.Table("students").
+		Joins("JOIN student_to_groups ON students.id = student_to_groups.student_id").
+		Where("student_to_groups.student_group_id = ?", schedule.StudentGroupID).
+		Find(&students).Error
+	
+	if err != nil {
+		return err
+	}
+
+	for _, student := range students {
+		attendance := &models.StudentAttendance{
+			AttendanceSessionID: sessionID,
+			StudentID:           student.ID,
+			Status:              models.StudentAttendanceStatusAbsent,
+		}
+		if err := s.attendanceRepo.CreateStudentAttendance(attendance); err != nil {
+			// Log the error but continue with other students
+			fmt.Printf("Error initializing attendance for student %d: %v\n", student.ID, err)
+		}
+	}
+
+	return nil
+}
+
+// mapSessionToResponse maps an AttendanceSession to its response format
+func (s *AttendanceService) mapSessionToResponse(session *models.AttendanceSession) (*models.AttendanceSessionResponse, error) {
+	if session == nil || session.CourseSchedule.Course.ID == 0 || session.CourseSchedule.Room.ID == 0 {
+		return nil, errors.New("invalid session data")
+	}
+
+	// Get attendance counts
+	attendances, err := s.attendanceRepo.ListStudentAttendances(session.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var attendedCount, lateCount, absentCount, excusedCount int
+	for _, a := range attendances {
+		switch a.Status {
+		case models.StudentAttendanceStatusPresent:
+			attendedCount++
+		case models.StudentAttendanceStatusLate:
+			lateCount++
+		case models.StudentAttendanceStatusAbsent:
+			absentCount++
+		case models.StudentAttendanceStatusExcused:
+			excusedCount++
+		}
+	}
+
+	endTime := ""
+	if session.EndTime != nil {
+		endTime = session.EndTime.Format("15:04")
+	}
+
+	// Create QR code URL if applicable
+	qrCodeURL := ""
+	if (session.Type == models.AttendanceTypeQRCode || session.Type == models.AttendanceTypeBoth) && session.QRCodeData != "" {
+		qrCodeURL = fmt.Sprintf("/api/attendance/qrcode/%d", session.ID)
+	}
+
+	return &models.AttendanceSessionResponse{
+		ID:               session.ID,
+		CourseScheduleID: session.CourseScheduleID,
+		CourseCode:       session.CourseSchedule.Course.Code,
+		CourseName:       session.CourseSchedule.Course.Name,
+		Room:             session.CourseSchedule.Room.Name,
+		Date:             session.Date.Format("2006-01-02"),
+		StartTime:        session.StartTime.Format("15:04"),
+		EndTime:          endTime,
+		ScheduleStartTime: session.CourseSchedule.StartTime,
+		ScheduleEndTime:  session.CourseSchedule.EndTime,
+		Type:             string(session.Type),
+		Status:           string(session.Status),
+		AutoClose:        session.AutoClose,
+		Duration:         session.Duration,
+		AllowLate:        session.AllowLate,
+		LateThreshold:    session.LateThreshold,
+		Notes:            session.Notes,
+		QRCodeURL:        qrCodeURL,
+		TotalStudents:    session.CourseSchedule.Enrolled,
+		AttendedCount:    attendedCount,
+		LateCount:        lateCount,
+		AbsentCount:      absentCount,
+		ExcusedCount:     excusedCount,
+		CreatedAt:        session.CreatedAt,
+	}, nil
+}
+
+// generateQRCodeData generates a random string for QR code data
+func generateQRCodeData() (string, error) {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+} 
