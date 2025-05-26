@@ -17,6 +17,7 @@ import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/home/data/datasources/student_remote_datasource.dart';
+import 'features/home/data/datasources/student_local_datasource.dart';
 import 'features/home/data/repositories/student_repository_impl.dart';
 import 'features/home/domain/repositories/student_repository.dart';
 import 'features/splash/presentation/screens/splash_screen.dart';
@@ -60,15 +61,20 @@ void main() async {
     prefs: prefs,
   );
 
-  // Create mahasiswa data source
-  final studentDataSource = StudentRemoteDataSourceImpl(
+  // Create student data sources
+  final studentRemoteDataSource = StudentRemoteDataSourceImpl(
     client: httpClient,
     sharedPreferences: prefs,
   );
 
-  // Create mahasiswa repository
+  final studentLocalDataSource = StudentLocalDataSourceImpl(
+    sharedPreferences: prefs,
+  );
+
+  // Create student repository
   final studentRepository = StudentRepositoryImpl(
-    remoteDataSource: studentDataSource,
+    remoteDataSource: studentRemoteDataSource,
+    localDataSource: studentLocalDataSource,
     networkInfo: networkInfo,
   );
 

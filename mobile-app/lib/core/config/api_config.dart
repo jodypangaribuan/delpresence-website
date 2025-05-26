@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' as flutter;
 
-/// A class to manage API configuration
+/// A comprehensive class to manage API configuration and endpoints
 class ApiConfig {
   // Private constructor to prevent direct instantiation
   ApiConfig._();
@@ -10,10 +10,16 @@ class ApiConfig {
   static ApiConfig get instance => _instance;
 
   // API configuration constants
-  static const String DEFAULT_BASE_URL = 'http://13.229.201.62:8080/api/v1';
+  static const String DEFAULT_BASE_URL =
+      'https://ddad-2404-c0-5610-00-d79-743e.ngrok-free.app';
+  static const String API_PATH = '/api/v1';
   static const int DEFAULT_TIMEOUT = 30;
   static const String API_VERSION = 'v1';
   static const bool DEFAULT_ENABLE_LOGGING = true;
+
+  // Commonly used endpoints
+  static const String CAMPUS_AUTH_ENDPOINT =
+      '$DEFAULT_BASE_URL/api/auth/campus/login';
 
   // Pengaturan keamanan
   bool _allowSelfSignedCerts = true;
@@ -40,15 +46,19 @@ class ApiConfig {
     if (allowSelfSignedCerts != null)
       _allowSelfSignedCerts = allowSelfSignedCerts;
 
-    debugPrint('🌐 API Config initialized');
-    debugPrint('🌐 Base URL: $_baseUrl');
-    debugPrint('🌐 Timeout: $_timeout seconds');
-    debugPrint('🌐 API logging: ${_enableApiLogging ? 'Enabled' : 'Disabled'}');
-    debugPrint('🌐 Allow self-signed certs: $_allowSelfSignedCerts');
+    flutter.debugPrint('🌐 API Config initialized');
+    flutter.debugPrint('🌐 Base URL: $_baseUrl');
+    flutter.debugPrint('🌐 Timeout: $_timeout seconds');
+    flutter.debugPrint(
+        '🌐 API logging: ${_enableApiLogging ? 'Enabled' : 'Disabled'}');
+    flutter.debugPrint('🌐 Allow self-signed certs: $_allowSelfSignedCerts');
   }
 
   /// Get the base URL
   String get baseUrl => _baseUrl;
+
+  /// Get the full API URL (baseUrl + API_PATH)
+  String get apiUrl => '$_baseUrl$API_PATH';
 
   /// Get the timeout duration
   Duration get timeout => Duration(seconds: _timeout);
@@ -57,7 +67,7 @@ class ApiConfig {
   String get apiVersion => API_VERSION;
 
   /// Check if API logging is enabled
-  bool get isLoggingEnabled => _enableApiLogging && kDebugMode;
+  bool get isLoggingEnabled => _enableApiLogging && flutter.kDebugMode;
 
   /// Check if self-signed certificates are allowed
   bool get allowSelfSignedCerts => _allowSelfSignedCerts;
@@ -69,6 +79,13 @@ class ApiConfig {
         'X-API-Version': apiVersion,
         'X-Platform': 'flutter',
       };
+
+  /// Get student data by user ID endpoint
+  String studentByUserIdEndpoint(int userId) =>
+      '$_baseUrl/api/students/by-user-id/$userId';
+
+  /// Get campus auth endpoint
+  String get campusAuthEndpoint => CAMPUS_AUTH_ENDPOINT;
 }
 
 // Berandai-andai atau Anggap saja fitur login dan register sudah ada dan halaman homepage sudah ada, dan saya ingin mengisi tabel Module "Attendance" dengan sub module "Doseen Generate QR", "mahasiswa scan QR untuk absen", "mahasiswa melakukan face recognition untuk absen", buatkan beberapa testcase untuk menguji ketiga fitur tersebut buat dalam tabel: No, Module, Sub Module, Test Case ID, Test Scenario, Type, Precondition, Steps, Expected Result, Actual Result

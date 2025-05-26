@@ -44,6 +44,11 @@ func (s *StudentService) GetStudentByID(id uint) (*models.Student, error) {
 	return s.repository.FindByID(id)
 }
 
+// GetStudentByUserID returns a student by their external UserID from campus
+func (s *StudentService) GetStudentByUserID(userID int) (*models.Student, error) {
+	return s.repository.FindByUserID(userID)
+}
+
 // SyncStudents fetches students from the campus API and syncs them to the database
 func (s *StudentService) SyncStudents() (int, error) {
 	// Get auth token from campus auth service
@@ -103,7 +108,7 @@ func (s *StudentService) SyncStudents() (int, error) {
 // fetchStudentsFromCampus fetches students from the campus API
 func (s *StudentService) fetchStudentsFromCampus(token string) ([]models.CampusStudent, error) {
 	log.Printf("Fetching students from campus API: %s", CampusStudentsURL)
-	
+
 	// Create request to campus API
 	req, err := http.NewRequest("GET", CampusStudentsURL, nil)
 	if err != nil {
@@ -116,21 +121,21 @@ func (s *StudentService) fetchStudentsFromCampus(token string) ([]models.CampusS
 	// Send request with increased timeout (2 minutes)
 	client := &http.Client{Timeout: 120 * time.Second}
 	log.Printf("Sending request to campus API with token (timeout: 2 minutes)")
-	
+
 	// Execute request with context for better error handling
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	req = req.WithContext(ctx)
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Network error when fetching students: %v", err)
-		
+
 		// Check for specific timeout errors
 		if os.IsTimeout(err) || strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
 			return nil, fmt.Errorf("campus API request timed out after 120 seconds: %w", err)
 		}
-		
+
 		return nil, fmt.Errorf("network error when fetching students: %w", err)
 	}
 	defer resp.Body.Close()
@@ -150,7 +155,7 @@ func (s *StudentService) fetchStudentsFromCampus(token string) ([]models.CampusS
 	}
 
 	log.Printf("Received response from campus API, length: %d bytes", len(bodyBytes))
-	
+
 	// For debugging, log a small portion of the response
 	previewLen := 200
 	if len(bodyBytes) < previewLen {
@@ -181,4 +186,4 @@ func (s *StudentService) fetchStudentsFromCampus(token string) ([]models.CampusS
 
 	log.Printf("Successfully fetched %d students from campus API", len(campusResp.Data.Students))
 	return campusResp.Data.Students, nil
-} 
+}

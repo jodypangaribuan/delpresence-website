@@ -33,9 +33,13 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
 
       final result = await _studentRepository.getStudentData(externalUserId);
 
+      // Check if we're using cached data
+      final isUsingCachedData = await _studentRepository.isUsingCachedData();
+
       result.fold(
         (failure) => emit(StudentError(failure.message)),
-        (student) => emit(StudentLoaded(student)),
+        (student) =>
+            emit(StudentLoaded(student, isUsingCachedData: isUsingCachedData)),
       );
     } catch (e) {
       debugPrint('Error loading student data: $e');

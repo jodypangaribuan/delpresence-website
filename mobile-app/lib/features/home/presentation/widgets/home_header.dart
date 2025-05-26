@@ -5,10 +5,17 @@ import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../bloc/student_bloc.dart';
 
-class HomeHeader extends StatelessWidget {
+class HomeHeader extends StatefulWidget {
   const HomeHeader({
     super.key,
   });
+
+  @override
+  State<HomeHeader> createState() => _HomeHeaderState();
+}
+
+class _HomeHeaderState extends State<HomeHeader> {
+  bool _hasShownCachedDataToast = false;
 
   String _getInitials(String fullName) {
     final nameParts = fullName.split(' ');
@@ -37,6 +44,16 @@ class HomeHeader extends StatelessWidget {
           studentName = state.student.basicInfo.nama;
           programName = state.student.basicInfo.prodiName;
           studentNim = state.student.basicInfo.nim;
+
+          // Show toast if using cached data and we haven't shown it yet
+          if (state.isUsingCachedData && !_hasShownCachedDataToast) {
+            _hasShownCachedDataToast = true;
+            // Use a post-frame callback to ensure the context is valid
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ToastUtils.showInfoToast(context,
+                  'Menggunakan data tersimpan. Silakan periksa koneksi internet Anda.');
+            });
+          }
         } else if (state is StudentError) {
           studentName = 'Error loading data';
           programName = 'Please try again';
@@ -199,27 +216,67 @@ class HomeHeader extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  studentName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.1,
-                                    shadows: [
-                                      BoxShadow(
-                                        color: Color(0xFF000000),
-                                        blurRadius: 2,
-                                        offset: Offset(0, 1),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        studentName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.1,
+                                          shadows: [
+                                            BoxShadow(
+                                              color: Color(0xFF000000),
+                                              blurRadius: 2,
+                                              offset: Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    // Show offline indicator when using cached data
+                                    if (state is StudentLoaded &&
+                                        state.isUsingCachedData)
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.3),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.offline_bolt,
+                                              color: Colors.white,
+                                              size: 10,
+                                            ),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              'Offline',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   programName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.95),
                                     fontSize: 12,
@@ -237,6 +294,8 @@ class HomeHeader extends StatelessWidget {
                                 const SizedBox(height: 1),
                                 Text(
                                   studentNim,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.9),
                                     fontSize: 11,

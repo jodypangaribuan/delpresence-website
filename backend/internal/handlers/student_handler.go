@@ -58,6 +58,33 @@ func (h *StudentHandler) GetStudentByID(c *gin.Context) {
 	})
 }
 
+// GetStudentByUserID returns a student by their user ID from the campus system
+func (h *StudentHandler) GetStudentByUserID(c *gin.Context) {
+	userIDStr := c.Param("user_id")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	student, err := h.service.GetStudentByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
+		return
+	}
+
+	if student == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Student retrieved successfully",
+		"data":    student,
+	})
+}
+
 // SyncStudents syncs students from the campus API
 func (h *StudentHandler) SyncStudents(c *gin.Context) {
 	// Sync students using the service
@@ -66,7 +93,7 @@ func (h *StudentHandler) SyncStudents(c *gin.Context) {
 		errMsg := err.Error()
 		statusCode := http.StatusInternalServerError
 		responseMsg := "Failed to sync students"
-		
+
 		// Check for specific errors to provide better messages
 		if strings.Contains(errMsg, "timeout") || strings.Contains(errMsg, "deadline exceeded") {
 			statusCode = http.StatusGatewayTimeout
@@ -75,7 +102,7 @@ func (h *StudentHandler) SyncStudents(c *gin.Context) {
 			statusCode = http.StatusServiceUnavailable
 			responseMsg = "Campus API service unavailable"
 		}
-		
+
 		c.JSON(statusCode, gin.H{
 			"status":  "error",
 			"message": responseMsg,
@@ -91,4 +118,4 @@ func (h *StudentHandler) SyncStudents(c *gin.Context) {
 			"count": count,
 		},
 	})
-} 
+}

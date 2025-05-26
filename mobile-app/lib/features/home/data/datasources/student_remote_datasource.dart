@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import '../models/student_model.dart';
-import '../../../../core/constants/api_constants.dart';
+import '../../../../core/config/api_config.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/utils/api_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,8 +32,7 @@ class StudentRemoteDataSourceImpl implements StudentRemoteDataSource {
       throw ServerException('Token not found');
     }
 
-    final url =
-        Uri.parse('${ApiConstants.baseUrl}/api/students/by-user-id/$userId');
+    final url = Uri.parse(ApiConfig.instance.studentByUserIdEndpoint(userId));
 
     try {
       // Log the request

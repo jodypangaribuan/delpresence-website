@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/utils/toast_utils.dart';
 import '../../data/models/student_model.dart';
 import '../bloc/student_bloc.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -20,7 +21,7 @@ class ProfileScreen extends StatelessWidget {
         title: const Text(
           'Profil Mahasiswa',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
@@ -70,6 +71,14 @@ class ProfileScreen extends StatelessWidget {
               ),
             );
           } else if (state is StudentLoaded) {
+            // Show toast if using cached data
+            if (state.isUsingCachedData) {
+              // Use a post-frame callback to ensure the context is valid
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ToastUtils.showInfoToast(context,
+                    'Menampilkan data yang tersimpan. Beberapa informasi mungkin tidak terbaru.');
+              });
+            }
             return _buildProfileContent(context, state.student);
           }
 
@@ -123,11 +132,12 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildProfileHeader(BuildContext context, StudentComplete student) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final avatarSize = screenWidth * 0.25; // 25% of screen width
+    final avatarSize =
+        screenWidth * 0.22; // Reduced from 25% to 22% of screen width
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 20), // Reduced padding
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -164,40 +174,45 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14), // Reduced spacing
 
           // Name and NIM
           Text(
             student.basicInfo.nama,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 16, // Reduced from 18
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3), // Reduced spacing
           Text(
             student.basicInfo.nim,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13, // Reduced from 14
               color: Colors.grey[600],
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7), // Reduced spacing
 
           // Program Study Pill - showing only the program without faculty
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 5), // Reduced padding
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16), // Smaller border radius
             ),
             child: Text(
               student.basicInfo.prodiName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11, // Reduced from 12
                 fontWeight: FontWeight.w500,
                 color: AppColors.primary,
               ),
@@ -210,11 +225,11 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 22, 16, 6), // Adjusted padding
       child: Text(
         title,
         style: const TextStyle(
-          fontSize: 16,
+          fontSize: 14, // Reduced from 16
           fontWeight: FontWeight.w600,
           color: Colors.black87,
         ),
@@ -224,7 +239,8 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildInfoItem(String label, String value) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 16, vertical: 10), // Reduced padding
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
@@ -239,16 +255,21 @@ class ProfileScreen extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13, // Reduced from 14
               color: Colors.grey[600],
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                fontSize: 13, // Reduced from 14
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
             ),
           ),
         ],
@@ -261,7 +282,8 @@ class ProfileScreen extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 10), // Reduced padding
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -274,14 +296,14 @@ class ProfileScreen extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 22,
+              size: 20, // Reduced from 22
               color: isDestructive ? Colors.red[400] : Colors.black87,
             ),
             const SizedBox(width: 12),
             Text(
               title,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13, // Reduced from 14
                 fontWeight: FontWeight.w500,
                 color: isDestructive ? Colors.red[400] : Colors.black87,
               ),
@@ -302,24 +324,129 @@ class ProfileScreen extends StatelessWidget {
   void _showLogoutConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Keluar'),
-        content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('Batal'),
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 12,
+                spreadRadius: 0,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.read<AuthBloc>().add(LogoutEvent());
-            },
-            child: const Text('Keluar'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon and header
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.logout_rounded,
+                    color: AppColors.error,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Title
+              const Text(
+                'Konfirmasi Logout',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Content
+              const Text(
+                'Apakah Anda yakin ingin keluar dari aplikasi?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Actions
+              Row(
+                children: [
+                  // Cancel button
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: Colors.grey.withOpacity(0.2),
+                          ),
+                        ),
+                        backgroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Confirm button
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        context.read<AuthBloc>().add(LogoutEvent());
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Logout',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

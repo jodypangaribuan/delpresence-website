@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/constants/api_constants.dart';
+import '../../../../core/config/api_config.dart';
 import '../../../../core/utils/api_logger.dart';
 import '../models/auth_response_model.dart';
 
@@ -23,7 +23,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String password,
   }) async {
     try {
-      final uri = Uri.parse(ApiConstants.campusAuthEndpoint);
+      final uri = Uri.parse(ApiConfig.CAMPUS_AUTH_ENDPOINT);
 
       // Create form data for the request
       var request = http.MultipartRequest('POST', uri);
@@ -144,7 +144,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     } catch (e, stackTrace) {
       ApiLogger.logError(
-        ApiConstants.campusAuthEndpoint,
+        ApiConfig.CAMPUS_AUTH_ENDPOINT,
         'Login error: ${e.toString()}',
         stackTrace,
       );

@@ -100,6 +100,7 @@ func main() {
 			// Admin access to student data
 			adminRoutes.GET("/students", studentHandler.GetAllStudents)
 			adminRoutes.GET("/students/:id", studentHandler.GetStudentByID)
+			adminRoutes.GET("/students/by-user-id/:user_id", studentHandler.GetStudentByUserID)
 			adminRoutes.POST("/students/sync", studentHandler.SyncStudents)
 
 			// Admin access to faculty data
@@ -129,7 +130,7 @@ func main() {
 			adminRoutes.POST("/rooms", roomHandler.CreateRoom)
 			adminRoutes.PUT("/rooms/:id", roomHandler.UpdateRoom)
 			adminRoutes.DELETE("/rooms/:id", roomHandler.DeleteRoom)
-			
+
 			// Admin access to academic year data
 			adminRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
 			adminRoutes.GET("/academic-years/:id", academicYearHandler.GetAcademicYearByID)
@@ -143,7 +144,7 @@ func main() {
 			adminRoutes.POST("/courses", courseHandler.CreateCourse)
 			adminRoutes.PUT("/courses/:id", courseHandler.UpdateCourse)
 			adminRoutes.DELETE("/courses/:id", courseHandler.DeleteCourse)
-			
+
 			// Admin access to student group data
 			adminRoutes.GET("/student-groups", studentGroupHandler.GetAllStudentGroups)
 			adminRoutes.GET("/student-groups/:id", studentGroupHandler.GetStudentGroupByID)
@@ -156,14 +157,14 @@ func main() {
 			adminRoutes.POST("/student-groups/:id/members/batch", studentGroupHandler.AddMultipleStudentsToGroup)
 			adminRoutes.DELETE("/student-groups/:id/members/:student_id", studentGroupHandler.RemoveStudentFromGroup)
 			adminRoutes.POST("/student-groups/:id/members/remove-batch", studentGroupHandler.RemoveMultipleStudentsFromGroup)
-			
+
 			// Admin access to course schedules
 			adminRoutes.GET("/schedules", courseScheduleHandler.GetAllSchedules)
 			adminRoutes.GET("/schedules/:id", courseScheduleHandler.GetScheduleByID)
 			adminRoutes.POST("/schedules", courseScheduleHandler.CreateSchedule)
 			adminRoutes.PUT("/schedules/:id", courseScheduleHandler.UpdateSchedule)
 			adminRoutes.DELETE("/schedules/:id", courseScheduleHandler.DeleteSchedule)
-			
+
 			// Admin access to lecturer assignments
 			adminRoutes.GET("/courses/assignments", lecturerAssignmentHandler.GetAllLecturerAssignments)
 			adminRoutes.GET("/courses/assignments/:id", lecturerAssignmentHandler.GetLecturerAssignmentByID)
@@ -173,7 +174,7 @@ func main() {
 			adminRoutes.GET("/courses/:id/lecturers", lecturerAssignmentHandler.GetAssignmentsByCourse)
 			adminRoutes.GET("/lecturers/:id/courses", lecturerAssignmentHandler.GetAssignmentsByLecturer)
 			adminRoutes.GET("/courses/:id/available-lecturers", lecturerAssignmentHandler.GetAvailableLecturers)
-			
+
 			// New endpoint to get lecturer for a course - use a more specific path to avoid conflict
 			adminRoutes.GET("/course-lecturers/course/:course_id", courseScheduleHandler.GetLecturerForCourse)
 		}
@@ -184,16 +185,16 @@ func main() {
 		{
 			// Get lecturer's own assignments
 			lecturerRoutes.GET("/assignments", lecturerAssignmentHandler.GetMyAssignments)
-			
+
 			// Get lecturer's course schedules
 			lecturerRoutes.GET("/schedules", courseScheduleHandler.GetMySchedules)
-			
+
 			// Get lecturer's courses (alias for assignments, more intuitive API endpoint)
 			lecturerRoutes.GET("/courses", lecturerAssignmentHandler.GetMyAssignments)
-			
+
 			// Get academic years (needed for filtering courses and schedules)
 			lecturerRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
-			
+
 			// Attendance management routes for lecturers
 			lecturerRoutes.POST("/attendance/sessions", attendanceHandler.CreateAttendanceSession)
 			lecturerRoutes.GET("/attendance/sessions/active", attendanceHandler.GetActiveAttendanceSessions)
@@ -221,9 +222,13 @@ func main() {
 			// Student routes go here
 		}
 	}
-	
+
 	// Start the server
 	port := utils.GetEnvWithDefault("SERVER_PORT", "8080")
+
+	// Add public endpoints
+	router.GET("/api/students/by-user-id/:user_id", studentHandler.GetStudentByUserID)
+
 	log.Printf("Server running on port %s", port)
 	err = router.Run(":" + port)
 	if err != nil {

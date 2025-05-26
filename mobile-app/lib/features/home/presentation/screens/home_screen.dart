@@ -18,6 +18,7 @@ import '../../domain/repositories/student_repository.dart';
 import 'course_list_screen.dart';
 import 'profile_screen.dart';
 import '../../../../features/settings/presentation/screens/settings_screen.dart';
+import 'dart:async';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,8 +27,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentIndex = 0;
+  bool _isFaceRecognition = false; // Track which attendance method is selected
+  late AnimationController _animationController;
+  late Animation<double> _slideAnimation;
+  Timer? _autoToggleTimer;
+  late AnimationController _indicatorAnimController;
+  late Animation<double> _indicatorAnimation;
 
   // Halaman yang akan ditampilkan berdasarkan index bottom navbar
   late final List<Widget> _pages;
@@ -39,9 +46,67 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _toggleAttendanceMethod({bool isAutomatic = false}) {
+    setState(() {
+      _isFaceRecognition = !_isFaceRecognition;
+    });
+    _animationController.forward(from: 0.0);
+
+    // Only show toast for manual changes
+    if (!isAutomatic) {
+      // Show toast indicating the current mode
+      ToastUtils.showInfoToast(
+          context,
+          _isFaceRecognition
+              ? 'Mode Face Recognition aktif'
+              : 'Mode QR Code aktif');
+    }
+
+    // Reset auto toggle timer
+    _resetAutoToggleTimer();
+  }
+
+  void _resetAutoToggleTimer() {
+    // Cancel existing timer if any
+    _autoToggleTimer?.cancel();
+
+    // Create new timer
+    _autoToggleTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _toggleAttendanceMethod(isAutomatic: true);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize animation controller for FAB
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _slideAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Initialize indicator animation controller
+    _indicatorAnimController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _indicatorAnimation = Tween<double>(
+      begin: 0.4,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _indicatorAnimController,
+      curve: Curves.easeInOut,
+    ));
 
     // Initialize pages list
     _pages = [
@@ -61,6 +126,17 @@ class _HomeScreenState extends State<HomeScreen> {
         systemNavigationBarDividerColor: Colors.transparent,
       ),
     );
+
+    // Start auto toggle timer
+    _resetAutoToggleTimer();
+  }
+
+  @override
+  void dispose() {
+    _autoToggleTimer?.cancel();
+    _animationController.dispose();
+    _indicatorAnimController.dispose();
+    super.dispose();
   }
 
   // Handle navigation to different pages based on bottom navbar index
@@ -107,24 +183,72 @@ class _HomeScreenState extends State<HomeScreen> {
             extendBodyBehindAppBar: true,
             extendBody: true,
             body: _getPageForIndex(_currentIndex),
-            // Center floating action button for QR scan (index 2)
-            floatingActionButton: FloatingActionButton(
-              onPressed: () {
-                HapticFeedback.mediumImpact();
-                // Navigate directly to the CourseSelectionScreen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CourseSelectionScreen(),
-                  ),
-                );
+            // Toggleable floating action button with swipe gesture
+            floatingActionButton: GestureDetector(
+              onHorizontalDragEnd: (details) {
+                // Toggle mode on any horizontal swipe, regardless of direction
+                if (details.primaryVelocity != null &&
+                    details.primaryVelocity!.abs() > 200) {
+                  // Only toggle if the swipe has enough velocity
+                  _toggleAttendanceMethod();
+                }
               },
-              backgroundColor: AppColors.primary,
-              elevation: 4,
-              child: const Icon(
-                Icons.face,
-                color: Colors.white,
-                size: 30,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Main Button
+                  FloatingActionButton(
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+
+                      if (_isFaceRecognition) {
+                        // Navigate to face recognition screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CourseSelectionScreen(),
+                          ),
+                        );
+                      } else {
+                        // Navigate to QR code scanner
+                        _showQRScannerBottomSheet(context);
+                      }
+                    },
+                    backgroundColor: AppColors.primary,
+                    elevation: 4,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder:
+                          (Widget child, Animation<double> animation) {
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: _isFaceRecognition
+                                ? const Offset(-1.5, 0.0)
+                                : const Offset(1.5, 0.0),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _isFaceRecognition
+                          ? const Icon(
+                              Icons.face_outlined,
+                              key: ValueKey('face'),
+                              color: Colors.white,
+                              size: 28,
+                            )
+                          : const Icon(
+                              Icons.qr_code_scanner_rounded,
+                              key: ValueKey('qr'),
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
             floatingActionButtonLocation:
@@ -143,6 +267,90 @@ class _HomeScreenState extends State<HomeScreen> {
     // Dispatch logout event to AuthBloc
     context.read<AuthBloc>().add(LogoutEvent());
     // Navigation will be handled by BlocListener
+  }
+
+  // Show QR scanner bottom sheet
+  void _showQRScannerBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.3,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+
+            // Title
+            Row(
+              children: [
+                Icon(
+                  Icons.qr_code_scanner,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Scan QR Code',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // Scan QR button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  // Navigate to QR code scanner (simulated for now)
+                  ToastUtils.showInfoToast(
+                      context, 'QR Scanner akan segera hadir');
+                },
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Mulai Scan',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

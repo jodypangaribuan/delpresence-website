@@ -13,11 +13,12 @@ class StudentLoading extends StudentState {}
 
 class StudentLoaded extends StudentState {
   final StudentComplete student;
+  final bool isUsingCachedData;
 
-  const StudentLoaded(this.student);
+  const StudentLoaded(this.student, {this.isUsingCachedData = false});
 
   @override
-  List<Object> get props => [student];
+  List<Object> get props => [student, isUsingCachedData];
 }
 
 class StudentError extends StudentState {
