@@ -5,6 +5,7 @@ import (
 	"github.com/delpresence/backend/internal/models"
 	"gorm.io/gorm"
 	"time"
+	"fmt"
 )
 
 // AcademicYearRepository is a repository for academic year operations
@@ -55,6 +56,19 @@ func (r *AcademicYearRepository) FindByName(name string) (*models.AcademicYear, 
 	return &academicYear, nil
 }
 
+// FindByNameAndSemester finds an academic year by name and semester combination
+func (r *AcademicYearRepository) FindByNameAndSemester(name string, semester string) (*models.AcademicYear, error) {
+	var academicYear models.AcademicYear
+	err := r.db.Where("name = ? AND semester = ?", name, semester).First(&academicYear).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &academicYear, nil
+}
+
 // FindByNameIncludingDeleted finds an academic year by name including soft-deleted records
 func (r *AcademicYearRepository) FindByNameIncludingDeleted(name string) (*models.AcademicYear, error) {
 	var academicYear models.AcademicYear
@@ -87,8 +101,17 @@ func (r *AcademicYearRepository) DeleteByID(id uint) error {
 func (r *AcademicYearRepository) RestoreSoftDeletedByName(name string, newData *models.AcademicYear) (*models.AcademicYear, error) {
 	var academicYear models.AcademicYear
 	
-	// Find the soft-deleted record
-	err := r.db.Unscoped().Where("name = ? AND deleted_at IS NOT NULL", name).First(&academicYear).Error
+	// Check if there's already an active record with the same name and semester
+	existingActive, err := r.FindByNameAndSemester(name, newData.Semester)
+	if err != nil {
+		return nil, err
+	}
+	if existingActive != nil {
+		return nil, fmt.Errorf("an active academic year with name '%s' and semester '%s' already exists", name, newData.Semester)
+	}
+	
+	// Find the soft-deleted record with this name
+	err = r.db.Unscoped().Where("name = ? AND deleted_at IS NOT NULL", name).First(&academicYear).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil // No soft-deleted record found
@@ -128,4 +151,55 @@ func (r *AcademicYearRepository) GetActiveAcademicYear() (*models.AcademicYear, 
 	}
 	
 	return &academicYear, nil
+}
+
+// FindDeletedByName finds a soft-deleted academic year by name
+func (r *AcademicYearRepository) FindDeletedByName(name string) (*models.AcademicYear, error) {
+	var academicYear models.AcademicYear
+	err := r.db.Unscoped().Where("name = ? AND deleted_at IS NOT NULL", name).First(&academicYear).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &academicYear, nil
+}
+
+// RestoreByName restores a soft-deleted academic year by name
+func (r *AcademicYearRepository) RestoreByName(name string) (*models.AcademicYear, error) {
+	// Find the deleted record
+	deletedYear, err := r.FindDeletedByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if deletedYear == nil {
+		return nil, nil
+	}
+	
+	// Restore the record
+	if err := r.db.Unscoped().Model(&models.AcademicYear{}).Where("id = ?", deletedYear.ID).Update("deleted_at", nil).Error; err != nil {
+		return nil, err
+	}
+	
+	// Return the restored record
+	return r.FindByID(deletedYear.ID)
+}
+
+// CheckNameExists checks if a name exists, including soft-deleted records
+func (r *AcademicYearRepository) CheckNameExists(name string, excludeID uint) (bool, error) {
+	var count int64
+	query := r.db.Unscoped().Model(&models.AcademicYear{}).Where("name = ?", name)
+	
+	// Exclude the current record if updating
+	if excludeID > 0 {
+		query = query.Where("id != ?", excludeID)
+	}
+	
+	err := query.Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	
+	return count > 0, nil
 } 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/services"
@@ -127,12 +128,17 @@ func (h *AcademicYearHandler) DeleteAcademicYear(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Invalid ID format"})
 		return
 	}
 
 	if err := h.service.DeleteAcademicYear(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// Check if the error is about dependencies (courses, assignments, etc.)
+		if strings.Contains(err.Error(), "cannot delete academic year: it is being used by") {
+			c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})
+		}
 		return
 	}
 

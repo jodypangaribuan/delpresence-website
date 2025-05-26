@@ -32,6 +32,19 @@ func (r *CourseRepository) GetByID(id uint) (models.Course, error) {
 	return course, err
 }
 
+// FindByID returns a course by its ID as a pointer
+func (r *CourseRepository) FindByID(id uint) (*models.Course, error) {
+	var course models.Course
+	err := r.db.Preload("Department").Preload("Faculty").Preload("AcademicYear").First(&course, id).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &course, nil
+}
+
 // Create creates a new course
 func (r *CourseRepository) Create(course models.Course) (models.Course, error) {
 	err := r.db.Create(&course).Error
@@ -84,4 +97,60 @@ func (r *CourseRepository) GetByActiveAcademicYear() ([]models.Course, error) {
 		Where("academic_years.is_active = ?", true).
 		Find(&courses).Error
 	return courses, err
+}
+
+// FindDeletedByCode finds a soft-deleted course by code
+func (r *CourseRepository) FindDeletedByCode(code string) (*models.Course, error) {
+	var course models.Course
+	err := r.db.Unscoped().
+		Preload("Department").
+		Preload("Faculty").
+		Preload("AcademicYear").
+		Where("code = ? AND deleted_at IS NOT NULL", code).
+		First(&course).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &course, nil
+}
+
+// RestoreByCode restores a soft-deleted course by code
+func (r *CourseRepository) RestoreByCode(code string) (*models.Course, error) {
+	// Find the deleted record
+	deletedCourse, err := r.FindDeletedByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if deletedCourse == nil {
+		return nil, nil
+	}
+	
+	// Restore the record
+	if err := r.db.Unscoped().Model(&models.Course{}).Where("id = ?", deletedCourse.ID).Update("deleted_at", nil).Error; err != nil {
+		return nil, err
+	}
+	
+	// Return the restored record
+	return r.FindByID(deletedCourse.ID)
+}
+
+// CheckCodeExists checks if a code exists, including soft-deleted records
+func (r *CourseRepository) CheckCodeExists(code string, excludeID uint) (bool, error) {
+	var count int64
+	query := r.db.Unscoped().Model(&models.Course{}).Where("code = ?", code)
+	
+	// Exclude the current record if updating
+	if excludeID > 0 {
+		query = query.Where("id != ?", excludeID)
+	}
+	
+	err := query.Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	
+	return count > 0, nil
 } 

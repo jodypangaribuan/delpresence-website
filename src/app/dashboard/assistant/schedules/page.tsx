@@ -165,7 +165,7 @@ export default function AssistantSchedulePage() {
             <div className="p-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-semibold text-[#002A5C]">Jadwal Perkuliahan</h3>
+                  <h3 className="text-xl font-semibold text-black">Jadwal Perkuliahan</h3>
                   <p className="text-sm text-muted-foreground mt-1">Daftar jadwal perkuliahan yang Anda bantu sebagai asisten dosen</p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
@@ -297,7 +297,7 @@ export default function AssistantSchedulePage() {
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-[#002A5C]">Detail Jadwal Perkuliahan</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-black">Detail Jadwal Perkuliahan</DialogTitle>
             <DialogDescription>
               Informasi lengkap tentang jadwal perkuliahan
             </DialogDescription>

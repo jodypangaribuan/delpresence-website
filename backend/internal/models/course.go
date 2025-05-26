@@ -9,7 +9,7 @@ import (
 // Course represents a course in the system
 type Course struct {
 	ID              uint           `gorm:"primaryKey" json:"id"`
-	Code            string         `gorm:"unique;not null" json:"code"`
+	Code            string         `gorm:"uniqueIndex:idx_courses_code_deleted_at;not null" json:"code"`
 	Name            string         `gorm:"not null" json:"name"`
 	Credits         int            `gorm:"not null" json:"credits"`
 	Semester        int            `gorm:"not null" json:"semester"`
@@ -22,18 +22,18 @@ type Course struct {
 	AcademicYear    AcademicYear   `gorm:"foreignKey:AcademicYearID" json:"academic_year"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedAt       gorm.DeletedAt `gorm:"index;uniqueIndex:idx_courses_code_deleted_at" json:"deleted_at,omitempty"`
 }
 
 // Department represents a department/study program
 type Department struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
-	Name      string         `gorm:"unique;not null" json:"name"`
+	Name      string         `gorm:"uniqueIndex:idx_departments_name_deleted_at;not null" json:"name"`
 	FacultyID uint           `gorm:"not null" json:"faculty_id"`
 	Faculty   Faculty        `gorm:"foreignKey:FacultyID" json:"faculty"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"index;uniqueIndex:idx_departments_name_deleted_at" json:"deleted_at,omitempty"`
 }
 
 // Faculty struct is defined in faculty.go - removed duplicate declaration 

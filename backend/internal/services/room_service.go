@@ -23,13 +23,36 @@ func NewRoomService() *RoomService {
 
 // CreateRoom creates a new room
 func (s *RoomService) CreateRoom(room *models.Room) error {
-	// Check if code already exists
-	existingRoom, err := s.repository.FindByCode(room.Code)
+	// Check if code exists (including soft-deleted)
+	exists, err := s.repository.CheckCodeExists(room.Code, 0)
 	if err != nil {
 		return err
 	}
-	if existingRoom != nil {
-		return errors.New("room with this code already exists")
+
+	if exists {
+		// Try to find a soft-deleted room with this code
+		deletedRoom, err := s.repository.FindDeletedByCode(room.Code)
+		if err != nil {
+			return err
+		}
+
+		if deletedRoom != nil {
+			// Restore the soft-deleted room with updated data
+			restoredRoom, err := s.repository.RestoreByCode(room.Code)
+			if err != nil {
+				return err
+			}
+			
+			// Update with new data
+			restoredRoom.Name = room.Name
+			restoredRoom.BuildingID = room.BuildingID
+			restoredRoom.Floor = room.Floor
+			restoredRoom.Capacity = room.Capacity
+			
+			return s.repository.Update(restoredRoom)
+		}
+		
+		return errors.New("kode ruangan sudah digunakan")
 	}
 
 	// Check if building exists
@@ -38,7 +61,7 @@ func (s *RoomService) CreateRoom(room *models.Room) error {
 		return err
 	}
 	if building == nil {
-		return errors.New("building not found")
+		return errors.New("gedung tidak ditemukan")
 	}
 
 	// Create room
@@ -53,17 +76,17 @@ func (s *RoomService) UpdateRoom(room *models.Room) error {
 		return err
 	}
 	if existingRoom == nil {
-		return errors.New("room not found")
+		return errors.New("ruangan tidak ditemukan")
 	}
 
 	// If code is changed, check if new code already exists
 	if room.Code != existingRoom.Code {
-		existingWithCode, err := s.repository.FindByCode(room.Code)
+		exists, err := s.repository.CheckCodeExists(room.Code, room.ID)
 		if err != nil {
 			return err
 		}
-		if existingWithCode != nil && existingWithCode.ID != room.ID {
-			return errors.New("room with this code already exists")
+		if exists {
+			return errors.New("kode ruangan sudah digunakan")
 		}
 	}
 
@@ -73,7 +96,7 @@ func (s *RoomService) UpdateRoom(room *models.Room) error {
 		return err
 	}
 	if building == nil {
-		return errors.New("building not found")
+		return errors.New("gedung tidak ditemukan")
 	}
 
 	// Update room
@@ -98,7 +121,7 @@ func (s *RoomService) GetRoomsByBuildingID(buildingID uint) ([]models.Room, erro
 		return nil, err
 	}
 	if building == nil {
-		return nil, errors.New("building not found")
+		return nil, errors.New("gedung tidak ditemukan")
 	}
 
 	return s.repository.FindByBuildingID(buildingID)
@@ -112,10 +135,10 @@ func (s *RoomService) DeleteRoom(id uint) error {
 		return err
 	}
 	if room == nil {
-		return errors.New("room not found")
+		return errors.New("ruangan tidak ditemukan")
 	}
 
-	// Delete room
+	// Delete room (soft delete)
 	return s.repository.DeleteByID(id)
 }
 

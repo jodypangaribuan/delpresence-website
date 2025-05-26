@@ -8,7 +8,8 @@ import { useRef } from "react";
 import Stack from "@/components/ui/Stack/Stack";
 import VariableProximity from "@/components/ui/VariableProximity/VariableProximity";
 import { useClientSide } from "@/shared/hooks/useClientSide";
-import { siteConfig, homepageImages } from "@/shared/utils/siteConfig";
+import { siteConfig, homepageImages, teamData } from "@/shared/utils/siteConfig";
+import { AnimatedTooltip } from "@/components/ui/animated-tooltip";
 
 export default function Home() {
   const isClient = useClientSide();
@@ -96,28 +97,33 @@ export default function Home() {
                     </Link>
                   </div>
 
-                  <div className="flex flex-wrap justify-center md:justify-start gap-5 sm:gap-6 text-sm text-slate-500">
-                    <Link
-                      href={siteConfig.links.privacyPolicy}
-                      className="hover:text-[#0687C9] transition-colors"
-                    >
-                      Kebijakan Privasi
-                    </Link>
-                    <Link
-                      href={siteConfig.links.termsOfUse}
-                      className="hover:text-[#0687C9] transition-colors"
-                    >
-                      Ketentuan Penggunaan
-                    </Link>
-                    <Link
-                      href={siteConfig.links.institution}
-                      className="hover:text-[#0687C9] transition-colors"
-                    >
-                      Website IT Del
-                    </Link>
-                    <p className="w-full md:w-auto mt-4 md:mt-0">
-                      {siteConfig.copyright}
-                    </p>
+                  <div className="flex flex-col space-y-5 text-sm text-slate-500">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-5 sm:gap-6">
+                      <div className="flex items-center justify-center w-full md:w-auto md:mr-auto">
+                        <AnimatedTooltip items={teamData} />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center w-full md:justify-start gap-5 sm:gap-6">
+                        <Link
+                          href={siteConfig.links.privacyPolicy}
+                          className="hover:text-[#0687C9] transition-colors"
+                        >
+                          Kebijakan Privasi
+                        </Link>
+                        <Link
+                          href={siteConfig.links.termsOfUse}
+                          className="hover:text-[#0687C9] transition-colors"
+                        >
+                          Ketentuan Penggunaan
+                        </Link>
+                        <Link
+                          href={siteConfig.links.institution}
+                          className="hover:text-[#0687C9] transition-colors"
+                        >
+                          Website IT Del
+                        </Link>
+                      </div>
+                    </div>
+                    <p className="text-center md:text-left text-slate-400">{siteConfig.copyright}</p>
                   </div>
                 </div>
                 <div className="md:w-1/2 lg:w-1/2 xl:w-3/5 hidden md:block">

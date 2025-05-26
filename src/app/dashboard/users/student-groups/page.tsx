@@ -64,9 +64,6 @@ const formSchema = z.object({
   }),
   semester: z.coerce.number().min(1, {
     message: "Semester harus dipilih.",
-  }),
-  academic_year_id: z.coerce.number().min(1, {
-    message: "Tahun akademik harus dipilih.",
   })
 });
 
@@ -79,12 +76,6 @@ interface StudentGroup {
     name: string;
   };
   semester: number;
-  academic_year: {
-    id: number;
-    name: string;
-    semester?: "ganjil" | "genap";
-    is_active?: boolean;
-  };
   student_count: number;
   created_at: string;
   updated_at: string;
@@ -134,7 +125,6 @@ export default function StudentGroupsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [semesterFilter, setSemesterFilter] = useState("");
-  const [academicYearFilter, setAcademicYearFilter] = useState("");
   const [studentSearchTerm, setStudentSearchTerm] = useState("");
   const [studentDeptFilter, setStudentDeptFilter] = useState("all");
   const [studentYearFilter, setStudentYearFilter] = useState("all");
@@ -155,7 +145,6 @@ export default function StudentGroupsPage() {
       name: "",
       department_id: 0,
       semester: 0,
-      academic_year_id: 0,
     },
   });
 
@@ -163,7 +152,6 @@ export default function StudentGroupsPage() {
   useEffect(() => {
     fetchStudentGroups();
     fetchDepartments();
-    fetchAcademicYears();
   }, []);
 
   // Function to fetch student groups from API
@@ -312,11 +300,8 @@ export default function StudentGroupsPage() {
     const matchesSemester = semesterFilter && semesterFilter !== "all" 
       ? group.semester === parseInt(semesterFilter) 
       : true;
-    const matchesAcademicYear = academicYearFilter && academicYearFilter !== "all" 
-      ? group.academic_year.id === parseInt(academicYearFilter) 
-      : true;
     
-    return matchesSearch && matchesDept && matchesSemester && matchesAcademicYear;
+    return matchesSearch && matchesDept && matchesSemester;
   });
 
   // Calculate pagination
@@ -449,7 +434,6 @@ export default function StudentGroupsPage() {
     form.setValue("name", group.name);
     form.setValue("department_id", group.department.id);
     form.setValue("semester", group.semester);
-    form.setValue("academic_year_id", group.academic_year.id);
     setIsEditDialogOpen(true);
   };
 
@@ -850,20 +834,6 @@ export default function StudentGroupsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                
-                <Select value={academicYearFilter || "all"} onValueChange={setAcademicYearFilter}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Tahun Akademik" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Tahun Akademik</SelectItem>
-                    {academicYears.map((year) => (
-                      <SelectItem key={year.id} value={year.id.toString()}>
-                        {year.name} - {year.semester}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
@@ -882,16 +852,15 @@ export default function StudentGroupsPage() {
                       <TableHead className="font-bold text-black">Program Studi</TableHead>
                       <TableHead className="font-bold text-black">Semester</TableHead>
                       <TableHead className="font-bold text-black">Jumlah Mahasiswa</TableHead>
-                      <TableHead className="font-bold text-black">Tahun Akademik</TableHead>
                       <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {currentData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-10">
+                        <TableCell colSpan={6} className="text-center py-10">
                           <div className="mt-2 text-sm text-gray-500">
-                            {searchTerm || deptFilter !== "all" || semesterFilter !== "all" || academicYearFilter !== "all"
+                            {searchTerm || deptFilter !== "all" || semesterFilter !== "all"
                               ? "Tidak ada data kelompok yang sesuai dengan filter"
                               : "Belum ada data kelompok mahasiswa"}
                           </div>
@@ -900,7 +869,6 @@ export default function StudentGroupsPage() {
                     ) : (
                       currentData.map((group, index) => {
                         const department = departments.find((d) => d.id === group.department.id);
-                        const academicYear = academicYears.find((y) => y.id === group.academic_year.id);
                         
                         return (
                           <TableRow key={group.id}>
@@ -909,15 +877,6 @@ export default function StudentGroupsPage() {
                             <TableCell>{department?.name || group.department?.name}</TableCell>
                             <TableCell>Semester {group.semester}</TableCell>
                             <TableCell>{group.student_count} Mahasiswa</TableCell>
-                            <TableCell>
-                              {academicYear ? `${academicYear.name} - ${academicYear.semester}` : 
-                                `${group.academic_year.name} - ${group.academic_year.semester}`}
-                              {group.academic_year.is_active && (
-                                <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
-                                  Aktif
-                                </Badge>
-                              )}
-                            </TableCell>
                             <TableCell className="text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -1100,36 +1059,6 @@ export default function StudentGroupsPage() {
                   )}
                 />
                 
-                <FormField
-                  control={form.control}
-                  name="academic_year_id"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Tahun Akademik</FormLabel>
-                      <div className="col-span-3">
-                        <Select 
-                          value={field.value.toString()} 
-                          onValueChange={(val) => field.onChange(parseInt(val))}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih tahun akademik" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {academicYears.map((year) => (
-                              <SelectItem key={year.id} value={year.id.toString()}>
-                                {year.name} - {year.semester}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => {
                     setIsAddDialogOpen(false);
@@ -1228,36 +1157,6 @@ export default function StudentGroupsPage() {
                             {Array.from({ length: 8 }, (_, i) => (
                               <SelectItem key={i + 1} value={(i + 1).toString()}>
                                 Semester {i + 1}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-               
-                <FormField
-                  control={form.control}
-                  name="academic_year_id"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">Tahun Akademik</FormLabel>
-                      <div className="col-span-3">
-                        <Select 
-                          value={field.value.toString()} 
-                          onValueChange={(val) => field.onChange(parseInt(val))}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih tahun akademik" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {academicYears.map((year) => (
-                              <SelectItem key={year.id} value={year.id.toString()}>
-                                {year.name} - {year.semester}
                               </SelectItem>
                             ))}
                           </SelectContent>

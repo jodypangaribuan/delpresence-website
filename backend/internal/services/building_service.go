@@ -21,13 +21,40 @@ func NewBuildingService() *BuildingService {
 
 // CreateBuilding creates a new building
 func (s *BuildingService) CreateBuilding(building *models.Building) error {
-	// Check if code already exists
-	existingBuilding, err := s.repository.FindByCode(building.Code)
+	// Check if code exists (including soft-deleted)
+	exists, err := s.repository.CheckCodeExists(building.Code, 0)
 	if err != nil {
 		return err
 	}
-	if existingBuilding != nil {
-		return errors.New("building with this code already exists")
+
+	if exists {
+		// Try to find a soft-deleted building with this code
+		deletedBuilding, err := s.repository.FindDeletedByCode(building.Code)
+		if err != nil {
+			return err
+		}
+
+		if deletedBuilding != nil {
+			// Restore the soft-deleted building with updated data
+			deletedBuilding.Name = building.Name
+			deletedBuilding.Floors = building.Floors
+			deletedBuilding.Description = building.Description
+			
+			// Restore the building
+			restoredBuilding, err := s.repository.RestoreByCode(building.Code)
+			if err != nil {
+				return err
+			}
+			
+			// Update with new data
+			restoredBuilding.Name = building.Name
+			restoredBuilding.Floors = building.Floors
+			restoredBuilding.Description = building.Description
+			
+			return s.repository.Update(restoredBuilding)
+		}
+		
+		return errors.New("kode gedung sudah digunakan")
 	}
 
 	// Create building
@@ -42,17 +69,17 @@ func (s *BuildingService) UpdateBuilding(building *models.Building) error {
 		return err
 	}
 	if existingBuilding == nil {
-		return errors.New("building not found")
+		return errors.New("gedung tidak ditemukan")
 	}
 
 	// If code is changed, check if new code already exists
 	if building.Code != existingBuilding.Code {
-		existingWithCode, err := s.repository.FindByCode(building.Code)
+		exists, err := s.repository.CheckCodeExists(building.Code, building.ID)
 		if err != nil {
 			return err
 		}
-		if existingWithCode != nil && existingWithCode.ID != building.ID {
-			return errors.New("building with this code already exists")
+		if exists {
+			return errors.New("kode gedung sudah digunakan")
 		}
 	}
 
@@ -78,7 +105,7 @@ func (s *BuildingService) DeleteBuilding(id uint) error {
 		return err
 	}
 	if building == nil {
-		return errors.New("building not found")
+		return errors.New("gedung tidak ditemukan")
 	}
 
 	// Check if there are any associated rooms
@@ -87,10 +114,10 @@ func (s *BuildingService) DeleteBuilding(id uint) error {
 		return err
 	}
 	if roomCount > 0 {
-		return errors.New("cannot delete building with associated rooms")
+		return errors.New("tidak dapat menghapus gedung yang memiliki ruangan")
 	}
 
-	// Delete building
+	// Delete building (soft delete)
 	return s.repository.DeleteByID(id)
 }
 
@@ -108,7 +135,7 @@ func (s *BuildingService) GetBuildingWithStats(id uint) (*BuildingWithStats, err
 		return nil, err
 	}
 	if building == nil {
-		return nil, errors.New("building not found")
+		return nil, errors.New("gedung tidak ditemukan")
 	}
 
 	// Count rooms

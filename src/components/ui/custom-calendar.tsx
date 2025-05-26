@@ -121,7 +121,7 @@ export function CustomCalendar({
           <span className="sr-only">Bulan sebelumnya</span>
         </Button>
         
-        <h2 className="text-sm font-medium text-[#002A5C]">{monthYear}</h2>
+        <h2 className="text-sm font-medium text-black">{monthYear}</h2>
         
         <Button 
           variant="ghost" 

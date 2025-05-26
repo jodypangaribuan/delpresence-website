@@ -313,7 +313,7 @@ export default function AttendancePage() {
             <div className="p-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-semibold text-[#002A5C]">Kelola Presensi</h3>
+                  <h3 className="text-xl font-semibold text-black">Kelola Presensi</h3>
                   <p className="text-sm text-muted-foreground mt-1">Kelola kehadiran mahasiswa dengan berbagai metode autentikasi</p>
                 </div>
                 <div>
@@ -321,19 +321,19 @@ export default function AttendancePage() {
                     <TabsList className="grid grid-cols-3 w-full md:w-[400px] bg-gray-100">
                       <TabsTrigger 
                         value="upcoming" 
-                        className="data-[state=active]:bg-white data-[state=active]:text-[#002A5C] data-[state=active]:shadow-sm"
+                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm"
                       >
                         Jadwal
                       </TabsTrigger>
                       <TabsTrigger 
                         value="active" 
-                        className="data-[state=active]:bg-white data-[state=active]:text-[#002A5C] data-[state=active]:shadow-sm"
+                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm"
                       >
                         Sesi Aktif
                       </TabsTrigger>
                       <TabsTrigger 
                         value="past" 
-                        className="data-[state=active]:bg-white data-[state=active]:text-[#002A5C] data-[state=active]:shadow-sm"
+                        className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm"
                       >
                         Riwayat
                       </TabsTrigger>
@@ -437,7 +437,7 @@ export default function AttendancePage() {
                 {activeTab === "active" && (
                   <div className="space-y-4">
                     <div className="mb-6">
-                      <h4 className="text-lg font-medium text-[#002A5C]">Sesi Presensi Aktif</h4>
+                      <h4 className="text-lg font-medium text-black">Sesi Presensi Aktif</h4>
                       <p className="text-sm text-muted-foreground mt-1">Pantau sesi presensi yang sedang berlangsung</p>
                     </div>
                     
@@ -550,7 +550,7 @@ export default function AttendancePage() {
                   <div className="space-y-4">
                     <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                       <div>
-                        <h4 className="text-lg font-medium text-[#002A5C]">Riwayat Sesi Presensi</h4>
+                        <h4 className="text-lg font-medium text-black">Riwayat Sesi Presensi</h4>
                         <p className="text-sm text-muted-foreground mt-1">Rekam jejak sesi presensi yang telah selesai</p>
                       </div>
                       <div className="flex flex-col gap-2 sm:flex-row">
@@ -655,7 +655,7 @@ export default function AttendancePage() {
           <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle className="text-xl font-semibold text-[#002A5C]">Pengaturan Sesi Presensi</DialogTitle>
+                <DialogTitle className="text-xl font-semibold text-black">Pengaturan Sesi Presensi</DialogTitle>
                 <DialogDescription>
                   {selectedSchedule && (
                     <div className="mt-2">

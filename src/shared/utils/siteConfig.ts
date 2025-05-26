@@ -23,7 +23,7 @@ export const siteConfig: SiteConfig = {
       to: '#00A3FF',
     }
   },
-  copyright: `© ${new Date().getFullYear()} Institut Teknologi Del`
+  copyright: `© ${new Date().getFullYear()} Institut Teknologi Del | Developed by Group 4, Final Project 2. All rights reserved.`
 };
 
 /**
@@ -49,5 +49,44 @@ export const homepageImages: CardImage[] = [
   {
     id: 1,
     img: "/images/image-beranda-1.jpg",
+  },
+];
+
+export const teamData = [
+  {
+    id: 1,
+    name: "Jody Edriano Pangaribuan",
+    designation: "Project Manager",
+    image: "/images/team/member1.jpg",
+  },
+  {
+    id: 2,
+    name: "Marshanda Kasih Simangunsong",
+    designation: "?",
+    image: "/images/team/member2.jpg",
+  },
+  {
+    id: 3,
+    name: "Anno Deritman Siregar",
+    designation: "?",
+    image: "/images/team/member3.jpg",
+  },
+  {
+    id: 4,
+    name: "Jessica Anastasya Purba",
+    designation: "?",
+    image: "/images/team/member4.jpg",
+  },
+  {
+    id: 5,
+    name: "Prapanca Ronaldo Panjaitan",
+    designation: "?",
+    image: "/images/team/member5.jpg",
+  },
+  {
+    id: 6,
+    name: "Kezia M S Siahaan",
+    designation: "?",
+    image: "/images/team/member6.jpg",
   },
 ]; 

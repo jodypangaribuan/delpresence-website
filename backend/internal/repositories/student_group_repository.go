@@ -23,7 +23,7 @@ func NewStudentGroupRepository() *StudentGroupRepository {
 // GetAll returns all student groups
 func (r *StudentGroupRepository) GetAll() ([]models.StudentGroup, error) {
 	var groups []models.StudentGroup
-	result := r.db.Preload("Department").Preload("AcademicYear").Find(&groups)
+	result := r.db.Preload("Department").Find(&groups)
 	
 	// Calculate student count for each group
 	for i := range groups {
@@ -38,7 +38,7 @@ func (r *StudentGroupRepository) GetAll() ([]models.StudentGroup, error) {
 // GetByID returns a student group by ID
 func (r *StudentGroupRepository) GetByID(id uint) (*models.StudentGroup, error) {
 	var group models.StudentGroup
-	result := r.db.Preload("Department").Preload("AcademicYear").First(&group, id)
+	result := r.db.Preload("Department").First(&group, id)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -54,22 +54,7 @@ func (r *StudentGroupRepository) GetByID(id uint) (*models.StudentGroup, error) 
 // GetByDepartment returns student groups filtered by department
 func (r *StudentGroupRepository) GetByDepartment(departmentID uint) ([]models.StudentGroup, error) {
 	var groups []models.StudentGroup
-	result := r.db.Where("department_id = ?", departmentID).Preload("Department").Preload("AcademicYear").Find(&groups)
-	
-	// Calculate student count for each group
-	for i := range groups {
-		var count int64
-		r.db.Model(&models.StudentToGroup{}).Where("student_group_id = ?", groups[i].ID).Count(&count)
-		groups[i].StudentCount = int(count)
-	}
-	
-	return groups, result.Error
-}
-
-// GetByAcademicYear returns student groups filtered by academic year
-func (r *StudentGroupRepository) GetByAcademicYear(academicYearID uint) ([]models.StudentGroup, error) {
-	var groups []models.StudentGroup
-	result := r.db.Where("academic_year_id = ?", academicYearID).Preload("Department").Preload("AcademicYear").Find(&groups)
+	result := r.db.Where("department_id = ?", departmentID).Preload("Department").Find(&groups)
 	
 	// Calculate student count for each group
 	for i := range groups {
@@ -84,7 +69,7 @@ func (r *StudentGroupRepository) GetByAcademicYear(academicYearID uint) ([]model
 // GetBySemester returns student groups filtered by semester
 func (r *StudentGroupRepository) GetBySemester(semester int) ([]models.StudentGroup, error) {
 	var groups []models.StudentGroup
-	result := r.db.Where("semester = ?", semester).Preload("Department").Preload("AcademicYear").Find(&groups)
+	result := r.db.Where("semester = ?", semester).Preload("Department").Find(&groups)
 	
 	// Calculate student count for each group
 	for i := range groups {
@@ -220,7 +205,6 @@ func (r *StudentGroupRepository) GetStudentGroups(studentID uint) ([]models.Stud
 	result := r.db.Joins("JOIN student_to_groups ON student_groups.id = student_to_groups.student_group_id").
 		Where("student_to_groups.student_id = ?", studentID).
 		Preload("Department").
-		Preload("AcademicYear").
 		Find(&groups)
 	
 	// Calculate student count for each group

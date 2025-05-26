@@ -39,25 +39,19 @@ func (h *LecturerAssignmentHandler) CreateLecturerAssignment(c *gin.Context) {
 
 	// Set default academic year if not provided
 	if input.AcademicYearID == 0 {
-		// Try to get active academic year
+		// Get any available academic year
 		academicYearRepo := repositories.NewAcademicYearRepository()
-		activeYear, err := academicYearRepo.GetActiveAcademicYear()
-		
-		if err == nil && activeYear != nil {
-			input.AcademicYearID = activeYear.ID
+		// Get the most recent one
+		academicYears, err := academicYearRepo.FindAll()
+		if err == nil && len(academicYears) > 0 {
+			// Sort by ID descending to get the most recent one
+			sort.Slice(academicYears, func(i, j int) bool {
+				return academicYears[i].ID > academicYears[j].ID
+			})
+			input.AcademicYearID = academicYears[0].ID
 		} else {
-			// If no active year, get the most recent one
-			academicYears, err := academicYearRepo.FindAll()
-			if err == nil && len(academicYears) > 0 {
-				// Sort by ID descending to get the most recent one
-				sort.Slice(academicYears, func(i, j int) bool {
-					return academicYears[i].ID > academicYears[j].ID
-				})
-				input.AcademicYearID = academicYears[0].ID
-			} else {
-				// If still no academic year, use ID 1 as fallback
-				input.AcademicYearID = 1
-			}
+			// If still no academic year, use ID 1 as fallback
+			input.AcademicYearID = 1
 		}
 	}
 
@@ -66,7 +60,25 @@ func (h *LecturerAssignmentHandler) CreateLecturerAssignment(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
-			"message": "Failed to check if assignment exists: " + err.Error(),
+			"message": "Gagal memeriksa penugasan yang ada: " + err.Error(),
+		})
+		return
+	}
+
+	// Check if any lecturer is already assigned to this course
+	existingAssignments, err := h.repo.GetByCourseID(input.CourseID, input.AcademicYearID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Gagal memeriksa penugasan yang ada: " + err.Error(),
+		})
+		return
+	}
+
+	if len(existingAssignments) > 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"status":  "error",
+			"message": "Tidak dapat menugaskan dosen: Satu mata kuliah hanya dapat ditugaskan kepada satu dosen. Hapus penugasan dosen yang ada terlebih dahulu.",
 		})
 		return
 	}
@@ -74,7 +86,7 @@ func (h *LecturerAssignmentHandler) CreateLecturerAssignment(c *gin.Context) {
 	if exists {
 		c.JSON(http.StatusConflict, gin.H{
 			"status":  "error",
-			"message": "This lecturer is already assigned to this course",
+			"message": "Dosen ini sudah ditugaskan untuk mata kuliah ini",
 		})
 		return
 	}
@@ -109,7 +121,7 @@ func (h *LecturerAssignmentHandler) CreateLecturerAssignment(c *gin.Context) {
 	if err != nil || course.ID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "Invalid course ID",
+			"message": "ID mata kuliah tidak valid",
 		})
 		return
 	}
@@ -135,7 +147,7 @@ func (h *LecturerAssignmentHandler) CreateLecturerAssignment(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
-			"message": "Lecturer assignment created successfully",
+			"message": "Penugasan dosen berhasil dibuat",
 			"data":    assignment,
 		})
 		return
@@ -143,7 +155,7 @@ func (h *LecturerAssignmentHandler) CreateLecturerAssignment(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Lecturer assignment created successfully",
+		"message": "Penugasan dosen berhasil dibuat",
 		"data":    response,
 	})
 }
@@ -303,7 +315,7 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 			   (input.CourseID != 0 && input.CourseID != existingAssignment.CourseID) {
 				c.JSON(http.StatusConflict, gin.H{
 					"status":  "error",
-					"message": "Another lecturer is already assigned to this course",
+					"message": "Dosen lain sudah ditugaskan untuk mata kuliah ini",
 				})
 				return
 			}
@@ -324,7 +336,7 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 			if err != nil || lecturer.ID == 0 {
 				c.JSON(http.StatusBadRequest, gin.H{
 					"status":  "error",
-					"message": "Invalid lecturer ID - no lecturer found with this ID",
+					"message": "ID dosen tidak valid - tidak ditemukan dosen dengan ID ini",
 				})
 				return
 			}
@@ -346,7 +358,7 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 		if err != nil || course.ID == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  "error",
-				"message": "Invalid course ID",
+				"message": "ID mata kuliah tidak valid",
 			})
 			return
 		}
@@ -379,21 +391,55 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 	}
 
 	// If the lecturer has changed, update related course schedules
-	if existingAssignment.UserID != originalUserID && 
-	   existingAssignment.CourseID == originalCourseID {
-		
-		// Update all schedules for this course to use the new lecturer
+	if existingAssignment.UserID != originalUserID {
+		// Update all schedules for this course to use the new lecturer, filtered by academic year
 		scheduleRepo := repositories.NewCourseScheduleRepository()
-		updateErr := scheduleRepo.UpdateSchedulesForCourse(
+		updateErr := scheduleRepo.UpdateSchedulesForCourseInAcademicYear(
 			existingAssignment.CourseID, 
+			existingAssignment.AcademicYearID,
 			uint(existingAssignment.UserID))
 		
 		if updateErr != nil {
 			// Log the error but continue - don't fail the whole operation
-			fmt.Printf("Warning: Failed to update related course schedules: %v\n", updateErr)
+			fmt.Printf("Warning: Failed to update related course schedules for academic year %d: %v\n", 
+				existingAssignment.AcademicYearID, updateErr)
 		} else {
-			fmt.Printf("Successfully updated related course schedules for course_id=%d to use lecturer_id=%d\n", 
-				existingAssignment.CourseID, existingAssignment.UserID)
+			fmt.Printf("Successfully updated related course schedules for course_id=%d, academic_year_id=%d to use lecturer_id=%d\n", 
+				existingAssignment.CourseID, existingAssignment.AcademicYearID, existingAssignment.UserID)
+		}
+	}
+
+	// If the course has changed (this is a rare case), clean up old schedules or update them
+	if existingAssignment.CourseID != originalCourseID && originalCourseID != 0 {
+		// Get the original assignments if any exist for the new combination
+		assignments, err := h.repo.GetByCourseID(existingAssignment.CourseID, existingAssignment.AcademicYearID)
+		
+		// If there are other assignments for this course in this academic year, use that lecturer instead
+		if err == nil && len(assignments) > 0 {
+			// Find an assignment that's not the current one
+			var otherAssignment models.LecturerAssignment
+			for _, a := range assignments {
+				if a.ID != existingAssignment.ID {
+					otherAssignment = a
+					break
+				}
+			}
+			
+			// If we found another assignment, update schedules to use that lecturer
+			if otherAssignment.ID != 0 {
+				scheduleRepo := repositories.NewCourseScheduleRepository()
+				updateErr := scheduleRepo.UpdateSchedulesForCourseInAcademicYear(
+					originalCourseID, 
+					existingAssignment.AcademicYearID,
+					uint(otherAssignment.UserID))
+				
+				if updateErr != nil {
+					fmt.Printf("Warning: Failed to update related course schedules for previous course: %v\n", updateErr)
+				} else {
+					fmt.Printf("Successfully updated schedules for previous course_id=%d to use alternative lecturer_id=%d\n", 
+						originalCourseID, otherAssignment.UserID)
+				}
+			}
 		}
 	}
 
@@ -402,7 +448,7 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
-			"message": "Lecturer assignment updated successfully",
+			"message": "Penugasan dosen berhasil diperbarui",
 			"data":    existingAssignment,
 		})
 		return
@@ -413,7 +459,7 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
-			"message": "Lecturer assignment updated successfully",
+			"message": "Penugasan dosen berhasil diperbarui",
 			"data":    refreshedAssignment,
 		})
 		return
@@ -421,7 +467,7 @@ func (h *LecturerAssignmentHandler) UpdateLecturerAssignment(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Lecturer assignment updated successfully",
+		"message": "Penugasan dosen berhasil diperbarui",
 		"data":    formattedResponse,
 	})
 	
@@ -456,6 +502,52 @@ func (h *LecturerAssignmentHandler) DeleteLecturerAssignment(c *gin.Context) {
 		})
 		return
 	}
+	
+	// Before deleting, store the course ID, academic year ID and user ID for schedule updates
+	courseID := assignment.CourseID
+	academicYearID := assignment.AcademicYearID
+	userID := assignment.UserID
+	
+	// Check if there are any other lecturer assignments for this course in this academic year
+	assignments, err := h.repo.GetByCourseID(courseID, academicYearID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Failed to check other assignments: " + err.Error(),
+		})
+		return
+	}
+	
+	// Count other assignments excluding the one being deleted
+	var otherAssignmentCount int = 0
+	var alternativeLecturerID int = 0
+	for _, otherAssignment := range assignments {
+		if otherAssignment.ID != uint(id) {
+			otherAssignmentCount++
+			alternativeLecturerID = otherAssignment.UserID
+			break
+		}
+	}
+
+	// Check if there are any course schedules associated with this lecturer and course
+	scheduleRepo := repositories.NewCourseScheduleRepository()
+	schedules, err := scheduleRepo.GetByCourseAndAcademicYear(courseID, academicYearID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Failed to check for associated schedules: " + err.Error(),
+		})
+		return
+	}
+
+	// If there are schedules and this is the only lecturer assignment, prevent deletion
+	if len(schedules) > 0 && otherAssignmentCount == 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"status":  "error",
+			"message": "Tidak dapat menghapus penugasan: Masih terdapat jadwal perkuliahan yang terkait dengan dosen ini. Silakan hapus jadwal terlebih dahulu atau tugaskan dosen lain untuk mata kuliah ini.",
+		})
+		return
+	}
 
 	// Delete the assignment
 	err = h.repo.Delete(uint(id))
@@ -466,10 +558,31 @@ func (h *LecturerAssignmentHandler) DeleteLecturerAssignment(c *gin.Context) {
 		})
 		return
 	}
+	
+	// After deleting the assignment, update course schedules if needed
+	// If there are other assignments for this course, update schedules to use one of those lecturers
+	if otherAssignmentCount > 0 && alternativeLecturerID != 0 {
+		// Check if there are any schedules with this lecturer
+		lecturerSchedules, err := scheduleRepo.GetByLecturerAndAcademicYear(uint(userID), academicYearID)
+		if err == nil && len(lecturerSchedules) > 0 {
+			// Update these schedules to use the alternative lecturer
+			updateErr := scheduleRepo.UpdateSchedulesForCourseInAcademicYear(
+				courseID, 
+				academicYearID,
+				uint(alternativeLecturerID))
+			
+			if updateErr != nil {
+				fmt.Printf("Warning: Failed to update schedules with alternative lecturer after deletion: %v\n", updateErr)
+			} else {
+				fmt.Printf("Successfully updated schedules to use alternative lecturer_id=%d after deletion\n", 
+					alternativeLecturerID)
+			}
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Lecturer assignment deleted successfully",
+		"message": "Penugasan dosen berhasil dihapus",
 	})
 }
 
@@ -543,12 +656,17 @@ func (h *LecturerAssignmentHandler) GetAssignmentsByCourse(c *gin.Context) {
 		academicYearID = uint(academicYearIDUint)
 	}
 
-	// If no academic year specified, try to get the active one
+	// If no academic year specified, try to get any available one
 	if academicYearID == 0 {
 		academicYearRepo := repositories.NewAcademicYearRepository()
-		activeYear, err := academicYearRepo.GetActiveAcademicYear()
-		if err == nil && activeYear != nil {
-			academicYearID = activeYear.ID
+		// Get all academic years and use the most recent one
+		academicYears, err := academicYearRepo.FindAll()
+		if err == nil && len(academicYears) > 0 {
+			// Sort by ID descending to get the most recent one
+			sort.Slice(academicYears, func(i, j int) bool {
+				return academicYears[i].ID > academicYears[j].ID
+			})
+			academicYearID = academicYears[0].ID
 		}
 	}
 
@@ -595,23 +713,18 @@ func (h *LecturerAssignmentHandler) GetAvailableLecturers(c *gin.Context) {
 		academicYearID = uint(academicYearIDUint)
 	}
 
-	// If no academic year specified, try to get any academic year
+	// If no academic year specified, try to get any available one
 	if academicYearID == 0 {
 		academicYearRepo := repositories.NewAcademicYearRepository()
-		
-		// Get all academic years and use the most recent one if available
+		// Get all academic years and use the most recent one
 		academicYears, err := academicYearRepo.FindAll()
 		if err == nil && len(academicYears) > 0 {
 			// Sort by ID descending to get the most recent one
 			sort.Slice(academicYears, func(i, j int) bool {
 				return academicYears[i].ID > academicYears[j].ID
 			})
-			
 			academicYearID = academicYears[0].ID
 		}
-		
-		// Even if we don't find an academic year, continue with ID=0
-		// This will make the repository return lecturers without academic year filtering
 	}
 
 	// Get available lecturers
@@ -642,42 +755,48 @@ func (h *LecturerAssignmentHandler) GetMyAssignments(c *gin.Context) {
 		return
 	}
 
-	// Get external user ID (lecturer ID in the external system) or use userID as fallback
-	externalUserID, exists := c.Get("external_user_id")
-	if !exists || externalUserID == nil {
-		// Use userID as fallback
-		externalUserID = userID
-	}
-
-	// Convert external user ID to int
-	var lecturerUserID int
-	switch v := externalUserID.(type) {
+	// First, look up the lecturer record in the database to get the correct user_id to filter by
+	lecturerRepo := repositories.NewLecturerRepository()
+	
+	// Convert the userID from context to the expected type
+	var userIDInt int
+	switch v := userID.(type) {
 	case int:
-		lecturerUserID = v
+		userIDInt = v
 	case int64:
-		lecturerUserID = int(v)
+		userIDInt = int(v)
 	case float64:
-		lecturerUserID = int(v)
+		userIDInt = int(v)
 	case uint:
-		lecturerUserID = int(v)
+		userIDInt = int(v)
 	case string:
 		id, err := strconv.Atoi(v)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":  "error",
-				"message": "Invalid lecturer ID",
+				"message": "Invalid user ID format",
 			})
 			return
 		}
-		lecturerUserID = id
+		userIDInt = id
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
-			"message": "Invalid lecturer ID type",
+			"message": "Invalid user ID type",
 		})
 		return
 	}
-
+	
+	// Get the lecturer by userID from authentication
+	lecturer, err := lecturerRepo.GetByUserID(userIDInt)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Lecturer not found: " + err.Error(),
+		})
+		return
+	}
+	
 	// Get academic year ID from query parameter, if provided
 	academicYearIDStr := c.Query("academic_year_id")
 	var academicYearID uint = 0
@@ -694,17 +813,22 @@ func (h *LecturerAssignmentHandler) GetMyAssignments(c *gin.Context) {
 		academicYearID = uint(academicYearIDUint)
 	}
 
-	// If no academic year specified, try to get the active one
+	// If no academic year specified, try to get any available one
 	if academicYearID == 0 {
 		academicYearRepo := repositories.NewAcademicYearRepository()
-		activeYear, err := academicYearRepo.GetActiveAcademicYear()
-		if err == nil && activeYear != nil {
-			academicYearID = activeYear.ID
+		// Get all academic years and use the most recent one
+		academicYears, err := academicYearRepo.FindAll()
+		if err == nil && len(academicYears) > 0 {
+			// Sort by ID descending to get the most recent one
+			sort.Slice(academicYears, func(i, j int) bool {
+				return academicYears[i].ID > academicYears[j].ID
+			})
+			academicYearID = academicYears[0].ID
 		}
 	}
 
-	// Get assignments for the lecturer
-	assignments, err := h.repo.GetByLecturerID(lecturerUserID, academicYearID)
+	// Use the lecturer's UserID from the database to get assignments
+	assignments, err := h.repo.GetByLecturerID(lecturer.UserID, academicYearID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",

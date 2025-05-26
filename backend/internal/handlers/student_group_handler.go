@@ -28,7 +28,6 @@ func (h *StudentGroupHandler) GetAllStudentGroups(c *gin.Context) {
 	// Parse query parameters for filtering
 	departmentID := c.Query("department_id")
 	semesterStr := c.Query("semester")
-	academicYearID := c.Query("academic_year_id")
 	
 	var groups []models.StudentGroup
 	var err error
@@ -48,13 +47,6 @@ func (h *StudentGroupHandler) GetAllStudentGroups(c *gin.Context) {
 			return
 		}
 		groups, err = h.repo.GetBySemester(semester)
-	} else if academicYearID != "" {
-		yearID, convErr := strconv.ParseUint(academicYearID, 10, 32)
-		if convErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Invalid academic year ID"})
-			return
-		}
-		groups, err = h.repo.GetByAcademicYear(uint(yearID))
 	} else {
 		groups, err = h.repo.GetAll()
 	}
@@ -90,7 +82,6 @@ func (h *StudentGroupHandler) CreateStudentGroup(c *gin.Context) {
 		Name           string `json:"name" binding:"required"`
 		DepartmentID   uint   `json:"department_id" binding:"required"`
 		Semester       int    `json:"semester" binding:"required,min=1,max=8"`
-		AcademicYearID uint   `json:"academic_year_id" binding:"required"`
 	}
 	
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -103,7 +94,6 @@ func (h *StudentGroupHandler) CreateStudentGroup(c *gin.Context) {
 		Name:          request.Name,
 		DepartmentID:  request.DepartmentID,
 		Semester:      request.Semester,
-		AcademicYearID: request.AcademicYearID,
 		StudentCount:  0,
 	}
 	
@@ -135,7 +125,6 @@ func (h *StudentGroupHandler) UpdateStudentGroup(c *gin.Context) {
 		Name           string `json:"name" binding:"required"`
 		DepartmentID   uint   `json:"department_id" binding:"required"`
 		Semester       int    `json:"semester" binding:"required,min=1,max=8"`
-		AcademicYearID uint   `json:"academic_year_id" binding:"required"`
 	}
 	
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -147,7 +136,6 @@ func (h *StudentGroupHandler) UpdateStudentGroup(c *gin.Context) {
 	existingGroup.Name = request.Name
 	existingGroup.DepartmentID = request.DepartmentID
 	existingGroup.Semester = request.Semester
-	existingGroup.AcademicYearID = request.AcademicYearID
 	
 	updatedGroup, err := h.repo.Update(*existingGroup)
 	if err != nil {

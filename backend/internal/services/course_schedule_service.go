@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"sort"
 	
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/repositories"
@@ -59,16 +60,25 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 	if err != nil || user == nil || user.Role != "Dosen" {
 		// Initialize repositories
 		lecturerAssignmentRepo := repositories.NewLecturerAssignmentRepository()
-		academicYearRepo := repositories.NewAcademicYearRepository()
 		
-		// Get active academic year
-		activeYear, err := academicYearRepo.GetActiveAcademicYear()
-		if err != nil || activeYear == nil {
-			return models.CourseSchedule{}, errors.New("failed to get active academic year")
+		// Get academic years and use the provided one or any available one
+		academicYearID := schedule.AcademicYearID
+		if academicYearID == 0 {
+			// Use any available academic year
+			academicYears, err := s.academicYearRepo.FindAll()
+			if err != nil || len(academicYears) == 0 {
+				return models.CourseSchedule{}, errors.New("no academic years found")
+			}
+			
+			// Sort by ID descending to get the most recent one
+			sort.Slice(academicYears, func(i, j int) bool {
+				return academicYears[i].ID > academicYears[j].ID
+			})
+			academicYearID = academicYears[0].ID
 		}
 		
 		// Check if any lecturer is assigned to this course
-		assignments, err := lecturerAssignmentRepo.GetByCourseID(schedule.CourseID, activeYear.ID)
+		assignments, err := lecturerAssignmentRepo.GetByCourseID(schedule.CourseID, academicYearID)
 		if err != nil || len(assignments) == 0 {
 			return models.CourseSchedule{}, errors.New("invalid lecturer/user ID and no lecturer assigned to this course")
 		}
@@ -151,72 +161,11 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 }
 
 // UpdateSchedule updates an existing course schedule
-func (s *CourseScheduleService) UpdateSchedule(id uint, schedule models.CourseSchedule) (models.CourseSchedule, error) {
-	// Get existing schedule
-	existingSchedule, err := s.repo.GetByID(id)
+func (s *CourseScheduleService) UpdateSchedule(schedule models.CourseSchedule) (models.CourseSchedule, error) {
+	// Check if schedule exists
+	existingSchedule, err := s.repo.GetByID(schedule.ID)
 	if err != nil {
 		return models.CourseSchedule{}, errors.New("schedule not found")
-	}
-
-	// Validate course
-	_, err = s.courseRepo.GetByID(schedule.CourseID)
-	if err != nil {
-		return models.CourseSchedule{}, errors.New("invalid course ID")
-	}
-
-	// Validate room
-	_, err = s.roomRepo.FindByID(schedule.RoomID)
-	if err != nil {
-		return models.CourseSchedule{}, errors.New("invalid room ID")
-	}
-
-	// Validate lecturer - look up in Users table first (ideally)
-	user, err := s.lecturerRepo.FindByID(schedule.UserID)
-	// If the User couldn't be found or is not a lecturer, check if a lecturer has been assigned to this course
-	if err != nil || user == nil || user.Role != "Dosen" {
-		// Initialize repositories
-		lecturerAssignmentRepo := repositories.NewLecturerAssignmentRepository()
-		academicYearRepo := repositories.NewAcademicYearRepository()
-		
-		// Get active academic year
-		activeYear, err := academicYearRepo.GetActiveAcademicYear()
-		if err != nil || activeYear == nil {
-			return models.CourseSchedule{}, errors.New("failed to get active academic year")
-		}
-		
-		// Check if any lecturer is assigned to this course
-		assignments, err := lecturerAssignmentRepo.GetByCourseID(schedule.CourseID, activeYear.ID)
-		if err != nil || len(assignments) == 0 {
-			return models.CourseSchedule{}, errors.New("invalid lecturer/user ID and no lecturer assigned to this course")
-		}
-		
-		// Adapt the schedule's UserID to use the first lecturer assignment's ID
-		lecturer := assignments[0].Lecturer
-		if lecturer == nil {
-			return models.CourseSchedule{}, errors.New("lecturer information not found for this course")
-		}
-		
-		// Try to find user by external ID
-		userRepo := repositories.NewUserRepository()
-		user, _ := userRepo.FindByExternalUserID(lecturer.UserID)
-		
-		// If user is found, use that ID; otherwise use the provided ID
-		if user != nil {
-			schedule.UserID = user.ID
-		}
-		// No need to update schedule.UserID here - we'll continue with the originally provided ID
-	}
-
-	// Validate student group
-	_, err = s.studentGroupRepo.GetByID(schedule.StudentGroupID)
-	if err != nil {
-		return models.CourseSchedule{}, errors.New("invalid student group ID")
-	}
-
-	// Validate academic year
-	academicYear, err := s.academicYearRepo.FindByID(schedule.AcademicYearID)
-	if err != nil || academicYear == nil {
-		return models.CourseSchedule{}, errors.New("invalid academic year ID")
 	}
 
 	// Check for room conflicts (excluding this schedule)
@@ -225,7 +174,7 @@ func (s *CourseScheduleService) UpdateSchedule(id uint, schedule models.CourseSc
 		schedule.Day,
 		schedule.StartTime,
 		schedule.EndTime,
-		&id,
+		&schedule.ID,
 	)
 	if err != nil {
 		return models.CourseSchedule{}, err
@@ -240,7 +189,7 @@ func (s *CourseScheduleService) UpdateSchedule(id uint, schedule models.CourseSc
 		schedule.Day,
 		schedule.StartTime,
 		schedule.EndTime,
-		&id,
+		&schedule.ID,
 	)
 	if err != nil {
 		return models.CourseSchedule{}, err
@@ -255,7 +204,7 @@ func (s *CourseScheduleService) UpdateSchedule(id uint, schedule models.CourseSc
 		schedule.Day,
 		schedule.StartTime,
 		schedule.EndTime,
-		&id,
+		&schedule.ID,
 	)
 	if err != nil {
 		return models.CourseSchedule{}, err
@@ -465,4 +414,19 @@ func (s *CourseScheduleService) CheckForScheduleConflicts(
 	conflicts["student_group"] = studentGroupConflict
 
 	return conflicts, nil
+}
+
+// CheckRoomScheduleConflict checks if there's a room schedule conflict
+func (s *CourseScheduleService) CheckRoomScheduleConflict(roomID uint, day string, startTime string, endTime string, scheduleID *uint) (bool, error) {
+	return s.repo.CheckScheduleConflict(roomID, day, startTime, endTime, scheduleID)
+}
+
+// CheckLecturerScheduleConflict checks if there's a lecturer schedule conflict
+func (s *CourseScheduleService) CheckLecturerScheduleConflict(userID uint, day string, startTime string, endTime string, scheduleID *uint) (bool, error) {
+	return s.repo.CheckLecturerScheduleConflict(userID, day, startTime, endTime, scheduleID)
+}
+
+// CheckStudentGroupScheduleConflict checks if there's a student group schedule conflict
+func (s *CourseScheduleService) CheckStudentGroupScheduleConflict(studentGroupID uint, day string, startTime string, endTime string, scheduleID *uint) (bool, error) {
+	return s.repo.CheckStudentGroupScheduleConflict(studentGroupID, day, startTime, endTime, scheduleID)
 } 

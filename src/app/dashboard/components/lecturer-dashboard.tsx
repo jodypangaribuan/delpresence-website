@@ -92,7 +92,7 @@ export default function LecturerDashboard() {
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-white rounded-lg p-6 border border-gray-100 shadow-sm">
-        <h1 className="text-2xl font-bold text-[#002A5C] mb-2">Selamat Datang, {userInfo.name}</h1>
+        <h1 className="text-2xl font-bold text-black mb-2">Selamat Datang, {userInfo.name}</h1>
         <p className="text-gray-600">Kelola jadwal dan kehadiran mahasiswa dengan mudah di satu tempat.</p>
       </div>
 
@@ -129,7 +129,7 @@ export default function LecturerDashboard() {
 
       {/* Quick Actions Section */}
       <div className="mt-8">
-        <h2 className="text-xl font-bold text-[#002A5C] mb-4 border-b pb-2">Manajemen Pengajaran</h2>
+        <h2 className="text-xl font-bold text-black mb-4 border-b pb-2">Manajemen Pengajaran</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
           <QuickActionCard
             title="Mata Kuliah Saya"
@@ -203,7 +203,7 @@ const QuickActionCard = ({ title, description, icon, href }: QuickActionCardProp
             <div className="bg-[#0687C9]/10 p-3 rounded-lg w-fit mb-3">
               <div className="text-[#0687C9]">{icon}</div>
             </div>
-            <h3 className="font-semibold text-lg mb-1">{title}</h3>
+            <h3 className="font-semibold text-lg mb-1 text-black">{title}</h3>
             <p className="text-sm text-muted-foreground">{description}</p>
           </div>
         </CardContent>

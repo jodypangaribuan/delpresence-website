@@ -276,4 +276,19 @@ func (r *CourseScheduleRepository) UpdateSchedulesForCourse(courseID, lecturerID
 	return r.db.Model(&models.CourseSchedule{}).
 		Where("course_id = ?", courseID).
 		Update("user_id", lecturerID).Error
+}
+
+// GetByCourseAndAcademicYear returns course schedules by course ID and academic year ID
+func (r *CourseScheduleRepository) GetByCourseAndAcademicYear(courseID, academicYearID uint) ([]models.CourseSchedule, error) {
+	var schedules []models.CourseSchedule
+	err := r.db.
+		Preload("Course").
+		Preload("Room").
+		Preload("Room.Building").
+		Preload("Lecturer").
+		Preload("StudentGroup").
+		Preload("AcademicYear").
+		Where("course_id = ? AND academic_year_id = ?", courseID, academicYearID).
+		Find(&schedules).Error
+	return schedules, err
 } 

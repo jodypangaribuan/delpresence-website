@@ -25,13 +25,13 @@ func NewAcademicYearService() *AcademicYearService {
 
 // CreateAcademicYear creates a new academic year
 func (s *AcademicYearService) CreateAcademicYear(academicYear *models.AcademicYear) error {
-	// Check if name already exists in active records
-	existingAcademicYear, err := s.repository.FindByName(academicYear.Name)
+	// Check if name and semester combination already exists in active records
+	existingAcademicYear, err := s.repository.FindByNameAndSemester(academicYear.Name, academicYear.Semester)
 	if err != nil {
 		return err
 	}
 	if existingAcademicYear != nil {
-		return errors.New("academic year with this name already exists")
+		return errors.New("academic year with this name and semester already exists")
 	}
 
 	// Try to restore a soft-deleted academic year with this name
@@ -70,14 +70,14 @@ func (s *AcademicYearService) UpdateAcademicYear(academicYear *models.AcademicYe
 		return errors.New("academic year not found")
 	}
 
-	// If name is changed, check if new name already exists
-	if academicYear.Name != existingAcademicYear.Name {
-		existingWithName, err := s.repository.FindByName(academicYear.Name)
+	// If name or semester is changed, check if the combination already exists
+	if academicYear.Name != existingAcademicYear.Name || academicYear.Semester != existingAcademicYear.Semester {
+		existingWithNameAndSemester, err := s.repository.FindByNameAndSemester(academicYear.Name, academicYear.Semester)
 		if err != nil {
 			return err
 		}
-		if existingWithName != nil && existingWithName.ID != academicYear.ID {
-			return errors.New("academic year with this name already exists")
+		if existingWithNameAndSemester != nil && existingWithNameAndSemester.ID != academicYear.ID {
+			return errors.New("academic year with this name and semester already exists")
 		}
 	}
 
@@ -119,61 +119,38 @@ func (s *AcademicYearService) DeleteAcademicYear(id uint) error {
 	// Get DB connection
 	db := database.GetDB()
 
-	// Begin transaction
-	tx := db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// Hard delete related lecturer assignments
-	if err := tx.Unscoped().Where("academic_year_id = ?", id).Delete(&models.LecturerAssignment{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete related lecturer assignments: %w", err)
+	// Check if this academic year is being used by courses
+	var courseCount int64
+	if err := db.Model(&models.Course{}).Where("academic_year_id = ?", id).Count(&courseCount).Error; err != nil {
+		return fmt.Errorf("failed to check related courses: %w", err)
 	}
 
-	// Hard delete related course schedules
-	if err := tx.Unscoped().Where("academic_year_id = ?", id).Delete(&models.CourseSchedule{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete related course schedules: %w", err)
+	if courseCount > 0 {
+		return errors.New("cannot delete academic year: it is being used by one or more courses")
 	}
 
-	// Get student group IDs to delete associated student-to-group relationships
-	var studentGroupIDs []uint
-	if err := tx.Model(&models.StudentGroup{}).Where("academic_year_id = ?", id).Pluck("id", &studentGroupIDs).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to get student group IDs: %w", err)
+	// Check if this academic year is being used by lecturer assignments
+	var assignmentCount int64
+	if err := db.Model(&models.LecturerAssignment{}).Where("academic_year_id = ?", id).Count(&assignmentCount).Error; err != nil {
+		return fmt.Errorf("failed to check related lecturer assignments: %w", err)
 	}
 
-	// If there are student groups, delete their student-to-group relationships
-	if len(studentGroupIDs) > 0 {
-		if err := tx.Unscoped().Where("student_group_id IN ?", studentGroupIDs).Delete(&models.StudentToGroup{}).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf("failed to delete related student-to-group relationships: %w", err)
-		}
+	if assignmentCount > 0 {
+		return errors.New("cannot delete academic year: it is being used by one or more lecturer assignments")
 	}
 
-	// Hard delete related student groups
-	if err := tx.Unscoped().Where("academic_year_id = ?", id).Delete(&models.StudentGroup{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete related student groups: %w", err)
+	// Check if this academic year is being used by course schedules
+	var scheduleCount int64
+	if err := db.Model(&models.CourseSchedule{}).Where("academic_year_id = ?", id).Count(&scheduleCount).Error; err != nil {
+		return fmt.Errorf("failed to check related course schedules: %w", err)
 	}
 
-	// Hard delete related courses
-	if err := tx.Unscoped().Where("academic_year_id = ?", id).Delete(&models.Course{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete related courses: %w", err)
+	if scheduleCount > 0 {
+		return errors.New("cannot delete academic year: it is being used by one or more course schedules")
 	}
 
-	// Delete the academic year
-	if err := tx.Delete(&models.AcademicYear{}, id).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete academic year: %w", err)
-	}
-
-	// Commit transaction
-	return tx.Commit().Error
+	// If not used by any related entities, proceed with deletion (soft delete)
+	return s.repository.DeleteByID(id)
 }
 
 // AcademicYearWithStats represents an academic year with additional statistics

@@ -44,6 +44,7 @@
     "framer-motion": "^11.18.2",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.501.0",
+    "motion": "^12.12.1",
     "next": "^15.3.1",
     "react": "^19.0.0",
     "react-apexcharts": "^1.7.0",
@@ -54,7 +55,7 @@
     "react-qr-code": "^2.0.15",
     "recharts": "^2.15.3",
     "sonner": "^2.0.3",
-    "tailwind-merge": "^3.2.0",
+    "tailwind-merge": "^3.3.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {

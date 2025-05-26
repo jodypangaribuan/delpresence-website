@@ -243,7 +243,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-white rounded-lg p-6 border border-gray-100 shadow-sm">
-        <h1 className="text-2xl font-bold text-[#002A5C] mb-2">Selamat Datang, {userInfo.name}</h1>
+        <h1 className="text-2xl font-bold text-black mb-2">Selamat Datang, {userInfo.name}</h1>
         <p className="text-gray-600">Kelola program studi, fakultas, dan data akademik dengan mudah di satu tempat.</p>
       </div>
 
@@ -306,7 +306,7 @@ export default function AdminDashboard() {
 
       {/* Quick Actions Section */}
       <div className="mt-8">
-        <h2 className="text-xl font-bold text-[#002A5C] mb-4 border-b pb-2">Aksi Cepat</h2>
+        <h2 className="text-xl font-bold text-black mb-4 border-b pb-2">Aksi Cepat</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Academic Management Card */}
           <QuickActionCard 
@@ -466,7 +466,7 @@ function QuickActionCard({
         <div className="mr-2">
           {icon}
         </div>
-        <h3 className="font-medium text-[#002A5C]">{title}</h3>
+        <h3 className="font-medium text-black">{title}</h3>
       </div>
       <div className="space-y-2">
         {actions.map((action, index) => (

@@ -73,6 +73,7 @@ export default function AcademicYearsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [semesterFilter, setSemesterFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -179,6 +180,8 @@ export default function AcademicYearsPage() {
   const handleDeleteAcademicYear = async () => {
     if (!currentAcademicYear) return;
     
+    setIsDeleting(true);
+    
     try {
       const response = await axios.delete(`${API_URL}/api/admin/academic-years/${currentAcademicYear.id}`, {
         headers: {
@@ -196,7 +199,20 @@ export default function AcademicYearsPage() {
       }
     } catch (error: any) {
       console.error("Error deleting academic year:", error);
-      toast.error(error.response?.data?.message || "Gagal menghapus tahun akademik");
+      const errorMessage = error.response?.data?.message || "Gagal menghapus tahun akademik";
+      
+      // Display a more user-friendly error message
+      if (errorMessage.includes("being used by one or more courses")) {
+        toast.error("Tidak dapat menghapus tahun akademik karena sedang digunakan oleh mata kuliah");
+      } else if (errorMessage.includes("being used by one or more lecturer assignments")) {
+        toast.error("Tidak dapat menghapus tahun akademik karena sedang digunakan oleh penugasan dosen");
+      } else if (errorMessage.includes("being used by one or more course schedules")) {
+        toast.error("Tidak dapat menghapus tahun akademik karena sedang digunakan oleh jadwal kuliah");
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -567,6 +583,7 @@ export default function AcademicYearsPage() {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDeleteAcademicYear}
+        isLoading={isDeleting}
         title="Hapus Tahun Akademik"
         description={`Apakah Anda yakin ingin menghapus tahun akademik "${currentAcademicYear?.name}"? Tindakan ini tidak dapat dibatalkan.`}
       />

@@ -148,6 +148,38 @@ func (h *CourseHandler) DeleteCourse(c *gin.Context) {
 		return
 	}
 	
+	// Check if the course has any lecturer assignments
+	lecturerAssignmentRepo := repositories.NewLecturerAssignmentRepository()
+	assignments, err := lecturerAssignmentRepo.GetByCourseID(uint(id), 0) // 0 means any academic year
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check course assignments: " + err.Error()})
+		return
+	}
+	
+	if len(assignments) > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": "error",
+			"message": "Cannot delete course: This course is assigned to one or more lecturers. Please remove all lecturer assignments first.",
+		})
+		return
+	}
+	
+	// Check if the course has any schedules
+	scheduleRepo := repositories.NewCourseScheduleRepository()
+	schedules, err := scheduleRepo.GetByCourse(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check course schedules: " + err.Error()})
+		return
+	}
+	
+	if len(schedules) > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": "error",
+			"message": "Cannot delete course: This course has one or more schedules. Please remove all course schedules first.",
+		})
+		return
+	}
+	
 	err = h.repo.Delete(uint(id))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})

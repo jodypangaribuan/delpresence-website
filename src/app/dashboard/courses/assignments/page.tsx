@@ -12,7 +12,8 @@ import {
   MoreHorizontal,
   Loader2,
   X,
-  Check
+  Check,
+  CircleUser
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import axios from "axios";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
@@ -434,6 +441,20 @@ export default function LecturerAssignmentsPage() {
     return semesters;
   }, [assignments]);
   
+  // Function to check if a course is already assigned to a lecturer
+  const isCourseAssigned = useMemo(() => {
+    return (courseId: number): boolean => {
+      if (!assignments || !Array.isArray(assignments)) {
+        return false;
+      }
+      
+      return assignments.some(assignment => 
+        assignment.course_id === courseId || 
+        assignment.course?.id === courseId
+      );
+    };
+  }, [assignments]);
+  
   // Filter assignments based on search query and semester filter
   const filteredAssignments = (assignments || []).filter((assignment) => {
     // Ensure assignment is defined
@@ -465,11 +486,10 @@ export default function LecturerAssignmentsPage() {
     setIsSubmitting(true);
     
     try {
-      // Use the active academic year if available, otherwise use the first one
+      // Use the first academic year if available
       let academicYearId = formAcademicYearId;
       if (!academicYearId && academicYears.length > 0) {
-        const activeYear = academicYears.find(year => year.name.includes("aktif"));
-        academicYearId = activeYear ? activeYear.id.toString() : academicYears[0].id.toString();
+        academicYearId = academicYears[0].id.toString();
       }
       
       // Prepare request data
@@ -790,8 +810,7 @@ export default function LecturerAssignmentsPage() {
                       </TableCell>
                       <TableCell className="text-center font-medium">{assignment.course_semester || assignment.course?.semester || '-'}</TableCell>
                       <TableCell className="font-medium">
-                        {assignment.academic_year_name || (typeof assignment.academic_year?.name === 'string' ? assignment.academic_year.name : 'N/A')} - 
-                        {assignment.academic_year_semester || (typeof assignment.academic_year?.semester === 'string' ? assignment.academic_year.semester : 'N/A')}
+                        {`${assignment.academic_year_name || (typeof assignment.academic_year?.name === 'string' ? assignment.academic_year.name : 'N/A')} - ${assignment.academic_year_semester || (typeof assignment.academic_year?.semester === 'string' ? assignment.academic_year.semester : 'N/A')}`}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -887,8 +906,6 @@ export default function LecturerAssignmentsPage() {
                                 {lecturer.nip && `NIP: ${lecturer.nip}`}
                                 {lecturer.nip && lecturer.email && " | "}
                                 {lecturer.email && `Email: ${lecturer.email}`}
-                                {(lecturer.nip || lecturer.email) && " | "}
-                                UserID: {lecturer.user_id || 'N/A'}
                               </div>
                             </li>
                           ))
@@ -912,8 +929,16 @@ export default function LecturerAssignmentsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id.toString()}>
-                        {course.code} - {course.name} (Semester {course.semester})
+                      <SelectItem 
+                        key={course.id} 
+                        value={course.id.toString()}
+                      >
+                        <div className="flex items-center">
+                          <span>{course.code} - {course.name} (Semester {course.semester})</span>
+                          {isCourseAssigned(course.id) && (
+                            <Check className="ml-2 h-4 w-4 text-green-500 flex-shrink-0" />
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -994,8 +1019,6 @@ export default function LecturerAssignmentsPage() {
                                 {lecturer.nip && `NIP: ${lecturer.nip}`}
                                 {lecturer.nip && lecturer.email && " | "}
                                 {lecturer.email && `Email: ${lecturer.email}`}
-                                {(lecturer.nip || lecturer.email) && " | "}
-                                UserID: {lecturer.user_id || 'N/A'}
                               </div>
                             </li>
                           ))
@@ -1019,8 +1042,16 @@ export default function LecturerAssignmentsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id.toString()}>
-                        {course.code} - {course.name} (Semester {course.semester})
+                      <SelectItem 
+                        key={course.id} 
+                        value={course.id.toString()}
+                      >
+                        <div className="flex items-center">
+                          <span>{course.code} - {course.name} (Semester {course.semester})</span>
+                          {isCourseAssigned(course.id) && (
+                            <Check className="ml-2 h-4 w-4 text-green-500 flex-shrink-0" />
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -251,7 +251,7 @@ export default function AssistantsPage() {
             <div className="p-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-semibold text-[#002A5C]">Kelola Asisten Dosen</h3>
+                  <h3 className="text-xl font-semibold text-black">Kelola Asisten Dosen</h3>
                   <p className="text-sm text-muted-foreground mt-1">Kelola penugasan asisten dosen untuk mata kuliah yang Anda ampu</p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
@@ -383,7 +383,7 @@ export default function AssistantsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-[#002A5C]">Pilih Asisten Dosen</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-black">Pilih Asisten Dosen</DialogTitle>
             <DialogDescription>
               {selectedSchedule && (
                 <div className="mt-2">

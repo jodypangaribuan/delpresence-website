@@ -95,6 +95,12 @@ interface Course {
     id: number;
     name: string;
   };
+  academic_year_id?: number;
+  academic_year?: {
+    id: number;
+    name: string;
+    semester?: string;
+  };
 }
 
 interface Room {
@@ -138,7 +144,6 @@ interface AcademicYear {
   semester: "ganjil" | "genap";
   start_date: string;
   end_date: string;
-  is_active: boolean;
 }
 
 interface CourseSchedule {
@@ -198,6 +203,58 @@ const scheduleFormSchema = z.object({
 
 type FormValues = z.infer<typeof scheduleFormSchema>;
 
+// Define an interface for the lecturer object returned by fetchLecturerForCourse
+interface CourseAssignedLecturer {
+  id: number;
+  external_user_id?: number;
+  full_name: string;
+  email?: string;
+  academicYearId?: number;
+  academicYearName?: string;
+}
+
+// Add this helper function at the top of the file, after the interfaces
+// Helper function to get the academic year display name
+const getAcademicYearDisplay = (
+  courseId: string | undefined, 
+  academicYearId: string | undefined, 
+  courses: Course[], 
+  academicYears: AcademicYear[]
+): string => {
+  // If we have a course ID
+  if (courseId) {
+    // Find the course to get its academic year
+    const courseIdNum = parseInt(courseId);
+    const selectedCourse = courses.find(course => course.id === courseIdNum);
+    
+    // If we found the course and it has an academic year
+    if (selectedCourse && selectedCourse.academic_year_id) {
+      // Use the course's academic year name directly if available
+      if (selectedCourse.academic_year?.name) {
+        return selectedCourse.academic_year.name;
+      }
+      
+      // As a fallback, look up in the academicYears array
+      const academicYear = academicYears.find(y => y.id === selectedCourse.academic_year_id);
+      if (academicYear) {
+        return academicYear.name;
+      }
+      
+      // Last resort, just return the ID
+      return `Tahun Akademik ID: ${selectedCourse.academic_year_id}`;
+    }
+  }
+  
+  // If we have an academic year ID but no matching course
+  if (academicYearId) {
+    const academicYearIdNum = parseInt(academicYearId);
+    const academicYear = academicYears.find(y => y.id === academicYearIdNum);
+    return academicYear?.name || `Tahun Akademik ID: ${academicYearId}`;
+  }
+  
+  return "Tahun akademik akan ditentukan berdasarkan mata kuliah";
+};
+
 export default function ScheduleManagePage() {
   // State for schedules data
   const [schedules, setSchedules] = useState<CourseSchedule[]>([]);
@@ -217,7 +274,7 @@ export default function ScheduleManagePage() {
   const [searchedLecturers, setSearchedLecturers] = useState<any[]>([]);
   const [showLecturerResults, setShowLecturerResults] = useState(false);
   const [searchingLecturers, setSearchingLecturers] = useState(false);
-  const [selectedLecturer, setSelectedLecturer] = useState<any | null>(null);
+  const [selectedLecturer, setSelectedLecturer] = useState<CourseAssignedLecturer | null>(null);
   
   // State for dialog visibility
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -266,9 +323,15 @@ export default function ScheduleManagePage() {
   };
 
   // New function to fetch the lecturer for a selected course
-  const fetchLecturerForCourse = async (courseId: number) => {
+  const fetchLecturerForCourse = async (courseId: number, academicYearId?: number): Promise<CourseAssignedLecturer | null> => {
     try {
-      const response = await api(`/admin/course-lecturers/course/${courseId}`, {
+      // Build URL with academic year if provided
+      let url = `/admin/course-lecturers/course/${courseId}`;
+      if (academicYearId) {
+        url += `?academic_year_id=${academicYearId}`;
+      }
+      
+      const response = await api(url, {
         method: 'GET',
       });
       
@@ -280,7 +343,7 @@ export default function ScheduleManagePage() {
         return {
           id: response.data.user_id || response.data.lecturer_id, // Prefer user_id if available
           external_user_id: response.data.external_user_id, // Store this for reference
-          full_name: response.data.name,
+          full_name: response.data.name || "Dosen", // Ensure full_name is always a string
           email: response.data.email,
           academicYearId: response.data.academic_year_id,
           academicYearName: response.data.academic_year_name
@@ -378,7 +441,17 @@ export default function ScheduleManagePage() {
       });
       
       if (response.status === "success") {
-        setSearchedLecturers(response.data);
+        // Format lecturers to ensure consistent structure
+        const formattedLecturers = response.data.map((lecturer: any) => ({
+          id: lecturer.id || lecturer.user_id || lecturer.lecturer_id,
+          external_user_id: lecturer.external_user_id,
+          full_name: lecturer.full_name || lecturer.name || lecturer.FullName || `Dosen (ID: ${lecturer.id})`,
+          email: lecturer.email || lecturer.Email,
+          department_id: lecturer.department_id || lecturer.study_program_id,
+          department_name: lecturer.department_name || lecturer.study_program_name
+        }));
+        
+        setSearchedLecturers(formattedLecturers);
       } else {
         console.error("Failed to search lecturers:", response);
         setSearchedLecturers([]);
@@ -402,9 +475,6 @@ export default function ScheduleManagePage() {
       return;
     }
     
-    // Store full lecturer object for reference
-    setSelectedLecturer(lecturer);
-    
     // Ensure ID is a valid number
     const lecturerId = Number(lecturer.id);
     
@@ -417,10 +487,24 @@ export default function ScheduleManagePage() {
     // Log for debugging
     console.log("Lecturer ID as number:", lecturerId);
     console.log("Lecturer ID type:", typeof lecturerId);
-    // If this is from our automated lookup, log the external_user_id also
-    if (lecturer.external_user_id) {
-      console.log("Lecturer external_user_id:", lecturer.external_user_id);
-    }
+
+    // Get the lecturer name, prioritizing different potential properties
+    const lecturerName = lecturer.full_name || lecturer.name || 
+                        (lecturer.FullName || lecturer.fullName) || 
+                        `Dosen (ID: ${lecturerId})`;
+    
+    // Format lecturer object to match CourseAssignedLecturer interface
+    const lecturerInfo: CourseAssignedLecturer = {
+      id: lecturerId,
+      external_user_id: lecturer.external_user_id,
+      full_name: lecturerName,
+      email: lecturer.email,
+      academicYearId: lecturer.academicYearId,
+      academicYearName: lecturer.academicYearName
+    };
+    
+    // Store full lecturer object for reference
+    setSelectedLecturer(lecturerInfo);
         
     // Store as string in the form (React Hook Form expects string values)
     const lecturerIdStr = String(lecturerId);
@@ -432,7 +516,12 @@ export default function ScheduleManagePage() {
       
       // Force validation update
       addForm.trigger("lecturer_id");
-          }
+      
+      // Show success toast for manual selection
+      toast.success("Dosen dipilih secara manual", {
+        description: `${lecturerName} telah dipilih sebagai dosen untuk jadwal ini`
+      });
+    }
           
     // If we're in edit form
     if (showEditDialog) {
@@ -441,10 +530,15 @@ export default function ScheduleManagePage() {
       
       // Force validation update
       editForm.trigger("lecturer_id");
+      
+      // Show success toast for manual selection
+      toast.success("Dosen dipilih secara manual", {
+        description: `${lecturerName} telah dipilih sebagai dosen untuk jadwal ini`
+      });
     }
     
-    // Set search term for display
-    setLecturerSearchTerm(lecturer.full_name || lecturer.name);
+    // Set search term for display - we've already ensured lecturerName is a string
+    setLecturerSearchTerm(lecturerName);
     setShowLecturerResults(false);
   };
 
@@ -455,79 +549,44 @@ export default function ScheduleManagePage() {
       // Log raw form data for debugging
       console.log("Raw form data:", data);
       
-      // Validate lecturer ID
-      const lecturerId = parseInt(data.lecturer_id);
-      if (isNaN(lecturerId) || lecturerId <= 0) {
-        // If lecturer ID is invalid, try to get a lecturer for the course
-        const courseId = parseInt(data.course_id);
-        if (!isNaN(courseId) && courseId > 0) {
-          try {
-            const lecturer = await fetchLecturerForCourse(courseId);
-            if (lecturer && lecturer.id) {
-              // Use the lecturer from the course
-              data.lecturer_id = lecturer.id.toString();
-              console.log("Using lecturer from course:", lecturer);
-            } else {
-              toast.error("Tidak dapat menambahkan jadwal", {
-                description: "ID dosen tidak valid dan tidak ada dosen yang ditugaskan untuk mata kuliah ini"
-              });
-              setIsSubmitting(false);
-              return;
-            }
-          } catch (error) {
-            console.error("Error fetching lecturer for course:", error);
-            toast.error("Tidak dapat menambahkan jadwal", {
-              description: "Gagal mendapatkan data dosen untuk mata kuliah ini"
-            });
-            setIsSubmitting(false);
-            return;
-          }
-        } else {
-          toast.error("Tidak dapat menambahkan jadwal", {
-            description: "ID dosen dan ID mata kuliah tidak valid"
-          });
-          setIsSubmitting(false);
-          return;
-        }
+      // Get the course ID and academic year ID
+      const courseId = parseInt(data.course_id);
+      const academicYearId = parseInt(data.academic_year_id);
+      
+      if (isNaN(courseId) || courseId <= 0 || isNaN(academicYearId) || academicYearId <= 0) {
+        toast.error("Tidak dapat menambahkan jadwal", {
+          description: "ID mata kuliah atau tahun akademik tidak valid"
+        });
+        setIsSubmitting(false);
+        return;
       }
       
-      // Ensure academic_year_id is populated
-      if (!data.academic_year_id) {
-        // Try to find the active academic year
-        const activeYear = academicYears.find(year => year.is_active);
-        if (activeYear) {
-          data.academic_year_id = activeYear.id.toString();
-          console.log("Using active academic year ID:", activeYear.id);
-        } else if (academicYears.length > 0) {
-          // If no active year, use the first one
-          data.academic_year_id = academicYears[0].id.toString();
-          console.log("Using first academic year ID:", academicYears[0].id);
-        } else {
-          toast.error("Tidak dapat menambahkan jadwal", {
-            description: "Tidak ada tahun akademik yang tersedia"
-          });
-          setIsSubmitting(false);
-          return;
-        }
+      // Check if we have a lecturer ID
+      if (!data.lecturer_id) {
+        toast.error("Tidak dapat menambahkan jadwal", {
+          description: "Dosen harus dipilih untuk jadwal ini"
+        });
+        setIsSubmitting(false);
+        return;
       }
       
       // Convert form string values to appropriate types for the API
       try {
         // Since we're using zod validation, we know the values are valid
         const formattedData = {
-          course_id: parseInt(data.course_id),
+          course_id: courseId,
           room_id: parseInt(data.room_id),
           day: data.day,
           start_time: data.start_time,
           end_time: data.end_time,
-          lecturer_id: parseInt(data.lecturer_id), // This should be the User.ID
+          lecturer_id: parseInt(data.lecturer_id), // Use the lecturer ID directly from the form
           student_group_id: parseInt(data.student_group_id),
-          academic_year_id: parseInt(data.academic_year_id)
+          academic_year_id: academicYearId
         };
         
         // Debug log for troubleshooting
         console.log("Sending schedule data:", formattedData);
-        console.log("Lecturer ID (User.ID) in formattedData:", formattedData.lecturer_id);
+        console.log("Lecturer ID in formattedData:", formattedData.lecturer_id);
         
         // Make API request
         const response = await api('/admin/schedules', {
@@ -556,7 +615,11 @@ export default function ScheduleManagePage() {
       console.error("Error adding schedule:", error);
       
       // Handle specific error messages
-      if (error.message && error.message.includes("invalid lecturer/user ID")) {
+      if (error.message && error.message.includes("is not assigned to this course")) {
+        toast.error("Gagal menambahkan jadwal", {
+          description: "Dosen yang dipilih tidak ditugaskan untuk mata kuliah ini pada tahun akademik yang dipilih"
+        });
+      } else if (error.message && error.message.includes("invalid lecturer/user ID")) {
         toast.error("Gagal menambahkan jadwal", {
           description: "ID dosen tidak valid atau tidak ada dosen yang ditugaskan untuk mata kuliah ini"
         });
@@ -577,83 +640,42 @@ export default function ScheduleManagePage() {
       // Log raw form data for debugging
       console.log("Raw edit form data:", data);
       
-      // Validate lecturer ID
-      const lecturerId = parseInt(data.lecturer_id);
-      if (isNaN(lecturerId) || lecturerId <= 0) {
-        // If lecturer ID is invalid, try to get a lecturer for the course
-        const courseId = parseInt(data.course_id);
-        if (!isNaN(courseId) && courseId > 0) {
-          try {
-            const lecturer = await fetchLecturerForCourse(courseId);
-            if (lecturer && lecturer.id) {
-              // Use the lecturer from the course
-              data.lecturer_id = lecturer.id.toString();
-              console.log("Using lecturer from course for edit:", lecturer);
-            } else {
-              toast.error("Tidak dapat memperbarui jadwal", {
-                description: "ID dosen tidak valid dan tidak ada dosen yang ditugaskan untuk mata kuliah ini"
-              });
-              setIsSubmitting(false);
-              return;
-            }
-          } catch (error) {
-            console.error("Error fetching lecturer for course:", error);
-            toast.error("Tidak dapat memperbarui jadwal", {
-              description: "Gagal mendapatkan data dosen untuk mata kuliah ini"
-            });
-            setIsSubmitting(false);
-            return;
-          }
-        } else {
-          toast.error("Tidak dapat memperbarui jadwal", {
-            description: "ID dosen dan ID mata kuliah tidak valid"
-          });
-          setIsSubmitting(false);
-          return;
-        }
+      // Get the course ID and academic year ID
+      const courseId = parseInt(data.course_id);
+      const academicYearId = parseInt(data.academic_year_id);
+      
+      if (isNaN(courseId) || courseId <= 0 || isNaN(academicYearId) || academicYearId <= 0) {
+        toast.error("Tidak dapat memperbarui jadwal", {
+          description: "ID mata kuliah atau tahun akademik tidak valid"
+        });
+        setIsSubmitting(false);
+        return;
       }
       
-      // Ensure academic_year_id is populated
-      if (!data.academic_year_id && currentSchedule) {
-        // First try to use the current schedule's academic year
-        if (currentSchedule.academic_year_id) {
-          data.academic_year_id = currentSchedule.academic_year_id.toString();
-          console.log("Using current schedule's academic year ID:", currentSchedule.academic_year_id);
-        } else {
-          // Try to find the active academic year
-          const activeYear = academicYears.find(year => year.is_active);
-          if (activeYear) {
-            data.academic_year_id = activeYear.id.toString();
-            console.log("Using active academic year ID:", activeYear.id);
-          } else if (academicYears.length > 0) {
-            // If no active year, use the first one
-            data.academic_year_id = academicYears[0].id.toString();
-            console.log("Using first academic year ID:", academicYears[0].id);
-          } else {
-            toast.error("Tidak dapat memperbarui jadwal", {
-              description: "Tidak ada tahun akademik yang tersedia"
-            });
-            setIsSubmitting(false);
-            return;
-          }
-        }
+      // Check if we have a lecturer ID
+      if (!data.lecturer_id) {
+        toast.error("Tidak dapat memperbarui jadwal", {
+          description: "Dosen harus dipilih untuk jadwal ini"
+        });
+        setIsSubmitting(false);
+        return;
       }
       
       // Convert form string values to appropriate types for the API
       const formattedData = {
-        course_id: parseInt(data.course_id),
+        course_id: courseId,
         room_id: parseInt(data.room_id),
         day: data.day,
         start_time: data.start_time,
         end_time: data.end_time, 
-        lecturer_id: parseInt(data.lecturer_id), // This should be the User.ID
+        lecturer_id: parseInt(data.lecturer_id), // Use the lecturer ID directly from the form
         student_group_id: parseInt(data.student_group_id),
-        academic_year_id: parseInt(data.academic_year_id)
+        academic_year_id: academicYearId
       };
       
       // Debug log for troubleshooting
       console.log("Sending edit schedule data:", formattedData);
-      console.log("Lecturer ID (User.ID) in edit formattedData:", formattedData.lecturer_id);
+      console.log("Lecturer ID in edit formattedData:", formattedData.lecturer_id);
         
       // Make API request
       const response = await api(`/admin/schedules/${currentSchedule?.id}`, {
@@ -676,7 +698,11 @@ export default function ScheduleManagePage() {
       console.error("Error updating schedule:", error);
       
       // Handle specific error messages
-      if (error.message && error.message.includes("invalid lecturer/user ID")) {
+      if (error.message && error.message.includes("is not assigned to this course")) {
+        toast.error("Gagal memperbarui jadwal", {
+          description: "Dosen yang dipilih tidak ditugaskan untuk mata kuliah ini pada tahun akademik yang dipilih"
+        });
+      } else if (error.message && error.message.includes("invalid lecturer/user ID")) {
         toast.error("Gagal memperbarui jadwal", {
           description: "ID dosen tidak valid atau tidak ada dosen yang ditugaskan untuk mata kuliah ini"
         });
@@ -734,10 +760,26 @@ export default function ScheduleManagePage() {
       });
       
       if (response.status === "success") {
-        setCourses(response.data);
+        // Check that courses have academic year information
+        const coursesWithAcademicYear = response.data.map((course: any) => {
+          if (!course.academic_year_id) {
+            console.warn(`Course ${course.id} (${course.name}) is missing academic_year_id`);
+          }
+          if (!course.academic_year) {
+            console.warn(`Course ${course.id} (${course.name}) is missing academic_year object`);
+          } else {
+            console.log(`Course ${course.id} (${course.name}) has academic_year_id: ${course.academic_year_id}, academic_year.name: ${course.academic_year?.name}`);
+          }
+          return course;
+        });
+        
+        setCourses(coursesWithAcademicYear);
+        
+        // Log courses to verify academic year information
+        console.log("Loaded courses with academic year info:", coursesWithAcademicYear);
         
         // Show warning if no courses are available
-        if (response.data.length === 0) {
+        if (coursesWithAcademicYear.length === 0) {
           toast.warning("Tidak ada mata kuliah tersedia", {
             description: "Silakan tambahkan mata kuliah terlebih dahulu"
           });
@@ -856,13 +898,8 @@ export default function ScheduleManagePage() {
         // Optional: If you want to set a default filter, uncomment this code:
         /*
         if (!academicYearFilter && response.data.length > 0) {
-          const activeYear = response.data.find((year: AcademicYear) => year.is_active);
-          if (activeYear) {
-            setAcademicYearFilter(activeYear.id);
-          } else {
-            // If no active year, set to the first year in the list
-            setAcademicYearFilter(response.data[0].id);
-          }
+          // Just use the first academic year in the list
+          setAcademicYearFilter(response.data[0].id);
         }
         */
       } else {
@@ -916,10 +953,9 @@ export default function ScheduleManagePage() {
     // Initialize the lecturer information explicitly
     if (schedule.lecturer_name) {
       console.log("Initializing lecturer info with name:", schedule.lecturer_name);
-      const lecturerInfo = {
+      const lecturerInfo: CourseAssignedLecturer = {
         id: schedule.lecturer_id,
-        full_name: schedule.lecturer_name,
-        name: schedule.lecturer_name
+        full_name: schedule.lecturer_name
       };
       setSelectedLecturer(lecturerInfo);
       setLecturerSearchTerm(schedule.lecturer_name);
@@ -933,19 +969,17 @@ export default function ScheduleManagePage() {
       
       if (foundLecturer && foundLecturer.name) {
         console.log("Found lecturer name from list:", foundLecturer.name);
-        const lecturerInfo = {
+        const lecturerInfo: CourseAssignedLecturer = {
           id: schedule.lecturer_id,
-          full_name: foundLecturer.name,
-          name: foundLecturer.name
+          full_name: foundLecturer.name
         };
         setSelectedLecturer(lecturerInfo);
         setLecturerSearchTerm(foundLecturer.name);
       } else {
         // If we still can't find a name, use a placeholder with ID
-        const lecturerInfo = {
+        const lecturerInfo: CourseAssignedLecturer = {
           id: schedule.lecturer_id,
-          full_name: `Dosen (ID: ${schedule.lecturer_id})`,
-          name: `Dosen (ID: ${schedule.lecturer_id})`
+          full_name: `Dosen (ID: ${schedule.lecturer_id})`
         };
         setSelectedLecturer(lecturerInfo);
         setLecturerSearchTerm(`Dosen (ID: ${schedule.lecturer_id})`);
@@ -956,6 +990,29 @@ export default function ScheduleManagePage() {
       setSelectedLecturer(null);
       setLecturerSearchTerm("");
     }
+    
+    // Find the course to get its academic year
+    const courseId = schedule.course_id;
+    const selectedCourse = courses.find(course => course.id === courseId);
+    
+    // Use the academic year from the course, not from the schedule
+    let academicYearId = schedule.academic_year_id?.toString() || "";
+    if (selectedCourse && selectedCourse.academic_year_id) {
+      academicYearId = selectedCourse.academic_year_id.toString();
+      console.log("Using academic year ID from course instead of schedule:", academicYearId);
+    }
+    
+    // Initialize form data
+    editForm.reset({
+      student_group_id: schedule.student_group_id?.toString() || "",
+      academic_year_id: academicYearId,
+      lecturer_id: schedule.lecturer_id?.toString() || "",
+      course_id: schedule.course_id?.toString() || "",
+      day: schedule.day || "",
+      start_time: schedule.start_time || "",
+      end_time: schedule.end_time || "",
+      room_id: schedule.room_id?.toString() || ""
+    });
     
     // Finally, open the dialog
     setShowEditDialog(true);
@@ -1011,7 +1068,7 @@ export default function ScheduleManagePage() {
       end_time: "10:00",
       lecturer_id: "",
       student_group_id: "",
-      academic_year_id: "",
+      academic_year_id: academicYears.length > 0 ? academicYears[0].id.toString() : "",
     }
   });
 
@@ -1025,15 +1082,17 @@ export default function ScheduleManagePage() {
       end_time: "10:00",
       lecturer_id: "",
       student_group_id: "",
-      academic_year_id: "",
+      academic_year_id: academicYears.length > 0 ? academicYears[0].id.toString() : "",
     }
   });
 
   // Clear lecturer search when dialogs close
   useEffect(() => {
+    // Always set showLecturerResults to false since fields are now read-only
+    setShowLecturerResults(false);
+    
     if (!showAddDialog && !showEditDialog) {
       setSearchedLecturers([]);
-      setShowLecturerResults(false);
     }
   }, [showAddDialog, showEditDialog]);
 
@@ -1046,11 +1105,13 @@ export default function ScheduleManagePage() {
       if (currentSchedule.lecturer_name) {
         console.log("Setting lecturer name:", currentSchedule.lecturer_name);
         setLecturerSearchTerm(currentSchedule.lecturer_name);
-        setSelectedLecturer({
+        
+        // Create a properly typed lecturer object
+        const lecturerInfo: CourseAssignedLecturer = {
           id: currentSchedule.lecturer_id,
-          full_name: currentSchedule.lecturer_name,
-          name: currentSchedule.lecturer_name
-        });
+          full_name: currentSchedule.lecturer_name
+        };
+        setSelectedLecturer(lecturerInfo);
       }
       
       // Then populate edit form with current schedule data
@@ -1067,7 +1128,7 @@ export default function ScheduleManagePage() {
     }
   }, [currentSchedule, editForm, showEditDialog]);
 
-  // Update the effect to do form reset when showing the add dialog
+  // Update the effect to reset academic_year_id when showing the add dialog
   useEffect(() => {
     if (showAddDialog) {
       // Reset the form when dialog is opened
@@ -1079,14 +1140,14 @@ export default function ScheduleManagePage() {
         end_time: "10:00",
         lecturer_id: "",
         student_group_id: "",
-        academic_year_id: "",
+        academic_year_id: "", // Set to empty string initially
       });
       
       // Clear selected lecturer
       setSelectedLecturer(null);
       setLecturerSearchTerm("");
     }
-  }, [showAddDialog, addForm]);
+  }, [showAddDialog, addForm, academicYears]);
 
   // Watch for changes in course_id in add form
   useEffect(() => {
@@ -1094,65 +1155,74 @@ export default function ScheduleManagePage() {
       // Only respond to course_id changes
       if (name === 'course_id' && value.course_id) {
         const courseId = parseInt(value.course_id);
+        
+        // Only proceed if we have a valid course ID
         if (!isNaN(courseId) && courseId > 0) {
           try {
-            // Fetch lecturer for this course
-            const lecturer = await fetchLecturerForCourse(courseId);
+            // Find the selected course to get its academic year
+            const selectedCourse = courses.find(course => course.id === courseId);
+            
+            // If we found the course and it has an academic year ID, use it
+            if (selectedCourse && selectedCourse.academic_year_id) {
+              // Set the academic year ID from the course (not from any other source)
+              addForm.setValue("academic_year_id", selectedCourse.academic_year_id.toString());
+              console.log("Watch: Setting academic year from course directly:", selectedCourse.academic_year_id);
+            }
+            
+            // Now try to fetch the lecturer for this course and academic year
+            const academicYearId = selectedCourse?.academic_year_id;
+            const lecturer = await fetchLecturerForCourse(courseId, academicYearId);
             
             if (lecturer) {
-              // Set the lecturer in the form
-              addForm.setValue("lecturer_id", lecturer.id.toString());
-              setSelectedLecturer(lecturer);
-              setLecturerSearchTerm(lecturer.full_name);
+              // Only update lecturer if it wasn't manually selected or if we're changing the course
+              const currentLecturerId = addForm.getValues("lecturer_id");
+              const manuallySelected = selectedLecturer && currentLecturerId && 
+                                      selectedLecturer.id.toString() === currentLecturerId;
               
-              // Set academic year from the lecturer assignment
-              if (lecturer.academicYearId) {
-                addForm.setValue("academic_year_id", lecturer.academicYearId.toString());
-                console.log("Setting academic year ID from lecturer assignment:", lecturer.academicYearId);
-              } else {
-                // If no academic year from lecturer, try to get the active one
-                const activeYear = academicYears.find(year => year.is_active);
-                if (activeYear) {
-                  addForm.setValue("academic_year_id", activeYear.id.toString());
-                  console.log("Setting academic year ID from active year:", activeYear.id);
-                } else if (academicYears.length > 0) {
-                  // If no active year, use the first one
-                  addForm.setValue("academic_year_id", academicYears[0].id.toString());
-                  console.log("Setting academic year ID from first year:", academicYears[0].id);
-                }
+              if (!manuallySelected || name === 'course_id') {
+                // Set the lecturer in the form
+                addForm.setValue("lecturer_id", lecturer.id.toString());
+                setSelectedLecturer(lecturer);
+                // Since we're using our interface, full_name is guaranteed to be a string
+                setLecturerSearchTerm(lecturer.full_name);
+                
+                toast.success("Dosen telah ditentukan secara otomatis", {
+                  description: `${lecturer.full_name} ditugaskan untuk mata kuliah ini`
+                });
+              }
+            } else {
+              // No lecturer found, but don't clear if manually selected
+              const currentLecturerId = addForm.getValues("lecturer_id");
+              const manuallySelected = selectedLecturer && currentLecturerId && 
+                                      selectedLecturer.id.toString() === currentLecturerId;
+              
+              if (!manuallySelected) {
+                console.log("No lecturer found for course ID:", courseId, "academic year ID:", academicYearId);
+                addForm.setValue("lecturer_id", "");
+                setSelectedLecturer(null);
+                setLecturerSearchTerm("");
               }
               
-              toast.success("Dosen telah ditentukan secara otomatis", {
-                description: `${lecturer.full_name} ditugaskan untuk mata kuliah ini`
-              });
-            } else {
-              // No lecturer found, but don't show an error - just let user select manually
-              console.log("No lecturer found for course ID:", courseId);
-              
-              // Still try to set academic year even if no lecturer
-              const activeYear = academicYears.find(year => year.is_active);
-              if (activeYear) {
-                addForm.setValue("academic_year_id", activeYear.id.toString());
-                console.log("Setting academic year ID from active year:", activeYear.id);
-              } else if (academicYears.length > 0) {
-                // If no active year, use the first one
-                addForm.setValue("academic_year_id", academicYears[0].id.toString());
-                console.log("Setting academic year ID from first year:", academicYears[0].id);
+              // If both course and academic year are selected but no lecturer found, show a warning
+              if (courseId && academicYearId && !manuallySelected) {
+                toast.warning("Perhatian", {
+                  description: "Tidak ada dosen yang ditugaskan untuk mata kuliah ini pada tahun akademik yang dipilih. Silakan pilih dosen secara manual."
+                });
               }
             }
           } catch (error) {
             // Silently handle errors - already logged in fetchLecturerForCourse
-            console.log("Error handled in course_id watch:", error);
+            console.log("Error handled in form watch:", error);
             
-            // Try to set academic year even if there was an error
-            const activeYear = academicYears.find(year => year.is_active);
-            if (activeYear) {
-              addForm.setValue("academic_year_id", activeYear.id.toString());
-              console.log("Setting academic year ID from active year:", activeYear.id);
-            } else if (academicYears.length > 0) {
-              // If no active year, use the first one
-              addForm.setValue("academic_year_id", academicYears[0].id.toString());
-              console.log("Setting academic year ID from first year:", academicYears[0].id);
+            // Don't clear lecturer if manually selected
+            const currentLecturerId = addForm.getValues("lecturer_id");
+            const manuallySelected = selectedLecturer && currentLecturerId && 
+                                    selectedLecturer.id.toString() === currentLecturerId;
+            
+            if (!manuallySelected) {
+              addForm.setValue("lecturer_id", "");
+              setSelectedLecturer(null);
+              setLecturerSearchTerm("");
             }
           }
         }
@@ -1160,7 +1230,7 @@ export default function ScheduleManagePage() {
     });
     
     return () => subscription.unsubscribe();
-  }, [addForm, academicYears]);
+  }, [addForm, courses, selectedLecturer]);
 
   // Watch for changes in course_id in edit form
   useEffect(() => {
@@ -1168,82 +1238,92 @@ export default function ScheduleManagePage() {
       // Only respond to course_id changes if edit dialog is open
       if (showEditDialog && name === 'course_id' && value.course_id) {
         const courseId = parseInt(value.course_id);
+        
         if (!isNaN(courseId) && courseId > 0) {
-          console.log("Course ID changed in edit form:", courseId);
+          console.log("Course changed in edit form: course ID:", courseId);
           
           // Check if the course ID is different from the original one
-          if (currentSchedule && courseId !== currentSchedule.course_id) {
-            console.log("Course changed, fetching new lecturer");
-            try {
-              // Fetch lecturer for this course
-              const lecturer = await fetchLecturerForCourse(courseId);
+          const courseChanged = currentSchedule && courseId !== currentSchedule.course_id;
+          
+          try {
+            // Find the selected course to get its academic year
+            const selectedCourse = courses.find(course => course.id === courseId);
+            
+            // If we found the course and it has an academic year ID, use it
+            if (selectedCourse && selectedCourse.academic_year_id) {
+              // Set the academic year ID from the course (not from any other source)
+              editForm.setValue("academic_year_id", selectedCourse.academic_year_id.toString());
+              console.log("Watch (edit): Setting academic year from course directly:", selectedCourse.academic_year_id);
+            }
+            
+            // Now try to fetch the lecturer for this course and academic year
+            const academicYearId = selectedCourse?.academic_year_id;
+            const lecturer = await fetchLecturerForCourse(courseId, academicYearId);
+            
+            if (lecturer) {
+              console.log("Found lecturer for selected course/year:", lecturer);
               
-              if (lecturer) {
-                console.log("Found lecturer for selected course:", lecturer);
+              // Only update lecturer if it wasn't manually selected or if we're changing the course
+              const currentLecturerId = editForm.getValues("lecturer_id");
+              const manuallySelected = selectedLecturer && currentLecturerId && 
+                                      selectedLecturer.id.toString() === currentLecturerId &&
+                                      selectedLecturer.id !== lecturer.id;
+              
+              if (!manuallySelected || courseChanged) {
                 // Set the lecturer in the form
                 editForm.setValue("lecturer_id", lecturer.id.toString());
                 setSelectedLecturer(lecturer);
+                // Since we're using our interface, full_name is guaranteed to be a string
                 setLecturerSearchTerm(lecturer.full_name);
-                
-                // Set academic year from the lecturer assignment
-                if (lecturer.academicYearId) {
-                  editForm.setValue("academic_year_id", lecturer.academicYearId.toString());
-                  console.log("Setting academic year ID from lecturer assignment:", lecturer.academicYearId);
-                } else {
-                  // If no academic year from lecturer, try to get the active one
-                  const activeYear = academicYears.find(year => year.is_active);
-                  if (activeYear) {
-                    editForm.setValue("academic_year_id", activeYear.id.toString());
-                    console.log("Setting academic year ID from active year:", activeYear.id);
-                  } else if (academicYears.length > 0) {
-                    // If no active year, use the first one
-                    editForm.setValue("academic_year_id", academicYears[0].id.toString());
-                    console.log("Setting academic year ID from first year:", academicYears[0].id);
-                  }
-                }
                 
                 toast.success("Dosen telah ditentukan secara otomatis", {
                   description: `${lecturer.full_name} ditugaskan untuk mata kuliah ini`
                 });
-              } else {
-                console.log("No lecturer found for course ID:", courseId);
-                // Don't show warning toast - let user select manually without interruption
-                
-                // Still try to set academic year even if no lecturer
-                const activeYear = academicYears.find(year => year.is_active);
-                if (activeYear) {
-                  editForm.setValue("academic_year_id", activeYear.id.toString());
-                  console.log("Setting academic year ID from active year:", activeYear.id);
-                } else if (academicYears.length > 0) {
-                  // If no active year, use the first one
-                  editForm.setValue("academic_year_id", academicYears[0].id.toString());
-                  console.log("Setting academic year ID from first year:", academicYears[0].id);
-                }
               }
-            } catch (error) {
-              // Silently handle errors - already logged in fetchLecturerForCourse
-              console.log("Error handled in edit form course_id watch:", error);
+            } else {
+              console.log("No lecturer found for course/year combo:", courseId, academicYearId);
               
-              // Try to set academic year even if there was an error
-              const activeYear = academicYears.find(year => year.is_active);
-              if (activeYear) {
-                editForm.setValue("academic_year_id", activeYear.id.toString());
-                console.log("Setting academic year ID from active year:", activeYear.id);
-              } else if (academicYears.length > 0) {
-                // If no active year, use the first one
-                editForm.setValue("academic_year_id", academicYears[0].id.toString());
-                console.log("Setting academic year ID from first year:", academicYears[0].id);
+              // Don't clear lecturer if manually selected
+              const currentLecturerId = editForm.getValues("lecturer_id");
+              const manuallySelected = selectedLecturer && currentLecturerId && 
+                                      selectedLecturer.id.toString() === currentLecturerId;
+              
+              if (!manuallySelected) {
+                // Clear lecturer field
+                editForm.setValue("lecturer_id", "");
+                setSelectedLecturer(null);
+                setLecturerSearchTerm("");
+              }
+              
+              // If both course and academic year are selected but no lecturer found, show a warning
+              if (courseId && academicYearId && !manuallySelected) {
+                toast.warning("Perhatian", {
+                  description: "Tidak ada dosen yang ditugaskan untuk mata kuliah ini pada tahun akademik yang dipilih. Silakan pilih dosen secara manual."
+                });
               }
             }
-          } else {
-            console.log("Course ID unchanged or matches original course");
+          } catch (error) {
+            // Silently handle errors - already logged in fetchLecturerForCourse
+            console.log("Error handled in edit form course watch:", error);
+            
+            // Don't clear lecturer if manually selected
+            const currentLecturerId = editForm.getValues("lecturer_id");
+            const manuallySelected = selectedLecturer && currentLecturerId && 
+                                    selectedLecturer.id.toString() === currentLecturerId;
+            
+            if (!manuallySelected) {
+              // Clear lecturer field
+              editForm.setValue("lecturer_id", "");
+              setSelectedLecturer(null);
+              setLecturerSearchTerm("");
+            }
           }
         }
       }
     });
     
     return () => subscription.unsubscribe();
-  }, [editForm, showEditDialog, currentSchedule, academicYears]);
+  }, [editForm, showEditDialog, currentSchedule, courses, selectedLecturer]);
 
   // Watch for changes in edit dialog visibility
   useEffect(() => {
@@ -1256,6 +1336,9 @@ export default function ScheduleManagePage() {
         // If we have a selected lecturer but no name in currentSchedule, use that
         console.log("Using selected lecturer name:", selectedLecturer.full_name);
         setLecturerSearchTerm(selectedLecturer.full_name);
+      } else {
+        // Fallback if there's no name
+        setLecturerSearchTerm("Pilih dosen");
       }
     }
   }, [showEditDialog, currentSchedule, selectedLecturer]);
@@ -1286,7 +1369,8 @@ export default function ScheduleManagePage() {
                 <DialogHeader>
                   <DialogTitle>Tambah Jadwal Perkuliahan</DialogTitle>
                   <DialogDescription>
-                    Masukkan detail jadwal baru yang ingin ditambahkan.
+                    Masukkan detail jadwal baru yang ingin ditambahkan. Dosen akan dipilih otomatis berdasarkan mata kuliah, 
+                    atau Anda dapat mencari dan memilih dosen secara manual.
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -1300,7 +1384,45 @@ export default function ScheduleManagePage() {
                               <FormItem>
                                 <FormLabel>Mata Kuliah</FormLabel>
                                 <Select
-                                  onValueChange={field.onChange}
+                                  onValueChange={(value) => {
+                                    field.onChange(value);
+                                    // When a course is selected, get its details to set the academic year
+                                    if (value) {
+                                      const courseId = parseInt(value);
+                                      const selectedCourse = courses.find(course => course.id === courseId);
+                                      console.log("Selected course:", selectedCourse);
+                                      
+                                      if (selectedCourse) {
+                                        console.log("Course academic_year_id:", selectedCourse.academic_year_id);
+                                        console.log("Course academic_year:", selectedCourse.academic_year);
+                                        
+                                        if (selectedCourse.academic_year_id) {
+                                          // ALWAYS set the academic year based on the course's academic_year_id
+                                          // NOT from academicYears array
+                                          addForm.setValue("academic_year_id", selectedCourse.academic_year_id.toString());
+                                          console.log("Setting academic year from course:", selectedCourse.academic_year_id);
+                                          
+                                          // Show a toast to inform the user
+                                          const academicYearName = selectedCourse.academic_year?.name || 
+                                            academicYears.find(y => y.id === selectedCourse.academic_year_id)?.name || 
+                                            selectedCourse.academic_year_id.toString();
+                                          
+                                          toast.info("Tahun akademik dipilih otomatis", {
+                                            description: `Tahun akademik ${academicYearName} dipilih berdasarkan mata kuliah`
+                                          });
+                                        } else {
+                                          console.warn("Selected course has no academic_year_id");
+                                          addForm.setValue("academic_year_id", "");
+                                        }
+                                      } else {
+                                        console.warn("Could not find selected course with ID:", courseId);
+                                        addForm.setValue("academic_year_id", "");
+                                      }
+                                    } else {
+                                      // Clear academic year if no course is selected
+                                      addForm.setValue("academic_year_id", "");
+                                    }
+                                  }}
                                   value={field.value}
                                 >
                                   <FormControl>
@@ -1424,14 +1546,47 @@ export default function ScheduleManagePage() {
                               <FormItem>
                                 <FormLabel>Dosen</FormLabel>
                                 <FormControl>
-                                  <div className="flex items-center">
-                                    <Input 
-                                      value={lecturerSearchTerm || "Dosen akan ditentukan berdasarkan mata kuliah"}
-                                      className="w-full bg-gray-50"
-                                      readOnly
-                                    />
-                                    {selectedLecturer && (
-                                      <Badge className="ml-2 bg-[#0687C9]">Otomatis</Badge>
+                                  <div className="relative">
+                                    <div className="flex items-center">
+                                      <Input 
+                                        value={lecturerSearchTerm || "Dosen akan ditentukan berdasarkan mata kuliah"}
+                                        readOnly
+                                        className="w-full"
+                                        placeholder="Dosen akan ditentukan berdasarkan mata kuliah"
+                                      />
+                                      {selectedLecturer && (
+                                        <Badge className="ml-2 bg-[#0687C9] absolute right-2 top-1/2 transform -translate-y-1/2">
+                                          {addForm.getValues().course_id ? "Otomatis" : "Manual"}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    
+                                    {showLecturerResults && (
+                                      <div className="absolute z-10 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-md shadow-lg mt-1">
+                                        {searchingLecturers ? (
+                                          <div className="flex items-center justify-center p-4">
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                            <span>Mencari dosen...</span>
+                                          </div>
+                                        ) : searchedLecturers.length > 0 ? (
+                                          <ScrollArea className="max-h-60">
+                                            {searchedLecturers.map((lecturer) => (
+                                              <div
+                                                key={lecturer.id}
+                                                className="p-2 hover:bg-gray-100 cursor-pointer"
+                                                onClick={() => selectLecturer(lecturer)}
+                                              >
+                                                <div className="font-medium">{lecturer.full_name || lecturer.name}</div>
+                                                {lecturer.email && <div className="text-xs text-gray-500">{lecturer.email}</div>}
+                                              </div>
+                                            ))}
+                                          </ScrollArea>
+                                        ) : (
+                                          <div className="p-2 text-center text-gray-500">
+                                            Tidak ada dosen yang ditemukan
+                                          </div>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 </FormControl>
@@ -1441,11 +1596,9 @@ export default function ScheduleManagePage() {
                                   value={field.value || ""}
                                   onChange={field.onChange}
                                 />
-                                {!field.value && !addForm.getValues().course_id && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Pilih mata kuliah terlebih dahulu untuk menentukan dosen
-                                  </p>
-                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Dosen otomatis dipilih sesuai dengan mata kuliah
+                                </p>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -1492,18 +1645,16 @@ export default function ScheduleManagePage() {
                           <FormItem>
                             <FormLabel>Tahun Akademik</FormLabel>
                             <FormControl>
-                              <div className="flex items-center">
+                              <div className="relative">
                                 <Input 
-                                  value={
-                                    field.value ? 
-                                      (academicYears.find(y => y.id.toString() === field.value)?.name || "Tahun akademik akan ditentukan otomatis") 
-                                      : "Tahun akademik akan ditentukan berdasarkan mata kuliah"
-                                  }
-                                  className="w-full bg-gray-50"
+                                  value={getAcademicYearDisplay(addForm.getValues().course_id, field.value, courses, academicYears)}
                                   readOnly
+                                  className="w-full"
                                 />
                                 {field.value && (
-                                  <Badge className="ml-2 bg-[#0687C9]">Otomatis</Badge>
+                                  <Badge className="ml-2 bg-[#0687C9] absolute right-2 top-1/2 transform -translate-y-1/2">
+                                    Otomatis
+                                  </Badge>
                                 )}
                               </div>
                             </FormControl>
@@ -1513,11 +1664,9 @@ export default function ScheduleManagePage() {
                               value={field.value || ""}
                               onChange={field.onChange}
                             />
-                            {!field.value && !addForm.getValues().course_id && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Pilih mata kuliah terlebih dahulu untuk menentukan tahun akademik
-                              </p>
-                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Tahun akademik otomatis dipilih sesuai dengan mata kuliah
+                            </p>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1816,7 +1965,8 @@ export default function ScheduleManagePage() {
           <DialogHeader>
             <DialogTitle>Edit Jadwal Perkuliahan</DialogTitle>
             <DialogDescription>
-              Ubah detail jadwal perkuliahan yang sudah ada.
+              Ubah detail jadwal perkuliahan yang sudah ada. Dosen akan dipilih otomatis berdasarkan mata kuliah, 
+              atau Anda dapat mencari dan memilih dosen secara manual.
             </DialogDescription>
           </DialogHeader>
           
@@ -1831,7 +1981,45 @@ export default function ScheduleManagePage() {
                       <FormItem>
                         <FormLabel>Mata Kuliah</FormLabel>
                         <Select
-                          onValueChange={field.onChange}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // When a course is selected, get its details to set the academic year
+                            if (value) {
+                              const courseId = parseInt(value);
+                              const selectedCourse = courses.find(course => course.id === courseId);
+                              console.log("Selected course (edit form):", selectedCourse);
+                              
+                              if (selectedCourse) {
+                                console.log("Course academic_year_id (edit form):", selectedCourse.academic_year_id);
+                                console.log("Course academic_year (edit form):", selectedCourse.academic_year);
+                                
+                                if (selectedCourse.academic_year_id) {
+                                  // ALWAYS set the academic year based on the course's academic_year_id
+                                  // NOT from academicYears array
+                                  editForm.setValue("academic_year_id", selectedCourse.academic_year_id.toString());
+                                  console.log("Setting academic year from course (edit form):", selectedCourse.academic_year_id);
+                                  
+                                  // Show a toast to inform the user
+                                  const academicYearName = selectedCourse.academic_year?.name || 
+                                    academicYears.find(y => y.id === selectedCourse.academic_year_id)?.name || 
+                                    selectedCourse.academic_year_id.toString();
+                                  
+                                  toast.info("Tahun akademik dipilih otomatis", {
+                                    description: `Tahun akademik ${academicYearName} dipilih berdasarkan mata kuliah`
+                                  });
+                                } else {
+                                  console.warn("Selected course has no academic_year_id (edit form)");
+                                  editForm.setValue("academic_year_id", "");
+                                }
+                              } else {
+                                console.warn("Could not find selected course with ID (edit form):", courseId);
+                                editForm.setValue("academic_year_id", "");
+                              }
+                            } else {
+                              // Clear academic year if no course is selected
+                              editForm.setValue("academic_year_id", "");
+                            }
+                          }}
                           value={field.value}
                         >
                           <FormControl>
@@ -1846,9 +2034,13 @@ export default function ScheduleManagePage() {
                                   {course.code} - {course.name}
                                 </SelectItem>
                               ))
-                            ) : (
+                            ) : currentSchedule ? (
                               <SelectItem value={currentSchedule.course_id.toString()}>
                                 {currentSchedule.course_code} - {currentSchedule.course_name}
+                              </SelectItem>
+                            ) : (
+                              <SelectItem value="loading" disabled>
+                                Memuat data mata kuliah...
                               </SelectItem>
                             )}
                           </SelectContent>
@@ -1961,16 +2153,47 @@ export default function ScheduleManagePage() {
                       <FormItem>
                         <FormLabel>Dosen</FormLabel>
                         <FormControl>
-                          <div className="flex items-center">
-                            <Input 
-                              value={lecturerSearchTerm || ""}
-                              className="w-full bg-gray-50"
-                              readOnly
-                            />
-                            {selectedLecturer && (
-                              <Badge className="ml-2 bg-[#0687C9]">
-                                {editForm.getValues().course_id !== currentSchedule?.course_id?.toString() ? "Otomatis" : "Tetap"}
-                              </Badge>
+                          <div className="relative">
+                            <div className="flex items-center">
+                              <Input 
+                                value={lecturerSearchTerm || "Dosen akan ditentukan berdasarkan mata kuliah"}
+                                readOnly
+                                className="w-full"
+                                placeholder="Dosen akan ditentukan berdasarkan mata kuliah"
+                              />
+                              {selectedLecturer && (
+                                <Badge className="ml-2 bg-[#0687C9] absolute right-2 top-1/2 transform -translate-y-1/2">
+                                  {editForm.getValues().course_id !== currentSchedule?.course_id?.toString() ? "Otomatis" : "Manual"}
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            {showLecturerResults && (
+                              <div className="absolute z-10 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-md shadow-lg mt-1">
+                                {searchingLecturers ? (
+                                  <div className="flex items-center justify-center p-4">
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    <span>Mencari dosen...</span>
+                                  </div>
+                                ) : searchedLecturers.length > 0 ? (
+                                  <ScrollArea className="max-h-60">
+                                    {searchedLecturers.map((lecturer) => (
+                                      <div
+                                        key={lecturer.id}
+                                        className="p-2 hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => selectLecturer(lecturer)}
+                                      >
+                                        <div className="font-medium">{lecturer.full_name || lecturer.name}</div>
+                                        {lecturer.email && <div className="text-xs text-gray-500">{lecturer.email}</div>}
+                                      </div>
+                                    ))}
+                                  </ScrollArea>
+                                ) : (
+                                  <div className="p-2 text-center text-gray-500">
+                                    Tidak ada dosen yang ditemukan
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         </FormControl>
@@ -1980,11 +2203,9 @@ export default function ScheduleManagePage() {
                           value={field.value || ""}
                           onChange={field.onChange}
                         />
-                        {!lecturerSearchTerm && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Pilih mata kuliah untuk menentukan dosen
-                          </p>
-                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Dosen otomatis dipilih sesuai dengan mata kuliah
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -2031,19 +2252,15 @@ export default function ScheduleManagePage() {
                       <FormItem>
                         <FormLabel>Tahun Akademik</FormLabel>
                         <FormControl>
-                          <div className="flex items-center">
+                          <div className="relative">
                             <Input 
-                              value={
-                                field.value ? 
-                                  (academicYears.find(y => y.id.toString() === field.value)?.name || currentSchedule?.academic_year_name || "Tahun akademik akan ditentukan otomatis") 
-                                  : "Tahun akademik akan ditentukan berdasarkan mata kuliah"
-                              }
-                              className="w-full bg-gray-50"
+                              value={getAcademicYearDisplay(editForm.getValues().course_id, field.value, courses, academicYears)}
                               readOnly
+                              className="w-full"
                             />
                             {field.value && (
-                              <Badge className="ml-2 bg-[#0687C9]">
-                                {editForm.getValues().course_id !== currentSchedule?.course_id?.toString() ? "Otomatis" : "Tetap"}
+                              <Badge className="ml-2 bg-[#0687C9] absolute right-2 top-1/2 transform -translate-y-1/2">
+                                Otomatis
                               </Badge>
                             )}
                           </div>
@@ -2054,11 +2271,9 @@ export default function ScheduleManagePage() {
                           value={field.value || ""}
                           onChange={field.onChange}
                         />
-                        {!field.value && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Pilih mata kuliah untuk menentukan tahun akademik
-                          </p>
-                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Tahun akademik otomatis dipilih sesuai dengan mata kuliah
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}

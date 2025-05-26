@@ -74,12 +74,12 @@ const CalendarDisplay = memo(function CalendarDisplay() {
       </button>
       {isCalendarOpen && (
         <div className="absolute right-0 mt-2 bg-white rounded-md shadow-lg p-4 border border-neutral-100 z-50 min-w-[280px]">
-          <div className="text-sm font-medium mb-3">Kalender</div>
+          <div className="text-sm font-medium mb-3 text-black">Kalender</div>
           <div className="p-2 text-center text-sm border rounded-md bg-neutral-50">
-            <div className="font-medium text-neutral-800">{format(new Date(), "MMMM yyyy", { locale: id })}</div>
+            <div className="font-medium text-black">{format(new Date(), "MMMM yyyy", { locale: id })}</div>
             <div className="mt-1 text-xs text-neutral-600">Kalender lengkap akan tersedia segera</div>
           </div>
-          <div className="mt-2 text-xs text-primary text-center">
+          <div className="mt-2 text-xs text-[#0687C9] text-center">
             Hari ini: {format(new Date(), "EEEE, d MMMM yyyy", { locale: id })}
           </div>
         </div>
@@ -142,7 +142,7 @@ const ProfileMenu = memo(function ProfileMenu() {
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="hidden md:block text-right min-w-[120px]">
-          <div className="text-sm font-medium text-neutral-800">{getFullName()}</div>
+          <div className="text-sm font-medium text-black">{getFullName()}</div>
           <div className="text-xs text-neutral-600">{getRoleText()}</div>
         </div>
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E6F3FB] text-[#0687C9]">
@@ -155,7 +155,7 @@ const ProfileMenu = memo(function ProfileMenu() {
         <div className="absolute right-0 mt-2 w-52 rounded-md bg-white shadow-lg border border-neutral-100 z-50">
           <div className="py-1">
             <div className="px-4 py-2 border-b border-neutral-100">
-              <p className="text-sm font-medium text-neutral-800">{getFullName()}</p>
+              <p className="text-sm font-medium text-black">{getFullName()}</p>
               <p className="text-xs text-neutral-600">{getRoleText()}</p>
             </div>
             <button
@@ -210,67 +210,67 @@ const NotificationsMenu = memo(function NotificationsMenu() {
 
   return (
     <div className="relative" ref={menuRef}>
-          <button
+      <button
         className="relative rounded-full p-2 hover:bg-[#E6F3FB]"
         onClick={() => setIsOpen(!isOpen)}
       >
         <Bell className="h-5 w-5 text-[#0687C9]" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1.5 h-2.5 w-2.5 rounded-full bg-red-500"></span>
-              )}
-            </button>
+        )}
+      </button>
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md bg-white shadow-lg border border-neutral-100 z-50">
-                <div className="p-4">
-                  <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-medium">
-                      Notifikasi
-                    </h3>
-              <button className="text-xs text-primary hover:text-primary/80">
-                      Tandai semua dibaca
-                    </button>
-                  </div>
-                  <div className="space-y-3">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`flex items-start rounded-md p-2 ${
+          <div className="p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-black">
+                Notifikasi
+              </h3>
+              <button className="text-xs text-[#0687C9] hover:text-[#0687C9]/80">
+                Tandai semua dibaca
+              </button>
+            </div>
+            <div className="space-y-3">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`flex items-start rounded-md p-2 ${
                     notification.read ? "" : "bg-[#E6F3FB]"
-                        }`}
-                      >
-                        <div className="flex-1">
-                          <p
-                            className={`text-sm font-medium ${
-                              notification.read
+                  }`}
+                >
+                  <div className="flex-1">
+                    <p
+                      className={`text-sm font-medium ${
+                        notification.read
                           ? "text-neutral-700"
-                          : "text-neutral-900"
-                            }`}
-                          >
-                            {notification.title}
-                          </p>
-                    <p className="text-xs text-neutral-600">
-                            {notification.message}
-                          </p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                            {notification.time}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex justify-center border-t border-gray-100 pt-3">
-                    <Link
-                      href="/dashboard/notifications"
-                className="text-xs text-[#0687C9] hover:text-[#056ba0]"
+                          : "text-black"
+                      }`}
                     >
-                      Lihat Semua Notifikasi
-                    </Link>
+                      {notification.title}
+                    </p>
+                    <p className="text-xs text-neutral-600">
+                      {notification.message}
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      {notification.time}
+                    </p>
                   </div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+            <div className="mt-3 flex justify-center border-t border-gray-100 pt-3">
+              <Link
+                href="/dashboard/notifications"
+                className="text-xs text-[#0687C9] hover:text-[#056ba0]"
+              >
+                Lihat Semua Notifikasi
+              </Link>
+            </div>
           </div>
+        </div>
+      )}
+    </div>
   );
 });
 
@@ -295,10 +295,10 @@ export function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-10 h-16 bg-white border-b border-neutral-200 shadow-sm">
-      <div className="flex h-full items-center justify-between px-4 md:px-6">
-        {/* Left side: Menu button (mobile), Campus Logo and DateTime */}
-        <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-10 h-auto min-h-16 bg-white border-b border-neutral-200 shadow-md">
+      <div className="flex flex-col md:flex-row h-full items-center justify-between px-4 py-2 md:py-0 md:px-6">
+        {/* Left side: Menu button (mobile) and DateTime */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
           {/* Menu button - only on mobile */}
           <button
             onClick={onMenuClick}
@@ -308,34 +308,33 @@ export function Header({ onMenuClick }: HeaderProps) {
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Logo - only on mobile */}
-          <div className="mr-6 md:hidden">
-            <Image
-              src="/images/logo2.png"
-              alt="Logo"
-              width={130}
-              height={32}
-              className="h-8 w-auto"
-            />
-          </div>
-
           {/* Date & Time Information */}
-          <div className="hidden md:block">
+          <div className="hidden md:block flex-grow">
             <Link href="/dashboard" className="group cursor-pointer">
-              <h2 className="text-lg font-medium text-[#002A5C] group-hover:text-primary transition-colors">
+              <h2 className="text-base lg:text-lg font-semibold text-black group-hover:text-[#0687C9] transition-colors">
                 Selamat datang di DelPresence Management System
               </h2>
-              <p className="text-sm text-neutral-600">
+              <p className="text-xs lg:text-sm text-neutral-600">
                 {formatDate(currentDateTime)} {formatTime(currentDateTime)}
               </p>
             </Link>
           </div>
         </div>
 
+        {/* Mobile view: Welcome text */}
+        <div className="md:hidden w-full text-center py-1">
+          <h2 className="text-sm font-semibold text-black">
+            DelPresence Management System
+          </h2>
+          <p className="text-xs text-neutral-600">
+            {formatDate(currentDateTime)} {formatTime(currentDateTime)}
+          </p>
+        </div>
+
         {/* Right side: Search, Tools and Profile Menu */}
-        <div className="flex items-center">
-          {/* Search Box - only on larger screens */}
-          <div className="hidden lg:flex items-center relative mx-4 w-80">
+        <div className="flex items-center justify-end w-full md:w-auto mt-2 md:mt-0">
+          {/* Search Box - responsive */}
+          <div className="hidden lg:flex items-center relative mx-4 w-64 xl:w-80">
             <Search className="absolute left-3 h-4 w-4 text-neutral-500" />
             <input
               type="text"
@@ -343,6 +342,14 @@ export function Header({ onMenuClick }: HeaderProps) {
               className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#0687C9] focus:ring-1 focus:ring-[#0687C9] transition-all placeholder:text-neutral-500"
             />
           </div>
+
+          {/* Mobile Search Button */}
+          <button
+            className="lg:hidden rounded-full p-2 hover:bg-[#E6F3FB]"
+            title="Cari"
+          >
+            <Search className="h-5 w-5 text-[#0687C9]" />
+          </button>
 
           {/* Calendar Tool */}
           <CalendarDisplay />

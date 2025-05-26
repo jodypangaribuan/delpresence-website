@@ -80,22 +80,10 @@ export default function LecturerCoursesPage() {
         const academicYearsData = response.data.data || [];
         setAcademicYears(academicYearsData);
         
-        // If we have academic years and none is selected, select the first one (likely the current)
+        // If we have academic years and none is selected, select the first one
         if (academicYearsData.length > 0 && !selectedAcademicYearId) {
-          // Try to find the active academic year first
-          const activeYear = academicYearsData.find((year: AcademicYear) => {
-            const now = new Date();
-            const start = new Date(year.start_date);
-            const end = new Date(year.end_date);
-            return now >= start && now <= end;
-          });
-          
-          if (activeYear) {
-            setSelectedAcademicYearId(activeYear.id.toString());
-          } else {
-            // If no active year, select the first one
-            setSelectedAcademicYearId(academicYearsData[0].id.toString());
-          }
+          // Just use the first academic year
+          setSelectedAcademicYearId(academicYearsData[0].id.toString());
         } else if (academicYearsData.length === 0) {
           // If no academic years available, set loading to false and show empty state
           setIsLoading(false);
@@ -326,7 +314,7 @@ export default function LecturerCoursesPage() {
             <div className="p-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
               <div>
-                  <h3 className="text-xl font-semibold text-[#002A5C]">Mata Kuliah Saya</h3>
+                  <h3 className="text-xl font-semibold text-black">Mata Kuliah Saya</h3>
                   <p className="text-sm text-muted-foreground mt-1">Daftar mata kuliah yang Anda ampu pada tahun akademik {getSelectedAcademicYearName()}</p>
               </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
@@ -347,7 +335,7 @@ export default function LecturerCoursesPage() {
                         <SelectContent>
                           {academicYears.map((year) => (
                             <SelectItem key={year.id} value={year.id.toString()}>
-                              {year.name} - {year.semester}
+                              {`${year.name} - ${year.semester}`}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -402,7 +390,7 @@ export default function LecturerCoursesPage() {
                           <TableCell>
                             <div className="flex items-center">
                               <CalendarDays className="h-3.5 w-3.5 mr-1.5 text-[#0687C9]" />
-                              {course.academic_year_name || "Tahun Akademik"} ({course.academic_year_semester || "-"})
+                              {`${course.academic_year_name || "Tahun Akademik"} - ${course.academic_year_semester || "-"}`}
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
@@ -461,7 +449,7 @@ export default function LecturerCoursesPage() {
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-[#002A5C]">Detail Mata Kuliah</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-black">Detail Mata Kuliah</DialogTitle>
             <DialogDescription>
               Informasi lengkap mengenai mata kuliah
             </DialogDescription>
@@ -470,7 +458,7 @@ export default function LecturerCoursesPage() {
           {selectedCourse && (
             <div className="space-y-6">
               <div className="bg-[#F9FBFC] p-4 rounded-lg border border-gray-100">
-                <h3 className="text-lg font-semibold text-[#002A5C] mb-2">
+                <h3 className="text-lg font-semibold text-black mb-2">
                   {selectedCourse.name}
                 </h3>
                 <div className="flex items-center text-sm text-muted-foreground">
@@ -485,7 +473,7 @@ export default function LecturerCoursesPage() {
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <CalendarDays className="h-4 w-4 mr-2 text-[#0687C9]" />
-                      <span>{selectedCourse.academic_year_name || "Tahun Akademik"} ({selectedCourse.academic_year_semester || "-"})</span>
+                      <span>{`${selectedCourse.academic_year_name || "Tahun Akademik"} - ${selectedCourse.academic_year_semester || "-"}`}</span>
                     </div>
                     <div className="flex items-center">
                       <Book className="h-4 w-4 mr-2 text-[#0687C9]" />

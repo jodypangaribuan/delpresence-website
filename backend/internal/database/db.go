@@ -134,6 +134,23 @@ func Initialize() {
 	if err != nil {
 		log.Fatalf("Error auto-migrating AcademicYear model: %v\n", err)
 	}
+	
+	// Drop existing unique index if it exists
+	if DB.Migrator().HasIndex(&models.AcademicYear{}, "idx_academic_years_name_deleted_at") {
+		log.Println("Dropping existing unique index on academic_years table...")
+		if err := DB.Migrator().DropIndex(&models.AcademicYear{}, "idx_academic_years_name_deleted_at"); err != nil {
+			log.Printf("Error dropping existing index: %v\n", err)
+		}
+	}
+	
+	// Ensure the new composite unique index exists
+	if !DB.Migrator().HasIndex(&models.AcademicYear{}, "idx_academic_years_name_semester_deleted_at") {
+		log.Println("Creating new composite unique index on academic_years table...")
+		if err := DB.Exec("CREATE UNIQUE INDEX idx_academic_years_name_semester_deleted_at ON academic_years (name, semester, COALESCE(deleted_at, '0001-01-01 00:00:00'::timestamp))").Error; err != nil {
+			log.Printf("Error creating new composite index: %v\n", err)
+		}
+	}
+	
 	log.Println("AcademicYear table migrated successfully")
 	
 	// Then migrate the Course model (depends on Department, Faculty, and AcademicYear)

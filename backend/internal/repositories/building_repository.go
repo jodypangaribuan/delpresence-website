@@ -63,8 +63,8 @@ func (r *BuildingRepository) FindAll() ([]models.Building, error) {
 
 // DeleteByID deletes a building by ID
 func (r *BuildingRepository) DeleteByID(id uint) error {
-	// Use Unscoped() to permanently delete the record instead of a soft delete
-	return r.db.Unscoped().Delete(&models.Building{}, id).Error
+	// Use soft delete (don't use Unscoped())
+	return r.db.Delete(&models.Building{}, id).Error
 }
 
 // CountRooms counts the number of rooms in a building
@@ -72,4 +72,55 @@ func (r *BuildingRepository) CountRooms(buildingID uint) (int64, error) {
 	var count int64
 	err := r.db.Model(&models.Room{}).Where("building_id = ?", buildingID).Count(&count).Error
 	return count, err
+}
+
+// FindDeletedByCode finds a soft-deleted building by code
+func (r *BuildingRepository) FindDeletedByCode(code string) (*models.Building, error) {
+	var building models.Building
+	err := r.db.Unscoped().Where("code = ? AND deleted_at IS NOT NULL", code).First(&building).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &building, nil
+}
+
+// RestoreByCode restores a soft-deleted building by code
+func (r *BuildingRepository) RestoreByCode(code string) (*models.Building, error) {
+	// Find the deleted record
+	deletedBuilding, err := r.FindDeletedByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if deletedBuilding == nil {
+		return nil, nil
+	}
+	
+	// Restore the record
+	if err := r.db.Unscoped().Model(&models.Building{}).Where("id = ?", deletedBuilding.ID).Update("deleted_at", nil).Error; err != nil {
+		return nil, err
+	}
+	
+	// Return the restored record
+	return r.FindByID(deletedBuilding.ID)
+}
+
+// CheckCodeExists checks if a code exists, including soft-deleted records
+func (r *BuildingRepository) CheckCodeExists(code string, excludeID uint) (bool, error) {
+	var count int64
+	query := r.db.Unscoped().Model(&models.Building{}).Where("code = ?", code)
+	
+	// Exclude the current record if updating
+	if excludeID > 0 {
+		query = query.Where("id != ?", excludeID)
+	}
+	
+	err := query.Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	
+	return count > 0, nil
 } 

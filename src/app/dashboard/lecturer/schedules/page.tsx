@@ -24,16 +24,30 @@ import { toast } from "sonner";
 
 interface Schedule {
   id: number;
-  courseCode: string;
-  courseName: string;
+  course_id: number;
+  course_name: string;
+  course_code: string;
   day: string;
-  time: string;
-  room: string;
-  date: string;
-  totalStudents: number;
-  assistantName: string;
-  upcoming: boolean;
-  status: "upcoming" | "completed" | "active" | "today";
+  start_time: string;
+  end_time: string;
+  room_name: string;
+  building_name: string;
+  lecturer_id: number;
+  lecturer_name: string;
+  student_group_id: number;
+  student_group_name: string;
+  academic_year_id: number;
+  academic_year_name: string;
+  capacity: number;
+  enrolled: number;
+  semester: string;
+  status?: "upcoming" | "today" | "active" | "completed";
+}
+
+interface AcademicYear {
+  id: number;
+  name: string;
+  is_active: boolean;
 }
 
 export default function LecturerSchedulePage() {
@@ -45,84 +59,108 @@ export default function LecturerSchedulePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<number | 'all'>(0);
 
-  // Mock data for development
+  // Load academic years
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      const mockSchedules = [
-        {
-          id: 1,
-          courseCode: "IF210",
-          courseName: "Algoritma & Pemrograman",
-          day: "Senin",
-          time: "08:00 - 10:30",
-          room: "Ruang Lab 3",
-          date: "2023-10-16",
-          totalStudents: 42,
-          assistantName: "Aninda Dillah Kuswardhani",
-          upcoming: true,
-          status: "upcoming" as const
-        },
-        {
-          id: 2,
-          courseCode: "IF310",
-          courseName: "Basis Data",
-          day: "Selasa",
-          time: "13:00 - 15:30",
-          room: "Ruang Lab 1",
-          date: "2023-10-17",
-          totalStudents: 38,
-          assistantName: "Melvin Adi Nugroho",
-          upcoming: true,
-          status: "today" as const
-        },
-        {
-          id: 3,
-          courseCode: "IF240",
-          courseName: "Struktur Data",
-          day: "Kamis",
-          time: "09:00 - 11:30",
-          room: "Ruang Lab 4",
-          date: "2023-10-19",
-          totalStudents: 30,
-          assistantName: "Farid Setiawan",
-          upcoming: true,
-          status: "upcoming" as const
-        },
-        {
-          id: 4,
-          courseCode: "IF402",
-          courseName: "Pemrograman Mobile",
-          day: "Rabu",
-          time: "10:00 - 12:30",
-          room: "Ruang Lab 2",
-          date: "2023-10-11",
-          totalStudents: 25,
-          assistantName: "Wilda Nurjanah",
-          upcoming: false,
-          status: "completed" as const
-        },
-        {
-          id: 5,
-          courseCode: "IF330",
-          courseName: "Jaringan Komputer",
-          day: "Jumat",
-          time: "13:00 - 15:30",
-          room: "Ruang Lab 3",
-          date: "2023-10-13",
-          totalStudents: 35,
-          assistantName: "-",
-          upcoming: false,
-          status: "completed" as const
+    const fetchAcademicYears = async () => {
+      try {
+        const response = await api<{status: string, data: AcademicYear[]}>('lecturer/academic-years');
+        if (response.status === 'success' && response.data) {
+          setAcademicYears(response.data);
+          // Just use the first year in the list
+          if (response.data.length > 0) {
+            setSelectedAcademicYear(response.data[0].id);
+          }
         }
-      ];
-
-      setSchedules(mockSchedules);
-      setFilteredSchedules(mockSchedules);
-      setIsLoading(false);
-    }, 1000);
+      } catch (error) {
+        console.error('Failed to fetch academic years:', error);
+        toast.error('Gagal memuat tahun akademik');
+      }
+    };
+    
+    fetchAcademicYears();
   }, []);
+
+  // Load lecturer's schedules
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      setIsLoading(true);
+      try {
+        let queryParam = '';
+        
+        // Handle academic year parameter
+        if (selectedAcademicYear === 'all') {
+          // Don't add any parameter for 'all'
+          queryParam = '';
+        } else if (selectedAcademicYear === 0) {
+          // Don't specify a parameter for 0 - backend will use active year by default
+          queryParam = '';
+        } else {
+          // Use the specific academic year ID
+          queryParam = `?academic_year_id=${selectedAcademicYear}`;
+        }
+          
+        const response = await api<{status: string, data: Schedule[]}>(`lecturer/schedules${queryParam}`);
+        if (response.status === 'success' && response.data) {
+          // Process schedules to add status
+          const processedSchedules = processScheduleStatus(response.data);
+          setSchedules(processedSchedules);
+          setFilteredSchedules(processedSchedules);
+        }
+      } catch (error) {
+        console.error('Failed to fetch lecturer schedules:', error);
+        toast.error('Gagal memuat jadwal mengajar');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchSchedules();
+  }, [selectedAcademicYear]);
+
+  // Process schedules to add status
+  const processScheduleStatus = (schedules: Schedule[]): Schedule[] => {
+    const today = new Date();
+    const dayNames = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+    const currentDay = dayNames[today.getDay()].toLowerCase();
+    
+    return schedules.map(schedule => {
+      const scheduleCopy = { ...schedule };
+      const day = schedule.day.toLowerCase();
+      
+      if (day === currentDay) {
+        // Check if current time is within class time
+        const now = today.getHours() * 60 + today.getMinutes();
+        const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
+        const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
+        const startTime = startHour * 60 + startMinute;
+        const endTime = endHour * 60 + endMinute;
+        
+        if (now >= startTime && now <= endTime) {
+          scheduleCopy.status = 'active';
+        } else if (now < startTime) {
+          scheduleCopy.status = 'today';
+        } else {
+          scheduleCopy.status = 'completed';
+        }
+      } else {
+        // Compare day of week
+        const dayIndex = dayNames.indexOf(day);
+        const currentDayIndex = today.getDay();
+        
+        if ((dayIndex > currentDayIndex) || 
+            (dayIndex < currentDayIndex && dayIndex > 0)) { // Next week
+          scheduleCopy.status = 'upcoming';
+        } else {
+          scheduleCopy.status = 'completed';
+        }
+      }
+      
+      return scheduleCopy;
+    });
+  };
 
   // Filter schedules based on search term, day and status filters
   useEffect(() => {
@@ -132,9 +170,9 @@ export default function LecturerSchedulePage() {
     if (searchTerm) {
       filtered = filtered.filter(
         (schedule) =>
-          schedule.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          schedule.courseCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          schedule.assistantName.toLowerCase().includes(searchTerm.toLowerCase())
+          schedule.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          schedule.course_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          schedule.lecturer_name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
@@ -157,6 +195,11 @@ export default function LecturerSchedulePage() {
     setShowDetails(true);
   };
 
+  // Format time for display
+  const formatTimeRange = (startTime: string, endTime: string) => {
+    return `${startTime} - ${endTime}`;
+  };
+
   return (
     <div className="space-y-6">
       <Card className="border border-gray-100 shadow-sm">
@@ -165,10 +208,25 @@ export default function LecturerSchedulePage() {
             <div className="p-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-semibold text-[#002A5C]">Jadwal Mengajar</h3>
+                  <h3 className="text-xl font-semibold text-black">Jadwal Mengajar</h3>
                   <p className="text-sm text-muted-foreground mt-1">Daftar jadwal mengajar mata kuliah yang Anda ampu</p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
+                  <Select value={selectedAcademicYear.toString()} onValueChange={(value) => setSelectedAcademicYear(value === 'all' ? 'all' : parseInt(value))}>
+                    <SelectTrigger className="w-full md:w-[200px]">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Tahun Akademik" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Tahun Akademik</SelectItem>
+                      {academicYears.map(year => (
+                        <SelectItem key={year.id} value={year.id.toString()}>
+                          {year.name} {year.is_active && '(Aktif)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <div className="relative w-full md:w-64">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -223,7 +281,7 @@ export default function LecturerSchedulePage() {
                         <TableHead className="font-bold text-black">Hari</TableHead>
                         <TableHead className="font-bold text-black">Jam</TableHead>
                         <TableHead className="font-bold text-black">Ruangan</TableHead>
-                        <TableHead className="font-bold text-black">Asisten</TableHead>
+                        <TableHead className="font-bold text-black">Kelas</TableHead>
                         <TableHead className="font-bold text-black">Status</TableHead>
                         <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                       </TableRow>
@@ -232,12 +290,12 @@ export default function LecturerSchedulePage() {
                       {filteredSchedules.map((schedule, index) => (
                         <TableRow key={schedule.id}>
                           <TableCell>{index + 1}</TableCell>
-                          <TableCell className="font-medium">{schedule.courseCode}</TableCell>
-                          <TableCell>{schedule.courseName}</TableCell>
+                          <TableCell className="font-medium">{schedule.course_code}</TableCell>
+                          <TableCell>{schedule.course_name}</TableCell>
                           <TableCell>{schedule.day}</TableCell>
-                          <TableCell>{schedule.time}</TableCell>
-                          <TableCell>{schedule.room}</TableCell>
-                          <TableCell>{schedule.assistantName}</TableCell>
+                          <TableCell>{formatTimeRange(schedule.start_time, schedule.end_time)}</TableCell>
+                          <TableCell>{schedule.room_name} ({schedule.building_name})</TableCell>
+                          <TableCell>{schedule.student_group_name}</TableCell>
                           <TableCell>
                             {schedule.status === "upcoming" && (
                               <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
@@ -297,7 +355,7 @@ export default function LecturerSchedulePage() {
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-[#002A5C]">Detail Jadwal Perkuliahan</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-black">Detail Jadwal Perkuliahan</DialogTitle>
             <DialogDescription>
               Informasi lengkap tentang jadwal perkuliahan
             </DialogDescription>
@@ -306,8 +364,8 @@ export default function LecturerSchedulePage() {
           {selectedSchedule && (
             <div className="space-y-4 py-2">
               <div className="flex flex-col space-y-1.5">
-                <h3 className="text-lg font-semibold">{selectedSchedule.courseCode}: {selectedSchedule.courseName}</h3>
-                <p className="text-sm text-muted-foreground">{selectedSchedule.day}, {selectedSchedule.time}</p>
+                <h3 className="text-lg font-semibold">{selectedSchedule.course_code}: {selectedSchedule.course_name}</h3>
+                <p className="text-sm text-muted-foreground">{selectedSchedule.day}, {formatTimeRange(selectedSchedule.start_time, selectedSchedule.end_time)}</p>
               </div>
               
               <div className="grid grid-cols-1 gap-4">
@@ -315,7 +373,7 @@ export default function LecturerSchedulePage() {
                   <BookOpen className="h-5 w-5 text-[#0687C9] mt-0.5" />
                   <div>
                     <p className="font-medium text-sm">Mata Kuliah</p>
-                    <p className="text-sm text-muted-foreground">{selectedSchedule.courseCode}: {selectedSchedule.courseName}</p>
+                    <p className="text-sm text-muted-foreground">{selectedSchedule.course_code}: {selectedSchedule.course_name}</p>
                   </div>
                 </div>
                 
@@ -323,23 +381,31 @@ export default function LecturerSchedulePage() {
                   <MapPin className="h-5 w-5 text-[#0687C9] mt-0.5" />
                   <div>
                     <p className="font-medium text-sm">Lokasi</p>
-                    <p className="text-sm text-muted-foreground">{selectedSchedule.room}</p>
+                    <p className="text-sm text-muted-foreground">{selectedSchedule.room_name} ({selectedSchedule.building_name})</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
                   <Calendar className="h-5 w-5 text-[#0687C9] mt-0.5" />
                   <div>
-                    <p className="font-medium text-sm">Tanggal</p>
-                    <p className="text-sm text-muted-foreground">{selectedSchedule.date}</p>
+                    <p className="font-medium text-sm">Jadwal</p>
+                    <p className="text-sm text-muted-foreground">{selectedSchedule.day}, {formatTimeRange(selectedSchedule.start_time, selectedSchedule.end_time)}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
                   <Users className="h-5 w-5 text-[#0687C9] mt-0.5" />
                   <div>
-                    <p className="font-medium text-sm">Jumlah Mahasiswa</p>
-                    <p className="text-sm text-muted-foreground">{selectedSchedule.totalStudents} mahasiswa</p>
+                    <p className="font-medium text-sm">Kelas</p>
+                    <p className="text-sm text-muted-foreground">{selectedSchedule.student_group_name}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <Users className="h-5 w-5 text-[#0687C9] mt-0.5" />
+                  <div>
+                    <p className="font-medium text-sm">Kapasitas</p>
+                    <p className="text-sm text-muted-foreground">{selectedSchedule.enrolled}/{selectedSchedule.capacity} mahasiswa</p>
                   </div>
                 </div>
                 
@@ -371,16 +437,6 @@ export default function LecturerSchedulePage() {
                     </div>
                   </div>
                 </div>
-
-                {selectedSchedule.assistantName !== "-" && (
-                  <div className="flex items-start space-x-3">
-                    <Users className="h-5 w-5 text-[#0687C9] mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Asisten Dosen</p>
-                      <p className="text-sm text-muted-foreground">{selectedSchedule.assistantName}</p>
-                    </div>
-                  </div>
-                )}
               </div>
               
               <div className="mt-6 pt-4 border-t border-gray-100">

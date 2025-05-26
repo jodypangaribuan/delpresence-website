@@ -13,9 +13,9 @@ type CourseSchedule struct {
 	Course          Course         `gorm:"foreignKey:CourseID" json:"course,omitempty"`
 	RoomID          uint           `gorm:"not null" json:"room_id"`
 	Room            Room           `gorm:"foreignKey:RoomID" json:"room,omitempty"`
-	Day             string         `gorm:"not null" json:"day"` // e.g., "Senin", "Selasa", etc.
-	StartTime       string         `gorm:"not null" json:"start_time"` // e.g., "08:00"
-	EndTime         string         `gorm:"not null" json:"end_time"`   // e.g., "10:30"
+	Day             string         `gorm:"not null" json:"day"`
+	StartTime       string         `gorm:"not null" json:"start_time"`
+	EndTime         string         `gorm:"not null" json:"end_time"`
 	UserID          uint           `gorm:"column:lecturer_id;not null" json:"user_id"`
 	Lecturer        User           `gorm:"foreignKey:UserID;references:ID" json:"lecturer,omitempty"`
 	StudentGroupID  uint           `gorm:"not null" json:"student_group_id"`
