@@ -11,7 +11,7 @@ class ApiConfig {
 
   // API configuration constants
   static const String DEFAULT_BASE_URL =
-      'https://ddad-2404-c0-5610-00-d79-743e.ngrok-free.app';
+      'https://7c00-103-167-217-200.ngrok-free.app';
   static const String API_PATH = '/api/v1';
   static const int DEFAULT_TIMEOUT = 30;
   static const String API_VERSION = 'v1';

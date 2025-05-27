@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Ensure favicon displays properly for all pages */
 /* icon-webpage.png is used as the site-wide favicon */
@@ -7,28 +9,27 @@
 
 /* Custom text selection color for inputs */
 ::selection {
-  background-color: #0687C9;
+  background-color: #0687c9;
   color: white;
 }
 
 ::-moz-selection {
-  background-color: #0687C9;
+  background-color: #0687c9;
   color: white;
 }
 
 /* Specific selection styles for login page inputs */
 .login-page input::selection {
-  background-color: #0687C9;
+  background-color: #0687c9;
   color: white;
 }
 
 .login-page input::-moz-selection {
-  background-color: #0687C9;
+  background-color: #0687c9;
   color: white;
 }
 
 :root {
-
   /* Card */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -120,7 +121,6 @@
 }
 
 @media (prefers-color-scheme: dark) {
-
   /* Memastikan halaman legal selalu menggunakan tema terang */
   [data-theme="light"],
   [data-force-light="true"],
@@ -194,7 +194,8 @@ canvas[style*="z-index: 9999"] {
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
+    outline-color: theme("colors.ring" / 50%);
   }
   body {
     @apply bg-background text-foreground;
@@ -202,7 +203,7 @@ canvas[style*="z-index: 9999"] {
 }
 
 /* Circular favicon style */
-link[rel="icon"], 
+link[rel="icon"],
 link[rel="shortcut icon"],
 link[rel="apple-touch-icon"] {
   border-radius: 50%;
@@ -211,7 +212,8 @@ link[rel="apple-touch-icon"] {
 }
 
 @keyframes pulse-slow {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
   }
