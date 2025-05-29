@@ -4,30 +4,30 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	
+
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/repositories"
 )
 
 // CourseScheduleService provides business logic for course schedules
 type CourseScheduleService struct {
-	repo              *repositories.CourseScheduleRepository
-	courseRepo        *repositories.CourseRepository
-	roomRepo          *repositories.RoomRepository
-	studentGroupRepo  *repositories.StudentGroupRepository
-	lecturerRepo      *repositories.UserRepository
-	academicYearRepo  *repositories.AcademicYearRepository
+	repo             *repositories.CourseScheduleRepository
+	courseRepo       *repositories.CourseRepository
+	roomRepo         *repositories.RoomRepository
+	studentGroupRepo *repositories.StudentGroupRepository
+	lecturerRepo     *repositories.UserRepository
+	academicYearRepo *repositories.AcademicYearRepository
 }
 
 // NewCourseScheduleService creates a new instance of CourseScheduleService
 func NewCourseScheduleService() *CourseScheduleService {
 	return &CourseScheduleService{
-		repo:              repositories.NewCourseScheduleRepository(),
-		courseRepo:        repositories.NewCourseRepository(),
-		roomRepo:          repositories.NewRoomRepository(),
-		studentGroupRepo:  repositories.NewStudentGroupRepository(),
-		lecturerRepo:      repositories.NewUserRepository(),
-		academicYearRepo:  repositories.NewAcademicYearRepository(),
+		repo:             repositories.NewCourseScheduleRepository(),
+		courseRepo:       repositories.NewCourseRepository(),
+		roomRepo:         repositories.NewRoomRepository(),
+		studentGroupRepo: repositories.NewStudentGroupRepository(),
+		lecturerRepo:     repositories.NewUserRepository(),
+		academicYearRepo: repositories.NewAcademicYearRepository(),
 	}
 }
 
@@ -64,7 +64,7 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 
 	// Always prioritize finding the lecturer from course assignments first
 	lecturerAssignmentRepo := repositories.NewLecturerAssignmentRepository()
-	
+
 	// Get academic years and use the provided one or any available one
 	academicYearID := schedule.AcademicYearID
 	if academicYearID == 0 {
@@ -73,37 +73,37 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 		if err != nil || len(academicYears) == 0 {
 			return models.CourseSchedule{}, errors.New("no academic years found")
 		}
-		
+
 		// Sort by ID descending to get the most recent one
 		sort.Slice(academicYears, func(i, j int) bool {
 			return academicYears[i].ID > academicYears[j].ID
 		})
 		academicYearID = academicYears[0].ID
 	}
-	
+
 	// Try to find existing schedules for this course to maintain consistent lecturer ID
 	existingSchedules, err := s.repo.GetByCourse(schedule.CourseID)
 	var consistentLecturerID uint = 0
-	
+
 	// If there are existing schedules for this course, prioritize using the same lecturer ID
 	if err == nil && len(existingSchedules) > 0 {
 		fmt.Printf("Found %d existing schedules for course ID=%d\n", len(existingSchedules), schedule.CourseID)
-		
+
 		// Sort all schedules by ID descending to get the most recent first
 		sort.Slice(existingSchedules, func(i, j int) bool {
 			return existingSchedules[i].ID > existingSchedules[j].ID
 		})
-		
+
 		// Log all existing schedules for debugging
 		for i, s := range existingSchedules {
 			fmt.Printf("  Existing schedule #%d: ID=%d, lecturer_id=%d\n", i+1, s.ID, s.UserID)
 		}
-		
+
 		// Use the first schedule (highest ID = most recent) that has a non-zero lecturer ID
 		for _, s := range existingSchedules {
 			if s.UserID > 0 {
 				consistentLecturerID = s.UserID
-				fmt.Printf("Selected lecturer ID=%d from existing schedule ID=%d for consistency\n", 
+				fmt.Printf("Selected lecturer ID=%d from existing schedule ID=%d for consistency\n",
 					consistentLecturerID, s.ID)
 				break
 			}
@@ -111,27 +111,27 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 	} else {
 		// Try to find recently deleted schedules that might have been soft-deleted
 		fmt.Printf("No active schedules found, checking for deleted schedules for course ID=%d\n", schedule.CourseID)
-		
+
 		var deletedSchedules []models.CourseSchedule
 		err := s.repo.DB().Unscoped().
 			Where("course_id = ? AND deleted_at IS NOT NULL", schedule.CourseID).
 			Order("id DESC").
 			Limit(5).
 			Find(&deletedSchedules).Error
-			
+
 		if err == nil && len(deletedSchedules) > 0 {
 			fmt.Printf("Found %d deleted schedules for course ID=%d\n", len(deletedSchedules), schedule.CourseID)
-			
+
 			// Log all deleted schedules for debugging
 			for i, s := range deletedSchedules {
 				fmt.Printf("  Deleted schedule #%d: ID=%d, lecturer_id=%d\n", i+1, s.ID, s.UserID)
 			}
-			
+
 			// Use the first deleted schedule with a non-zero lecturer ID
 			for _, s := range deletedSchedules {
 				if s.UserID > 0 {
 					consistentLecturerID = s.UserID
-					fmt.Printf("Selected lecturer ID=%d from deleted schedule ID=%d for consistency\n", 
+					fmt.Printf("Selected lecturer ID=%d from deleted schedule ID=%d for consistency\n",
 						consistentLecturerID, s.ID)
 					break
 				}
@@ -140,7 +140,7 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 			fmt.Printf("No deleted schedules found for course ID=%d, error: %v\n", schedule.CourseID, err)
 		}
 	}
-	
+
 	// If we found a consistent lecturer ID from existing schedules, use it
 	if consistentLecturerID > 0 {
 		// Only override if no specific lecturer was requested
@@ -155,7 +155,7 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 			// Use lecturer from assignment if available
 			lecturer := assignments[0].Lecturer
 			lecturerID := uint(lecturer.UserID) // Use the external UserID for consistency
-			
+
 			// Only override UserID if a specific one wasn't requested
 			if schedule.UserID == 0 {
 				schedule.UserID = lecturerID
@@ -168,7 +168,7 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 			schedule.UserID = 5106
 		}
 	}
-	
+
 	// If we still don't have a valid UserID or need to validate the provided one
 	if schedule.UserID > 0 {
 		// Verify the lecturer exists
@@ -176,20 +176,20 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 		if err != nil || user == nil || user.Role != "Dosen" {
 			// Try to find lecturer in the lecturer table
 			lecturerRepo := repositories.NewLecturerRepository()
-			
+
 			fmt.Printf("Looking up lecturer with UserID=%d in lecturer table\n", schedule.UserID)
-			
+
 			// First, try as external UserID (most common case)
 			lecturer, err := lecturerRepo.GetByUserID(int(schedule.UserID))
 			if err == nil && lecturer.ID > 0 {
-				fmt.Printf("Found lecturer by UserID=%d: ID=%d, FullName=%s\n", 
+				fmt.Printf("Found lecturer by UserID=%d: ID=%d, FullName=%s\n",
 					schedule.UserID, lecturer.ID, lecturer.FullName)
 				// Keep using the provided UserID which matches lecturer.UserID
 			} else {
 				// Try by direct ID
 				lecturer, err = lecturerRepo.GetByID(schedule.UserID)
 				if err == nil && lecturer.ID > 0 {
-					fmt.Printf("Found lecturer by direct ID=%d: UserID=%d, FullName=%s\n", 
+					fmt.Printf("Found lecturer by direct ID=%d: UserID=%d, FullName=%s\n",
 						schedule.UserID, lecturer.UserID, lecturer.FullName)
 					// Found by direct ID, use the UserID if available
 					if lecturer.UserID > 0 {
@@ -215,7 +215,7 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 		// No lecturer ID provided and none found from assignments or existing schedules
 		return models.CourseSchedule{}, errors.New("no lecturer ID provided or found from assignments")
 	}
-	
+
 	fmt.Printf("Final lecturer ID for new schedule: %d\n", schedule.UserID)
 
 	// Validate student group
@@ -230,22 +230,11 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 		return models.CourseSchedule{}, errors.New("invalid academic year ID")
 	}
 
-	// Check for room conflicts
-	hasConflict, err := s.repo.CheckScheduleConflict(
-		schedule.RoomID, 
-		schedule.Day, 
-		schedule.StartTime, 
-		schedule.EndTime, 
-		nil,
-	)
-	if err != nil {
-		return models.CourseSchedule{}, err
-	}
-	if hasConflict {
-		return models.CourseSchedule{}, errors.New("room is already scheduled for this time")
-	}
+	// Room conflict check is now skipped to allow flexible room scheduling
+	// This allows rooms to be used for multiple classes at the same time if needed
 
 	// Check for lecturer conflicts
+	var hasConflict bool
 	hasConflict, err = s.repo.CheckLecturerScheduleConflict(
 		schedule.UserID,
 		schedule.Day,
@@ -260,29 +249,17 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 		return models.CourseSchedule{}, errors.New("lecturer is already scheduled for this time")
 	}
 
-	// Check for student group conflicts
-	hasConflict, err = s.repo.CheckStudentGroupScheduleConflict(
-		schedule.StudentGroupID,
-		schedule.Day,
-		schedule.StartTime,
-		schedule.EndTime,
-		nil,
-	)
-	if err != nil {
-		return models.CourseSchedule{}, err
-	}
-	if hasConflict {
-		return models.CourseSchedule{}, errors.New("student group is already scheduled for this time")
-	}
+	// Student group conflict check is now skipped to allow flexible scheduling
+	// This allows student groups to attend multiple classes at the same time if needed
 
 	createdSchedule, err := s.repo.Create(schedule)
 	if err != nil {
 		return models.CourseSchedule{}, err
 	}
-	
-	fmt.Printf("Created new schedule with ID=%d, lecturer_id=%d, student_group_id=%d\n", 
+
+	fmt.Printf("Created new schedule with ID=%d, lecturer_id=%d, student_group_id=%d\n",
 		createdSchedule.ID, createdSchedule.UserID, createdSchedule.StudentGroupID)
-		
+
 	return createdSchedule, nil
 }
 
@@ -300,7 +277,7 @@ func (s *CourseScheduleService) UpdateSchedule(schedule models.CourseSchedule) (
 		if err != nil {
 			return models.CourseSchedule{}, errors.New("invalid room ID")
 		}
-		
+
 		// Update capacity from room if room changed or capacity is not set
 		if schedule.Capacity <= 0 {
 			schedule.Capacity = room.Capacity
@@ -308,22 +285,17 @@ func (s *CourseScheduleService) UpdateSchedule(schedule models.CourseSchedule) (
 		}
 	}
 
-	// Check for room conflicts (excluding this schedule)
-	hasConflict, err := s.repo.CheckScheduleConflict(
-		schedule.RoomID,
-		schedule.Day,
-		schedule.StartTime,
-		schedule.EndTime,
-		&schedule.ID,
-	)
-	if err != nil {
-		return models.CourseSchedule{}, err
-	}
-	if hasConflict {
-		return models.CourseSchedule{}, errors.New("room is already scheduled for this time")
+	// Validate academic year
+	academicYear, err := s.academicYearRepo.FindByID(schedule.AcademicYearID)
+	if err != nil || academicYear == nil {
+		return models.CourseSchedule{}, errors.New("invalid academic year ID")
 	}
 
-	// Check for lecturer conflicts (excluding this schedule)
+	// Room conflict check is now skipped to allow flexible room scheduling
+	// This allows rooms to be used for multiple classes at the same time if needed
+
+	// Check for lecturer conflicts
+	var hasConflict bool
 	hasConflict, err = s.repo.CheckLecturerScheduleConflict(
 		schedule.UserID,
 		schedule.Day,
@@ -338,20 +310,8 @@ func (s *CourseScheduleService) UpdateSchedule(schedule models.CourseSchedule) (
 		return models.CourseSchedule{}, errors.New("lecturer is already scheduled for this time")
 	}
 
-	// Check for student group conflicts (excluding this schedule)
-	hasConflict, err = s.repo.CheckStudentGroupScheduleConflict(
-		schedule.StudentGroupID,
-		schedule.Day,
-		schedule.StartTime,
-		schedule.EndTime,
-		&schedule.ID,
-	)
-	if err != nil {
-		return models.CourseSchedule{}, err
-	}
-	if hasConflict {
-		return models.CourseSchedule{}, errors.New("student group is already scheduled for this time")
-	}
+	// Student group conflict check is now skipped to allow flexible scheduling
+	// This allows student groups to attend multiple classes at the same time if needed
 
 	// Keep some fields from existing
 	schedule.CreatedAt = existingSchedule.CreatedAt
@@ -419,17 +379,17 @@ func (s *CourseScheduleService) GetSchedulesByCourseAndAcademicYear(courseID, ac
 func (s *CourseScheduleService) FormatScheduleForResponse(schedule models.CourseSchedule) map[string]interface{} {
 	// Build a response that matches the expected frontend format
 	response := map[string]interface{}{
-		"id":             schedule.ID,
-		"course_id":      schedule.CourseID,
-		"room_id":        schedule.RoomID,
-		"day":            schedule.Day,
-		"start_time":     schedule.StartTime,
-		"end_time":       schedule.EndTime,
-		"lecturer_id":    schedule.UserID,
+		"id":               schedule.ID,
+		"course_id":        schedule.CourseID,
+		"room_id":          schedule.RoomID,
+		"day":              schedule.Day,
+		"start_time":       schedule.StartTime,
+		"end_time":         schedule.EndTime,
+		"lecturer_id":      schedule.UserID,
 		"student_group_id": schedule.StudentGroupID,
 		"academic_year_id": schedule.AcademicYearID,
-		"capacity":       schedule.Capacity,
-		"enrolled":       0, // Default to 0, will be updated below
+		"capacity":         schedule.Capacity,
+		"enrolled":         0, // Default to 0, will be updated below
 	}
 
 	// Always get actual student count for this group from DB, don't trust the cached value
@@ -437,10 +397,10 @@ func (s *CourseScheduleService) FormatScheduleForResponse(schedule models.Course
 		// Get student count from the student_to_groups table
 		var count int64
 		s.repo.DB().Model(&models.StudentToGroup{}).Where("student_group_id = ?", schedule.StudentGroupID).Count(&count)
-		
+
 		// Update the enrolled value with the actual count
 		response["enrolled"] = count
-		
+
 		// Also update the model value for future use
 		schedule.Enrolled = int(count)
 	}
@@ -454,7 +414,7 @@ func (s *CourseScheduleService) FormatScheduleForResponse(schedule models.Course
 
 	if schedule.Room.ID != 0 {
 		response["room_name"] = schedule.Room.Name
-		
+
 		if schedule.Room.Building.ID != 0 {
 			response["building_name"] = schedule.Room.Building.Name
 		}
@@ -463,13 +423,13 @@ func (s *CourseScheduleService) FormatScheduleForResponse(schedule models.Course
 	// Better lecturer name resolution with multiple fallbacks
 	lecturerName := "Dosen" // Default fallback
 	lecturerRepo := repositories.NewLecturerRepository()
-	
+
 	// Try multiple approaches to get the lecturer name
-	
+
 	// First, check if User object is loaded with schedule
 	if schedule.Lecturer.ID != 0 {
 		lecturerName = schedule.Lecturer.Username
-		
+
 		// If User has ExternalUserID, try to get lecturer name from that
 		if schedule.Lecturer.ExternalUserID != nil {
 			externalUserID := int(*schedule.Lecturer.ExternalUserID)
@@ -479,7 +439,7 @@ func (s *CourseScheduleService) FormatScheduleForResponse(schedule models.Course
 			}
 		}
 	}
-	
+
 	// If we still don't have a good name, try with schedule.UserID directly
 	if lecturerName == "Dosen" || lecturerName == "" {
 		// Try by UserID first
@@ -494,7 +454,7 @@ func (s *CourseScheduleService) FormatScheduleForResponse(schedule models.Course
 			}
 		}
 	}
-	
+
 	// Save the found lecturer name
 	response["lecturer_name"] = lecturerName
 
@@ -585,4 +545,4 @@ func (s *CourseScheduleService) CheckLecturerScheduleConflict(userID uint, day s
 // CheckStudentGroupScheduleConflict checks if there's a student group schedule conflict
 func (s *CourseScheduleService) CheckStudentGroupScheduleConflict(studentGroupID uint, day string, startTime string, endTime string, scheduleID *uint) (bool, error) {
 	return s.repo.CheckStudentGroupScheduleConflict(studentGroupID, day, startTime, endTime, scheduleID)
-} 
+}

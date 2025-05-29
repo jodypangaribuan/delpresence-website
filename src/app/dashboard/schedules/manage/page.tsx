@@ -26,6 +26,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { TimePicker } from "@/components/ui/time-picker";
 import { 
   Dialog, 
   DialogContent, 
@@ -228,15 +229,26 @@ const getAcademicYearDisplay = (
     
     // If we found the course and it has an academic year
     if (selectedCourse && selectedCourse.academic_year_id) {
-      // Use the course's academic year name directly if available
-      if (selectedCourse.academic_year?.name) {
-        return selectedCourse.academic_year.name;
+      // Use the course's academic year data if available
+      if (selectedCourse.academic_year) {
+        const academicYear = selectedCourse.academic_year;
+        // Capitalize first letter of semester type and use it directly
+        const semesterType = academicYear.semester ? 
+          academicYear.semester.charAt(0).toUpperCase() + academicYear.semester.slice(1) : 
+          "";
+        // Return both name and semester type
+        return `${academicYear.name} - ${semesterType}`;
       }
       
       // As a fallback, look up in the academicYears array
       const academicYear = academicYears.find(y => y.id === selectedCourse.academic_year_id);
       if (academicYear) {
-        return academicYear.name;
+        // Capitalize first letter of semester type and use it directly
+        const semesterType = academicYear.semester ? 
+          academicYear.semester.charAt(0).toUpperCase() + academicYear.semester.slice(1) : 
+          "";
+        // Return both name and semester type
+        return `${academicYear.name} - ${semesterType}`;
       }
       
       // Last resort, just return the ID
@@ -248,7 +260,15 @@ const getAcademicYearDisplay = (
   if (academicYearId) {
     const academicYearIdNum = parseInt(academicYearId);
     const academicYear = academicYears.find(y => y.id === academicYearIdNum);
-    return academicYear?.name || `Tahun Akademik ID: ${academicYearId}`;
+    if (academicYear) {
+      // Capitalize first letter of semester type and use it directly
+      const semesterType = academicYear.semester ? 
+        academicYear.semester.charAt(0).toUpperCase() + academicYear.semester.slice(1) : 
+        "";
+      // Return both name and semester type
+      return `${academicYear.name} - ${semesterType}`;
+    }
+    return `Tahun Akademik ID: ${academicYearId}`;
   }
   
   return "Tahun akademik akan ditentukan berdasarkan mata kuliah";
@@ -1374,7 +1394,7 @@ function SchedulesContent() {
                   Tambah Jadwal
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-3xl">
+              <DialogContent style={{maxWidth: '80vw', width: '900px'}} className="!max-w-none">
                 <DialogHeader>
                   <DialogTitle>Tambah Jadwal Perkuliahan</DialogTitle>
                   <DialogDescription>
@@ -1384,8 +1404,8 @@ function SchedulesContent() {
                 </DialogHeader>
                 
                     <Form {...addForm}>
-                      <form onSubmit={addForm.handleSubmit(handleAddSchedule)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                      <form onSubmit={addForm.handleSubmit(handleAddSchedule)} className="space-y-6">
+                        <div className="grid grid-cols-2 gap-6">
                           <FormField
                             control={addForm.control}
                             name="course_id"
@@ -1493,7 +1513,10 @@ function SchedulesContent() {
                               <FormItem>
                                 <FormLabel>Jam Mulai</FormLabel>
                                 <FormControl>
-                                  <Input type="time" {...field} />
+                                  <TimePicker
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1507,7 +1530,10 @@ function SchedulesContent() {
                               <FormItem>
                                 <FormLabel>Jam Selesai</FormLabel>
                                 <FormControl>
-                                  <Input type="time" {...field} />
+                                  <TimePicker
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1970,7 +1996,7 @@ function SchedulesContent() {
       
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent style={{maxWidth: '80vw', width: '900px'}} className="!max-w-none">
           <DialogHeader>
             <DialogTitle>Edit Jadwal Perkuliahan</DialogTitle>
             <DialogDescription>
@@ -1981,8 +2007,8 @@ function SchedulesContent() {
           
           {currentSchedule && (
             <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(handleEditSchedule)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={editForm.handleSubmit(handleEditSchedule)} className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
                   <FormField
                     control={editForm.control}
                     name="course_id"
@@ -2094,9 +2120,9 @@ function SchedulesContent() {
                       <FormItem>
                         <FormLabel>Jam Mulai</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="time" 
-                            {...field} 
+                          <TimePicker
+                            value={field.value}
+                            onChange={field.onChange}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2111,9 +2137,9 @@ function SchedulesContent() {
                       <FormItem>
                         <FormLabel>Jam Selesai</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="time" 
-                            {...field}
+                          <TimePicker
+                            value={field.value}
+                            onChange={field.onChange}
                           />
                         </FormControl>
                         <FormMessage />

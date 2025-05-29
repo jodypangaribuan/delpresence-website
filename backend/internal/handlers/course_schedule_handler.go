@@ -1,18 +1,18 @@
 package handlers
 
 import (
-	"net/http"
-	"strconv"
-	"sort"
-	"fmt"
-	"strings"
-	"regexp"
 	"errors"
+	"fmt"
+	"net/http"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/delpresence/backend/internal/models"
+	"github.com/delpresence/backend/internal/repositories"
 	"github.com/delpresence/backend/internal/services"
 	"github.com/gin-gonic/gin"
-	"github.com/delpresence/backend/internal/repositories"
 )
 
 // CourseScheduleHandler handles API requests for course schedules
@@ -98,7 +98,7 @@ func (h *CourseScheduleHandler) GetAllSchedules(c *gin.Context) {
 	formattedSchedules := h.service.FormatSchedulesForResponse(schedules)
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data": formattedSchedules,
+		"data":   formattedSchedules,
 	})
 }
 
@@ -119,22 +119,22 @@ func (h *CourseScheduleHandler) GetScheduleByID(c *gin.Context) {
 	formattedSchedule := h.service.FormatScheduleForResponse(schedule)
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data": formattedSchedule,
+		"data":   formattedSchedule,
 	})
 }
 
 // CreateSchedule creates a new course schedule
 func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 	var request struct {
-		CourseID        uint   `json:"course_id" binding:"required"`
-		RoomID          uint   `json:"room_id" binding:"required"`
-		Day             string `json:"day" binding:"required"`
-		StartTime       string `json:"start_time" binding:"required"`
-		EndTime         string `json:"end_time" binding:"required"`
-		LecturerID      uint   `json:"lecturer_id" binding:"required"`
-		StudentGroupID  uint   `json:"student_group_id" binding:"required"`
-		AcademicYearID  uint   `json:"academic_year_id" binding:"required"`
-		Capacity        int    `json:"capacity"`
+		CourseID       uint   `json:"course_id" binding:"required"`
+		RoomID         uint   `json:"room_id" binding:"required"`
+		Day            string `json:"day" binding:"required"`
+		StartTime      string `json:"start_time" binding:"required"`
+		EndTime        string `json:"end_time" binding:"required"`
+		LecturerID     uint   `json:"lecturer_id" binding:"required"`
+		StudentGroupID uint   `json:"student_group_id" binding:"required"`
+		AcademicYearID uint   `json:"academic_year_id" binding:"required"`
+		Capacity       int    `json:"capacity"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -162,7 +162,7 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 	assignedLecturerID, err := h.validateLecturerAssignment(request.CourseID, request.AcademicYearID, request.LecturerID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
+			"status":  "error",
 			"message": err.Error(),
 		})
 		return
@@ -189,10 +189,10 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 		"senin": true, "selasa": true, "rabu": true,
 		"kamis": true, "jumat": true, "sabtu": true, "minggu": true,
 	}
-	
+
 	if !validDays[strings.ToLower(request.Day)] {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
+			"status":  "error",
 			"message": "Invalid day of week. Must be one of: Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu",
 		})
 		return
@@ -202,7 +202,7 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 	timeRegex := regexp.MustCompile(`^([01]?[0-9]|2[0-3]):[0-5][0-9]$`)
 	if !timeRegex.MatchString(request.StartTime) || !timeRegex.MatchString(request.EndTime) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
+			"status":  "error",
 			"message": "Invalid time format. Times must be in HH:MM format",
 		})
 		return
@@ -211,39 +211,27 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 	// Parse start and end times
 	startTimeParts := strings.Split(request.StartTime, ":")
 	endTimeParts := strings.Split(request.EndTime, ":")
-	
+
 	startHour, _ := strconv.Atoi(startTimeParts[0])
 	startMinute, _ := strconv.Atoi(startTimeParts[1])
 	endHour, _ := strconv.Atoi(endTimeParts[0])
 	endMinute, _ := strconv.Atoi(endTimeParts[1])
-	
+
 	// Convert to minutes for comparison
 	startTimeMinutes := startHour*60 + startMinute
 	endTimeMinutes := endHour*60 + endMinute
-	
+
 	// Verify end time is after start time
 	if endTimeMinutes <= startTimeMinutes {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
+			"status":  "error",
 			"message": "End time must be after start time",
 		})
 		return
 	}
 
-	// Check for room conflicts
-	roomConflict, err := h.service.CheckRoomScheduleConflict(request.RoomID, request.Day, request.StartTime, request.EndTime, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check room conflicts"})
-		return
-	}
-	
-	if roomConflict {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
-			"message": "Room is already scheduled for this time",
-		})
-		return
-	}
+	// Room conflict check is now skipped to allow flexible room scheduling
+	// This allows rooms to be used for multiple classes at the same time if needed
 
 	// Check for lecturer conflicts
 	lecturerConflict, err := h.service.CheckLecturerScheduleConflict(assignedLecturerID, request.Day, request.StartTime, request.EndTime, nil)
@@ -251,29 +239,17 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check lecturer conflicts"})
 		return
 	}
-	
+
 	if lecturerConflict {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
+			"status":  "error",
 			"message": "Lecturer is already scheduled for this time",
 		})
 		return
 	}
 
-	// Check for student group conflicts
-	studentGroupConflict, err := h.service.CheckStudentGroupScheduleConflict(request.StudentGroupID, request.Day, request.StartTime, request.EndTime, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check student group conflicts"})
-		return
-	}
-	
-	if studentGroupConflict {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
-			"message": "Student group is already scheduled for this time",
-		})
-		return
-	}
+	// Student group conflict check is now skipped to allow flexible scheduling
+	// This allows student groups to attend multiple classes at the same time if needed
 
 	// All validations passed, create the schedule
 	schedule := models.CourseSchedule{
@@ -315,15 +291,15 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 
 	// Parse request body
 	var request struct {
-		CourseID        uint   `json:"course_id"`
-		RoomID          uint   `json:"room_id"`
-		Day             string `json:"day"`
-		StartTime       string `json:"start_time"`
-		EndTime         string `json:"end_time"`
-		LecturerID      uint   `json:"lecturer_id"`
-		StudentGroupID  uint   `json:"student_group_id"`
-		AcademicYearID  uint   `json:"academic_year_id"`
-		Capacity        int    `json:"capacity"`
+		CourseID       uint   `json:"course_id"`
+		RoomID         uint   `json:"room_id"`
+		Day            string `json:"day"`
+		StartTime      string `json:"start_time"`
+		EndTime        string `json:"end_time"`
+		LecturerID     uint   `json:"lecturer_id"`
+		StudentGroupID uint   `json:"student_group_id"`
+		AcademicYearID uint   `json:"academic_year_id"`
+		Capacity       int    `json:"capacity"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -334,38 +310,38 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 	// Store original course ID and academic year ID for comparison
 	originalCourseID := existingSchedule.CourseID
 	originalAcademicYearID := existingSchedule.AcademicYearID
-	
+
 	// Check if the course is being changed
 	courseChanged := request.CourseID != 0 && request.CourseID != originalCourseID
 	academicYearChanged := request.AcademicYearID != 0 && request.AcademicYearID != originalAcademicYearID
-	
+
 	// Determine the effective course ID and academic year ID for validation
 	effectiveCourseID := originalCourseID
 	if courseChanged {
 		effectiveCourseID = request.CourseID
 	}
-	
+
 	effectiveAcademicYearID := originalAcademicYearID
 	if academicYearChanged {
 		effectiveAcademicYearID = request.AcademicYearID
 	}
-	
+
 	// If course or academic year is changing, verify the lecturer assignment
 	if courseChanged || academicYearChanged || request.LecturerID != 0 {
 		// Validate and get the correct assigned lecturer for this course
 		assignedLecturerID, err := h.validateLecturerAssignment(effectiveCourseID, effectiveAcademicYearID, request.LecturerID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error", 
+				"status":  "error",
 				"message": err.Error(),
 			})
 			return
 		}
-		
+
 		// Set the validated lecturer ID
 		request.LecturerID = assignedLecturerID
 	}
-	
+
 	// Update fields if provided
 	schedule := existingSchedule
 
@@ -392,58 +368,58 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 			"senin": true, "selasa": true, "rabu": true,
 			"kamis": true, "jumat": true, "sabtu": true, "minggu": true,
 		}
-		
+
 		if !validDays[strings.ToLower(request.Day)] {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error", 
+				"status":  "error",
 				"message": "Invalid day of week. Must be one of: Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu",
 			})
 			return
 		}
-		
+
 		schedule.Day = request.Day
 	}
 
 	// Validate time format if provided
 	timeRegex := regexp.MustCompile(`^([01]?[0-9]|2[0-3]):[0-5][0-9]$`)
-	
+
 	startTimeProvided := request.StartTime != ""
 	endTimeProvided := request.EndTime != ""
-	
+
 	if startTimeProvided && !timeRegex.MatchString(request.StartTime) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
+			"status":  "error",
 			"message": "Invalid start time format. Times must be in HH:MM format",
 		})
 		return
 	}
-	
+
 	if endTimeProvided && !timeRegex.MatchString(request.EndTime) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
+			"status":  "error",
 			"message": "Invalid end time format. Times must be in HH:MM format",
 		})
 		return
 	}
-	
+
 	// If both start and end times are provided, verify end is after start
 	if startTimeProvided && endTimeProvided {
 		startTimeParts := strings.Split(request.StartTime, ":")
 		endTimeParts := strings.Split(request.EndTime, ":")
-		
+
 		startHour, _ := strconv.Atoi(startTimeParts[0])
 		startMinute, _ := strconv.Atoi(startTimeParts[1])
 		endHour, _ := strconv.Atoi(endTimeParts[0])
 		endMinute, _ := strconv.Atoi(endTimeParts[1])
-		
+
 		// Convert to minutes for comparison
 		startTimeMinutes := startHour*60 + startMinute
 		endTimeMinutes := endHour*60 + endMinute
-		
+
 		// Verify end time is after start time
 		if endTimeMinutes <= startTimeMinutes {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error", 
+				"status":  "error",
 				"message": "End time must be after start time",
 			})
 			return
@@ -452,20 +428,20 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 		// Only start time was provided, use with existing end time
 		endTimeParts := strings.Split(schedule.EndTime, ":")
 		startTimeParts := strings.Split(request.StartTime, ":")
-		
+
 		startHour, _ := strconv.Atoi(startTimeParts[0])
 		startMinute, _ := strconv.Atoi(startTimeParts[1])
 		endHour, _ := strconv.Atoi(endTimeParts[0])
 		endMinute, _ := strconv.Atoi(endTimeParts[1])
-		
+
 		// Convert to minutes for comparison
 		startTimeMinutes := startHour*60 + startMinute
 		endTimeMinutes := endHour*60 + endMinute
-		
+
 		// Verify end time is after start time
 		if endTimeMinutes <= startTimeMinutes {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error", 
+				"status":  "error",
 				"message": "End time must be after start time",
 			})
 			return
@@ -474,20 +450,20 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 		// Only end time was provided, use with existing start time
 		startTimeParts := strings.Split(schedule.StartTime, ":")
 		endTimeParts := strings.Split(request.EndTime, ":")
-		
+
 		startHour, _ := strconv.Atoi(startTimeParts[0])
 		startMinute, _ := strconv.Atoi(startTimeParts[1])
 		endHour, _ := strconv.Atoi(endTimeParts[0])
 		endMinute, _ := strconv.Atoi(endTimeParts[1])
-		
+
 		// Convert to minutes for comparison
 		startTimeMinutes := startHour*60 + startMinute
 		endTimeMinutes := endHour*60 + endMinute
-		
+
 		// Verify end time is after start time
 		if endTimeMinutes <= startTimeMinutes {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error", 
+				"status":  "error",
 				"message": "End time must be after start time",
 			})
 			return
@@ -512,69 +488,30 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 
 	// Check for conflicts before updating
 	scheduleID := uint(id)
-	
-	// Check room conflicts
-	roomConflict, err := h.service.CheckRoomScheduleConflict(
-		schedule.RoomID, 
-		schedule.Day, 
-		schedule.StartTime, 
-		schedule.EndTime, 
-		&scheduleID,
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check room conflicts"})
-		return
-	}
-	
-	if roomConflict {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
-			"message": "Room is already scheduled for this time",
-		})
-		return
-	}
-	
-	// Check lecturer conflicts
+
+	// Check lecturer conflicts (excluding this schedule)
 	lecturerConflict, err := h.service.CheckLecturerScheduleConflict(
-		schedule.UserID, 
-		schedule.Day, 
-		schedule.StartTime, 
-		schedule.EndTime, 
+		schedule.UserID,
+		schedule.Day,
+		schedule.StartTime,
+		schedule.EndTime,
 		&scheduleID,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check lecturer conflicts"})
 		return
 	}
-	
+
 	if lecturerConflict {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
+			"status":  "error",
 			"message": "Lecturer is already scheduled for this time",
 		})
 		return
 	}
-	
-	// Check student group conflicts
-	studentGroupConflict, err := h.service.CheckStudentGroupScheduleConflict(
-		schedule.StudentGroupID, 
-		schedule.Day, 
-		schedule.StartTime, 
-		schedule.EndTime, 
-		&scheduleID,
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check student group conflicts"})
-		return
-	}
-	
-	if studentGroupConflict {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error", 
-			"message": "Student group is already scheduled for this time",
-		})
-		return
-	}
+
+	// Student group conflict check is now skipped to allow flexible scheduling
+	// This allows student groups to attend multiple classes at the same time if needed
 
 	// Update the schedule
 	updatedSchedule, err := h.service.UpdateSchedule(schedule)
@@ -601,17 +538,17 @@ func (h *CourseScheduleHandler) DeleteSchedule(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
+		"status":  "success",
 		"message": "Schedule deleted successfully",
 	})
 }
 
-// CheckScheduleConflicts checks for conflicts when adding or updating a schedule
+// CheckScheduleConflicts checks for various scheduling conflicts
 func (h *CourseScheduleHandler) CheckScheduleConflicts(c *gin.Context) {
 	var request struct {
 		ScheduleID     *uint  `json:"schedule_id"`
 		RoomID         uint   `json:"room_id" binding:"required"`
-		UserID         uint   `json:"lecturer_id" binding:"required"`
+		LecturerID     uint   `json:"lecturer_id" binding:"required"`
 		StudentGroupID uint   `json:"student_group_id" binding:"required"`
 		Day            string `json:"day" binding:"required"`
 		StartTime      string `json:"start_time" binding:"required"`
@@ -619,27 +556,36 @@ func (h *CourseScheduleHandler) CheckScheduleConflicts(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
 
 	conflicts, err := h.service.CheckForScheduleConflicts(
 		request.ScheduleID,
 		request.RoomID,
-		request.UserID,
+		request.LecturerID,
 		request.StudentGroupID,
 		request.Day,
 		request.StartTime,
 		request.EndTime,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check for conflicts: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
 
+	// Room conflicts are now just warnings, not blocking errors
+	hasBlockingConflict := conflicts["lecturer"] // Only lecturer conflicts are blocking
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data": conflicts,
+		"data": map[string]interface{}{
+			"conflicts":                      conflicts,
+			"has_blocking_conflict":          hasBlockingConflict,
+			"room_conflict_warning":          conflicts["room"],
+			"student_group_conflict_warning": conflicts["student_group"],
+			"message":                        "Room and student group conflicts are non-blocking and will allow flexible scheduling",
+		},
 	})
 }
 
@@ -649,15 +595,15 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "User not found in token",
 		})
 		return
 	}
-	
+
 	// First, look up the lecturer record in the database to get the correct user_id to filter by
 	lecturerRepo := repositories.NewLecturerRepository()
-	
+
 	// Convert to the appropriate type
 	var userIDInt int
 	switch v := userID.(type) {
@@ -671,7 +617,7 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 		id, err := strconv.Atoi(v)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
+				"status":  "error",
 				"message": "Invalid user ID format",
 			})
 			return
@@ -679,22 +625,22 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 		userIDInt = id
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "Invalid user ID type",
 		})
 		return
 	}
-	
+
 	// Debug log to check userID
 	fmt.Printf("Looking up lecturer with userID: %d\n", userIDInt)
-	
+
 	// Get the lecturer by userID from authentication
 	lecturer, err := lecturerRepo.GetByUserID(userIDInt)
-	
+
 	// Variables to track which ID we finally use
 	var finalUserID uint
 	var idSource string
-	
+
 	if err != nil {
 		// Try alternative method to find lecturer
 		fmt.Printf("Error finding lecturer by userID %d: %v\n", userIDInt, err)
@@ -702,7 +648,7 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 		lecturer, err = lecturerRepo.GetByID(uint(userIDInt))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{
-				"status": "error",
+				"status":  "error",
 				"message": "Lecturer not found: " + err.Error(),
 			})
 			return
@@ -713,11 +659,11 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 		finalUserID = uint(lecturer.UserID)
 		idSource = "lecturer.UserID"
 	}
-	
+
 	// Log lecturer found
-	fmt.Printf("Found lecturer: ID=%d, UserID=%d, Name=%s, using %s=%d for queries\n", 
+	fmt.Printf("Found lecturer: ID=%d, UserID=%d, Name=%s, using %s=%d for queries\n",
 		lecturer.ID, lecturer.UserID, lecturer.FullName, idSource, finalUserID)
-	
+
 	// Check for academic year filter
 	var academicYearID uint = 0
 	academicYearIDStr := c.Query("academic_year_id")
@@ -730,7 +676,7 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 			academicYearID = uint(id)
 		}
 	}
-	
+
 	// If no academic year specified, try to get any available one
 	if academicYearID == 0 {
 		academicYearRepo := repositories.NewAcademicYearRepository()
@@ -745,12 +691,12 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 			fmt.Printf("Using academicYearID: %d\n", academicYearID)
 		}
 	}
-	
+
 	// Get schedules for the lecturer, filtered by academic year if specified
 	var schedules []models.CourseSchedule
 	var tryMethods = []struct {
-		name   string
-		tryFn  func() ([]models.CourseSchedule, error)
+		name  string
+		tryFn func() ([]models.CourseSchedule, error)
 	}{
 		{
 			name: "by lecturer UserID",
@@ -784,15 +730,15 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 			tryFn: func() ([]models.CourseSchedule, error) {
 				assignmentRepo := repositories.NewLecturerAssignmentRepository()
 				var allSchedules []models.CourseSchedule
-				
+
 				// Try multiple lecturer IDs for assignments
 				lecturerIDs := []int{lecturer.UserID, int(lecturer.ID), userIDInt}
-				
+
 				for _, lid := range lecturerIDs {
 					assignments, err := assignmentRepo.GetByLecturerID(lid, academicYearID)
 					if err == nil && len(assignments) > 0 {
 						fmt.Printf("Found %d assignments for lecturer ID %d\n", len(assignments), lid)
-						
+
 						for _, assignment := range assignments {
 							var courseSchedules []models.CourseSchedule
 							if academicYearID > 0 {
@@ -804,7 +750,7 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 						}
 					}
 				}
-				
+
 				if len(allSchedules) > 0 {
 					return allSchedules, nil
 				}
@@ -812,7 +758,7 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 			},
 		},
 	}
-	
+
 	// Try each method until we find schedules
 	var methodUsed string
 	for _, method := range tryMethods {
@@ -824,22 +770,22 @@ func (h *CourseScheduleHandler) GetMySchedules(c *gin.Context) {
 			break
 		}
 	}
-	
+
 	fmt.Printf("Found %d schedules for lecturer using method: %s\n", len(schedules), methodUsed)
-	
+
 	// If still no schedules found, return an empty array rather than an error
 	if len(schedules) == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "success",
-			"data": []map[string]interface{}{}, // Empty array
+			"data":   []map[string]interface{}{}, // Empty array
 		})
 		return
 	}
-	
+
 	formattedSchedules := h.service.FormatSchedulesForResponse(schedules)
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data": formattedSchedules,
+		"data":   formattedSchedules,
 	})
 }
 
@@ -848,7 +794,7 @@ func (h *CourseScheduleHandler) GetLecturerForCourse(c *gin.Context) {
 	courseID, err := strconv.ParseUint(c.Param("course_id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "Invalid course ID",
 		})
 		return
@@ -856,97 +802,97 @@ func (h *CourseScheduleHandler) GetLecturerForCourse(c *gin.Context) {
 
 	// Get lecturer assignment for this course from repository
 	lecturerAssignmentRepo := repositories.NewLecturerAssignmentRepository()
-	
+
 	// Try to get any academic year, don't require an active one
 	academicYearRepo := repositories.NewAcademicYearRepository()
-	
+
 	// First try to get all academic years and use the most recent one
 	academicYears, err := academicYearRepo.FindAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "Failed to get academic years: " + err.Error(),
 		})
 		return
 	}
-	
+
 	var academicYearID uint = 0
 	var academicYearName string = "Default"
-	
+
 	// If we have academic years, use the most recent one
 	if len(academicYears) > 0 {
 		// Sort by ID descending to get the most recent one
 		sort.Slice(academicYears, func(i, j int) bool {
 			return academicYears[i].ID > academicYears[j].ID
 		})
-		
+
 		academicYearID = academicYears[0].ID
 		academicYearName = academicYears[0].Name
 	}
-	
+
 	// Get assignments for this course without academic year filter
 	assignments, assignmentErr := lecturerAssignmentRepo.GetByCourseID(uint(courseID), 0)
-	
+
 	// If we still have an error after trying
 	if assignmentErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "Failed to get lecturer assignments: " + assignmentErr.Error(),
 		})
 		return
 	}
-	
+
 	// If no assignments found
 	if len(assignments) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "No lecturer assigned to this course",
 		})
 		return
 	}
-	
+
 	// Return the first assigned lecturer (typically there should be only one)
 	lecturer := assignments[0].Lecturer
 	if lecturer == nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"status": "error",
+			"status":  "error",
 			"message": "Lecturer information not found",
 		})
 		return
 	}
-	
+
 	// Get the User record associated with this lecturer's UserID
 	userRepo := repositories.NewUserRepository()
 	user, err := userRepo.FindByExternalUserID(lecturer.UserID)
-	
+
 	// If user not found in our database, create a temporary one for this response
 	if user == nil {
 		// Use the lecturer info to create a response
 		c.JSON(http.StatusOK, gin.H{
 			"status": "success",
 			"data": gin.H{
-				"lecturer_id": lecturer.ID, // Use the Lecturer.ID as fallback for user ID
-				"user_id": lecturer.ID,     // Include user_id field using Lecturer.ID
-				"external_user_id": lecturer.UserID, // Include external ID for reference
-				"name": lecturer.FullName,
-				"email": lecturer.Email,
-				"academic_year_id": academicYearID,
+				"lecturer_id":        lecturer.ID,     // Use the Lecturer.ID as fallback for user ID
+				"user_id":            lecturer.ID,     // Include user_id field using Lecturer.ID
+				"external_user_id":   lecturer.UserID, // Include external ID for reference
+				"name":               lecturer.FullName,
+				"email":              lecturer.Email,
+				"academic_year_id":   academicYearID,
 				"academic_year_name": academicYearName,
 			},
 		})
 		return
 	}
-	
+
 	// Normal response when user is found
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data": gin.H{
-			"lecturer_id": user.ID, // Use User.ID as the reference ID for CourseSchedule.UserID
-			"user_id": user.ID,     // Include user_id field to be explicit
-			"external_user_id": lecturer.UserID, // Include external ID for reference
-			"name": lecturer.FullName,
-			"email": lecturer.Email,
-			"academic_year_id": academicYearID,
+			"lecturer_id":        user.ID,         // Use User.ID as the reference ID for CourseSchedule.UserID
+			"user_id":            user.ID,         // Include user_id field to be explicit
+			"external_user_id":   lecturer.UserID, // Include external ID for reference
+			"name":               lecturer.FullName,
+			"email":              lecturer.Email,
+			"academic_year_id":   academicYearID,
 			"academic_year_name": academicYearName,
 		},
 	})
@@ -957,18 +903,18 @@ func (h *CourseScheduleHandler) validateLecturerAssignment(courseID, academicYea
 	// Look up the assigned lecturer for this course in the specified academic year
 	lecturerAssignmentRepo := repositories.NewLecturerAssignmentRepository()
 	assignments, err := lecturerAssignmentRepo.GetByCourseID(courseID, academicYearID)
-	
+
 	// If admin explicitly provided a lecturer ID, use it without requiring an assignment
 	if providedUserID != 0 {
 		// Verify the lecturer exists in our system
 		lecturerRepo := repositories.NewLecturerRepository()
-		
+
 		// First try to get lecturer by user_id (external ID)
 		lecturer, err := lecturerRepo.GetByUserID(int(providedUserID))
 		if err == nil && lecturer.ID > 0 {
 			return providedUserID, nil
 		}
-		
+
 		// If not found by user_id, try by lecturer.ID directly
 		lecturer, err = lecturerRepo.GetByID(providedUserID)
 		if err == nil && lecturer.ID > 0 {
@@ -978,17 +924,17 @@ func (h *CourseScheduleHandler) validateLecturerAssignment(courseID, academicYea
 			}
 			return providedUserID, nil
 		}
-		
+
 		// If we couldn't find the lecturer at all, return an error
 		return 0, fmt.Errorf("invalid lecturer/user ID: %d", providedUserID)
 	}
-	
+
 	// If no lecturer ID was provided, check for assigned lecturers
 	if err != nil || len(assignments) == 0 {
 		return 0, fmt.Errorf("no lecturer is assigned to this course for the given academic year")
 	}
-	
+
 	// Use the first assigned lecturer
 	assignedLecturerID := uint(assignments[0].UserID)
 	return assignedLecturerID, nil
-} 
+}
