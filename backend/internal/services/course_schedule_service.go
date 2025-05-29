@@ -233,21 +233,8 @@ func (s *CourseScheduleService) CreateSchedule(schedule models.CourseSchedule) (
 	// Room conflict check is now skipped to allow flexible room scheduling
 	// This allows rooms to be used for multiple classes at the same time if needed
 
-	// Check for lecturer conflicts
-	var hasConflict bool
-	hasConflict, err = s.repo.CheckLecturerScheduleConflict(
-		schedule.UserID,
-		schedule.Day,
-		schedule.StartTime,
-		schedule.EndTime,
-		nil,
-	)
-	if err != nil {
-		return models.CourseSchedule{}, err
-	}
-	if hasConflict {
-		return models.CourseSchedule{}, errors.New("lecturer is already scheduled for this time")
-	}
+	// Lecturer conflict check is now skipped to allow flexible scheduling
+	// This allows lecturers to teach multiple classes at the same time if needed
 
 	// Student group conflict check is now skipped to allow flexible scheduling
 	// This allows student groups to attend multiple classes at the same time if needed
@@ -294,21 +281,8 @@ func (s *CourseScheduleService) UpdateSchedule(schedule models.CourseSchedule) (
 	// Room conflict check is now skipped to allow flexible room scheduling
 	// This allows rooms to be used for multiple classes at the same time if needed
 
-	// Check for lecturer conflicts
-	var hasConflict bool
-	hasConflict, err = s.repo.CheckLecturerScheduleConflict(
-		schedule.UserID,
-		schedule.Day,
-		schedule.StartTime,
-		schedule.EndTime,
-		&schedule.ID,
-	)
-	if err != nil {
-		return models.CourseSchedule{}, err
-	}
-	if hasConflict {
-		return models.CourseSchedule{}, errors.New("lecturer is already scheduled for this time")
-	}
+	// Lecturer conflict check is now skipped to allow flexible scheduling
+	// This allows lecturers to teach multiple classes at the same time if needed
 
 	// Student group conflict check is now skipped to allow flexible scheduling
 	// This allows student groups to attend multiple classes at the same time if needed

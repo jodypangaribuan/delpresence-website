@@ -142,6 +142,22 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 		return
 	}
 
+	// Check for duplicate schedule (same course, day, time)
+	scheduleRepo := repositories.NewCourseScheduleRepository()
+	var existingSchedules []models.CourseSchedule
+	err := scheduleRepo.DB().
+		Where("course_id = ? AND day = ? AND start_time = ? AND end_time = ? AND academic_year_id = ?",
+			request.CourseID, request.Day, request.StartTime, request.EndTime, request.AcademicYearID).
+		Find(&existingSchedules).Error
+
+	if err == nil && len(existingSchedules) > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Duplicate schedule: A schedule with the same course, day, and time already exists",
+		})
+		return
+	}
+
 	// Validate academic year
 	academicYearRepo := repositories.NewAcademicYearRepository()
 	academicYear, err := academicYearRepo.FindByID(request.AcademicYearID)
@@ -233,20 +249,8 @@ func (h *CourseScheduleHandler) CreateSchedule(c *gin.Context) {
 	// Room conflict check is now skipped to allow flexible room scheduling
 	// This allows rooms to be used for multiple classes at the same time if needed
 
-	// Check for lecturer conflicts
-	lecturerConflict, err := h.service.CheckLecturerScheduleConflict(assignedLecturerID, request.Day, request.StartTime, request.EndTime, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check lecturer conflicts"})
-		return
-	}
-
-	if lecturerConflict {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Lecturer is already scheduled for this time",
-		})
-		return
-	}
+	// Lecturer conflict check is now skipped to allow flexible scheduling
+	// This allows lecturers to teach multiple classes at the same time if needed
 
 	// Student group conflict check is now skipped to allow flexible scheduling
 	// This allows student groups to attend multiple classes at the same time if needed
@@ -307,6 +311,48 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 		return
 	}
 
+	// Determine the effective values for checking duplicates
+	effectiveCourseID := existingSchedule.CourseID
+	if request.CourseID != 0 {
+		effectiveCourseID = request.CourseID
+	}
+
+	effectiveDay := existingSchedule.Day
+	if request.Day != "" {
+		effectiveDay = request.Day
+	}
+
+	effectiveStartTime := existingSchedule.StartTime
+	if request.StartTime != "" {
+		effectiveStartTime = request.StartTime
+	}
+
+	effectiveEndTime := existingSchedule.EndTime
+	if request.EndTime != "" {
+		effectiveEndTime = request.EndTime
+	}
+
+	effectiveAcademicYearID := existingSchedule.AcademicYearID
+	if request.AcademicYearID != 0 {
+		effectiveAcademicYearID = request.AcademicYearID
+	}
+
+	// Check for duplicate schedule (same course, day, time) excluding this schedule
+	scheduleRepo := repositories.NewCourseScheduleRepository()
+	var existingSchedules []models.CourseSchedule
+	err = scheduleRepo.DB().
+		Where("id <> ? AND course_id = ? AND day = ? AND start_time = ? AND end_time = ? AND academic_year_id = ?",
+			id, effectiveCourseID, effectiveDay, effectiveStartTime, effectiveEndTime, effectiveAcademicYearID).
+		Find(&existingSchedules).Error
+
+	if err == nil && len(existingSchedules) > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Duplicate schedule: A schedule with the same course, day, and time already exists",
+		})
+		return
+	}
+
 	// Store original course ID and academic year ID for comparison
 	originalCourseID := existingSchedule.CourseID
 	originalAcademicYearID := existingSchedule.AcademicYearID
@@ -316,12 +362,12 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 	academicYearChanged := request.AcademicYearID != 0 && request.AcademicYearID != originalAcademicYearID
 
 	// Determine the effective course ID and academic year ID for validation
-	effectiveCourseID := originalCourseID
+	effectiveCourseID = originalCourseID
 	if courseChanged {
 		effectiveCourseID = request.CourseID
 	}
 
-	effectiveAcademicYearID := originalAcademicYearID
+	effectiveAcademicYearID = originalAcademicYearID
 	if academicYearChanged {
 		effectiveAcademicYearID = request.AcademicYearID
 	}
@@ -487,31 +533,8 @@ func (h *CourseScheduleHandler) UpdateSchedule(c *gin.Context) {
 	}
 
 	// Check for conflicts before updating
-	scheduleID := uint(id)
-
-	// Check lecturer conflicts (excluding this schedule)
-	lecturerConflict, err := h.service.CheckLecturerScheduleConflict(
-		schedule.UserID,
-		schedule.Day,
-		schedule.StartTime,
-		schedule.EndTime,
-		&scheduleID,
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Failed to check lecturer conflicts"})
-		return
-	}
-
-	if lecturerConflict {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Lecturer is already scheduled for this time",
-		})
-		return
-	}
-
-	// Student group conflict check is now skipped to allow flexible scheduling
-	// This allows student groups to attend multiple classes at the same time if needed
+	// All conflict checks are now skipped to allow flexible scheduling
+	// This allows resources to be used for multiple classes at the same time
 
 	// Update the schedule
 	updatedSchedule, err := h.service.UpdateSchedule(schedule)
@@ -574,8 +597,8 @@ func (h *CourseScheduleHandler) CheckScheduleConflicts(c *gin.Context) {
 		return
 	}
 
-	// Room conflicts are now just warnings, not blocking errors
-	hasBlockingConflict := conflicts["lecturer"] // Only lecturer conflicts are blocking
+	// All conflicts are now just warnings, not blocking errors
+	hasBlockingConflict := false // No blocking conflicts - all are warnings
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
@@ -583,8 +606,9 @@ func (h *CourseScheduleHandler) CheckScheduleConflicts(c *gin.Context) {
 			"conflicts":                      conflicts,
 			"has_blocking_conflict":          hasBlockingConflict,
 			"room_conflict_warning":          conflicts["room"],
+			"lecturer_conflict_warning":      conflicts["lecturer"],
 			"student_group_conflict_warning": conflicts["student_group"],
-			"message":                        "Room and student group conflicts are non-blocking and will allow flexible scheduling",
+			"message":                        "Room, lecturer, and student group conflicts are non-blocking and will allow flexible scheduling",
 		},
 	})
 }
