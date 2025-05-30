@@ -127,12 +127,12 @@ func (r *CourseRepository) RestoreByCode(code string) (*models.Course, error) {
 	if deletedCourse == nil {
 		return nil, nil
 	}
-	
+
 	// Restore the record
 	if err := r.db.Unscoped().Model(&models.Course{}).Where("id = ?", deletedCourse.ID).Update("deleted_at", nil).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Return the restored record
 	return r.FindByID(deletedCourse.ID)
 }
@@ -141,16 +141,16 @@ func (r *CourseRepository) RestoreByCode(code string) (*models.Course, error) {
 func (r *CourseRepository) CheckCodeExists(code string, excludeID uint) (bool, error) {
 	var count int64
 	query := r.db.Unscoped().Model(&models.Course{}).Where("code = ?", code)
-	
+
 	// Exclude the current record if updating
 	if excludeID > 0 {
 		query = query.Where("id != ?", excludeID)
 	}
-	
+
 	err := query.Count(&count).Error
 	if err != nil {
 		return false, err
 	}
-	
+
 	return count > 0, nil
-} 
+}

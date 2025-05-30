@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/repositories"
-	"github.com/delpresence/backend/internal/database"
 	"gorm.io/gorm"
 )
 
@@ -231,9 +231,9 @@ func (s *AttendanceService) GetActiveSessionsByCourse(courseID uint) ([]models.A
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var allResponses []models.AttendanceSessionResponse
-	
+
 	// For each schedule, get active attendance sessions
 	for _, schedule := range schedules {
 		sessions, err := s.attendanceRepo.GetActiveSessionsForSchedule(schedule.ID)
@@ -241,7 +241,7 @@ func (s *AttendanceService) GetActiveSessionsByCourse(courseID uint) ([]models.A
 			fmt.Printf("Error getting active sessions for schedule %d: %v\n", schedule.ID, err)
 			continue
 		}
-		
+
 		// Transform to response objects
 		for _, session := range sessions {
 			response, err := s.mapSessionToResponse(&session)
@@ -251,7 +251,7 @@ func (s *AttendanceService) GetActiveSessionsByCourse(courseID uint) ([]models.A
 			allResponses = append(allResponses, *response)
 		}
 	}
-	
+
 	return allResponses, nil
 }
 
@@ -353,25 +353,25 @@ func (s *AttendanceService) GetAttendanceStatistics(courseScheduleID uint, lectu
 func (s *AttendanceService) initializeStudentAttendances(sessionID uint, courseScheduleID uint) error {
 	// For simplicity, we'll use a placeholder implementation
 	// In a real system, you'd query students enrolled in the course schedule
-	
+
 	// Get the course schedule to find the student group ID
 	schedule, err := s.scheduleRepo.GetByID(courseScheduleID)
 	if err != nil {
 		return err
 	}
-	
+
 	// If there's no student group, return early
 	if schedule.StudentGroupID == 0 {
 		return nil
 	}
-	
+
 	// Find all students in this group using the student_to_groups table
 	var students []models.Student
 	err = s.db.Table("students").
 		Joins("JOIN student_to_groups ON students.id = student_to_groups.student_id").
 		Where("student_to_groups.student_group_id = ?", schedule.StudentGroupID).
 		Find(&students).Error
-	
+
 	if err != nil {
 		return err
 	}
@@ -429,30 +429,30 @@ func (s *AttendanceService) mapSessionToResponse(session *models.AttendanceSessi
 	}
 
 	return &models.AttendanceSessionResponse{
-		ID:               session.ID,
-		CourseScheduleID: session.CourseScheduleID,
-		CourseCode:       session.CourseSchedule.Course.Code,
-		CourseName:       session.CourseSchedule.Course.Name,
-		Room:             session.CourseSchedule.Room.Name,
-		Date:             session.Date.Format("2006-01-02"),
-		StartTime:        session.StartTime.Format("15:04"),
-		EndTime:          endTime,
+		ID:                session.ID,
+		CourseScheduleID:  session.CourseScheduleID,
+		CourseCode:        session.CourseSchedule.Course.Code,
+		CourseName:        session.CourseSchedule.Course.Name,
+		Room:              session.CourseSchedule.Room.Name,
+		Date:              session.Date.Format("2006-01-02"),
+		StartTime:         session.StartTime.Format("15:04"),
+		EndTime:           endTime,
 		ScheduleStartTime: session.CourseSchedule.StartTime,
-		ScheduleEndTime:  session.CourseSchedule.EndTime,
-		Type:             string(session.Type),
-		Status:           string(session.Status),
-		AutoClose:        session.AutoClose,
-		Duration:         session.Duration,
-		AllowLate:        session.AllowLate,
-		LateThreshold:    session.LateThreshold,
-		Notes:            session.Notes,
-		QRCodeURL:        qrCodeURL,
-		TotalStudents:    session.CourseSchedule.Enrolled,
-		AttendedCount:    attendedCount,
-		LateCount:        lateCount,
-		AbsentCount:      absentCount,
-		ExcusedCount:     excusedCount,
-		CreatedAt:        session.CreatedAt,
+		ScheduleEndTime:   session.CourseSchedule.EndTime,
+		Type:              string(session.Type),
+		Status:            string(session.Status),
+		AutoClose:         session.AutoClose,
+		Duration:          session.Duration,
+		AllowLate:         session.AllowLate,
+		LateThreshold:     session.LateThreshold,
+		Notes:             session.Notes,
+		QRCodeURL:         qrCodeURL,
+		TotalStudents:     session.CourseSchedule.Enrolled,
+		AttendedCount:     attendedCount,
+		LateCount:         lateCount,
+		AbsentCount:       absentCount,
+		ExcusedCount:      excusedCount,
+		CreatedAt:         session.CreatedAt,
 	}, nil
 }
 
@@ -464,4 +464,4 @@ func generateQRCodeData() (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
-} 
+}

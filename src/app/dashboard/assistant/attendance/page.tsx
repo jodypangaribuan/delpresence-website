@@ -5,294 +5,424 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   Calendar, 
   QrCode, 
   Clock, 
-  Plus,
   FileText,
+  BarChart,
   Filter,
   Search,
+  ArrowLeft,
   CheckCircle2,
   AlertCircle,
   Users,
-  Timer as TimerIcon,
-  BarChart3,
-  ScanFace
+  Eye,
+  ExternalLink,
+  Timer
 } from "lucide-react";
 import { SelectValue, SelectTrigger, SelectContent, SelectItem, Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
+import { api } from "@/utils/api";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { format, parseISO } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
+import axios from "axios";
+import { API_URL } from "@/utils/env";
+
+// AttendanceSession interface
+interface AttendanceSession {
+  id: number;
+  courseScheduleId: number;
+  courseCode: string;
+  courseName: string;
+  room: string;
+  date: string;
+  startTime: string;
+  endTime?: string;
+  scheduleStartTime: string;
+  scheduleEndTime: string;
+  type: string;
+  status: string;
+  autoClose: boolean;
+  duration: number;
+  allowLate: boolean;
+  lateThreshold: number;
+  notes: string;
+  qrCodeUrl?: string;
+  totalStudents: number;
+  attendedCount: number;
+  lateCount: number;
+  absentCount: number;
+  excusedCount: number;
+  createdAt: string;
+}
 
 interface Schedule {
   id: number;
   courseCode: string;
   courseName: string;
-  lecturerName: string;
   day: string;
   startTime: string;
   endTime: string;
   room: string;
   date: string;
   totalStudents: number;
+  lecturerName: string;
 }
 
-interface ActiveSession {
+// Define our interface for raw attendance session data from API
+interface AttendanceSessionData {
   id: number;
-  courseCode: string;
-  courseName: string;
-  lecturerName: string;
-  startTime: string;
-  endTime: string;
+  course_schedule_id: number;
+  course_code: string;
+  course_name: string;
   room: string;
-  attendanceType: string;
-  startedAt: string;
-  status: string;
-  attendedCount: number;
-  totalStudents: number;
-  remainingTime?: number; // in seconds
-}
-
-interface PastSession {
-  id: number;
-  courseCode: string;
-  courseName: string;
-  lecturerName: string;
   date: string;
-  startTime: string;
-  endTime: string;
-  room: string;
-  attendanceType: string;
-  attendedCount: number;
-  totalStudents: number;
-  duration?: number; // in minutes
+  start_time: string;
+  end_time?: string;
+  schedule_start_time: string;
+  schedule_end_time: string;
+  type: string;
+  status: string;
+  auto_close: boolean;
+  duration: number;
+  allow_late: boolean;
+  late_threshold: number;
+  notes: string;
+  qr_code_url?: string;
+  total_students: number;
+  attended_count: number;
+  late_count: number;
+  absent_count: number;
+  excused_count: number;
+  created_at: string;
 }
 
-interface AttendanceSettings {
-  type: "QR Code" | "Face Recognition" | "Manual";
-  autoClose: boolean;
-  duration: number; // in minutes
-  allowLate: boolean;
-  lateThreshold: number; // in minutes
-  notes: string;
+// Direct API functions
+const getActiveAttendanceSessions = async (): Promise<AttendanceSession[]> => {
+  const token = typeof window !== 'undefined' ? 
+    localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
+  
+  try {
+    const response = await axios.get(`${API_URL}/api/assistant/attendance/sessions/active`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    // Handle different response formats
+    const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+    return data.map((session: AttendanceSessionData) => mapSessionFromApi(session));
+  } catch (error) {
+    console.error('Error fetching active attendance sessions:', error);
+    return [];
+  }
+};
+
+const getAttendanceSessions = async (startDate?: string, endDate?: string): Promise<AttendanceSession[]> => {
+  const token = typeof window !== 'undefined' ? 
+    localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
+  
+  let endpoint = `${API_URL}/api/assistant/attendance/sessions`;
+  if (startDate || endDate) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    endpoint += `?${params.toString()}`;
+  }
+  
+  try {
+    const response = await axios.get(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    // Handle different response formats
+    const data = Array.isArray(response.data) ? response.data : response.data?.data || response.data?.sessions || [];
+    return data.map((session: AttendanceSessionData) => mapSessionFromApi(session));
+  } catch (error) {
+    console.error('Error fetching attendance sessions:', error);
+    return [];
+  }
+};
+
+const getAssistantSchedules = async (): Promise<Schedule[]> => {
+  // This endpoint will only return schedules for courses where the current user is assigned as a teaching assistant
+  const token = typeof window !== 'undefined' ? 
+    localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
+  
+  try {
+    const response = await axios.get(`${API_URL}/api/assistant/schedules`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    const schedules = response.data?.data || [];
+    
+    return schedules.map((schedule: any) => ({
+      id: schedule.id,
+      courseCode: schedule.course?.code || schedule.course_code || "",
+      courseName: schedule.course?.name || schedule.course_name || "",
+      day: schedule.day || "",
+      startTime: schedule.start_time || "",
+      endTime: schedule.end_time || "",
+      room: schedule.room ? 
+        `${schedule.room.name || ""}, ${schedule.room.building?.name || ""}` : 
+        `${schedule.room_name || ""}, ${schedule.building_name || ""}`,
+      date: schedule.date || "",
+      totalStudents: schedule.enrolled || 0,
+      lecturerName: schedule.lecturer?.full_name || schedule.lecturer_name || ""
+    }));
+  } catch (error) {
+    console.error('Error fetching assistant schedules:', error);
+    return [];
+  }
+};
+
+// Mapping function to ensure consistent format
+const mapSessionFromApi = (session: AttendanceSessionData): AttendanceSession => {
+  return {
+    id: session.id,
+    courseScheduleId: session.course_schedule_id,
+    courseCode: session.course_code,
+    courseName: session.course_name,
+    room: session.room,
+    date: session.date,
+    startTime: session.start_time,
+    endTime: session.end_time,
+    scheduleStartTime: session.schedule_start_time,
+    scheduleEndTime: session.schedule_end_time,
+    type: mapTypeFromApi(session.type),
+    status: mapStatusFromApi(session.status),
+    autoClose: session.auto_close,
+    duration: session.duration,
+    allowLate: session.allow_late,
+    lateThreshold: session.late_threshold,
+    notes: session.notes,
+    qrCodeUrl: session.qr_code_url,
+    totalStudents: session.total_students,
+    attendedCount: session.attended_count,
+    lateCount: session.late_count,
+    absentCount: session.absent_count,
+    excusedCount: session.excused_count,
+    createdAt: session.created_at
+  };
+};
+
+const mapTypeFromApi = (type: string): string => {
+  switch (type) {
+    case "QR_CODE": return "QR Code";
+    case "FACE_RECOGNITION": return "Face Recognition";
+    case "BOTH": return "Keduanya";
+    default: return type;
+  }
+};
+
+const mapStatusFromApi = (status: string): string => {
+  switch (status) {
+    case "ACTIVE": return "Aktif";
+    case "CLOSED": return "Selesai";
+    case "PENDING": return "Menunggu";
+    default: return status;
+  }
+};
+
+interface AcademicYear {
+  id: number;
+  name: string;
 }
 
 export default function AssistantAttendancePage() {
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
-  const [pastSessions, setPastSessions] = useState<PastSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("upcoming");
-  const [showQRDialog, setShowQRDialog] = useState(false);
-  const [showAttendanceList, setShowAttendanceList] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(null);
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
-  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
-  const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings>({
-    type: "QR Code",
-    autoClose: true,
-    duration: 15,
-    allowLate: true,
-    lateThreshold: 10,
-    notes: ""
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [activeSessions, setActiveSessions] = useState<AttendanceSession[]>([]);
+  const [pastSessions, setPastSessions] = useState<AttendanceSession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dayFilter, setDayFilter] = useState("all");
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<number>(0);
+
+  // Fetch data on component mount
+  useEffect(() => {
+    // Debug: Check user role from token
+    const checkUserRole = async () => {
+      try {
+        const token = typeof window !== 'undefined' ? 
+          localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
+        
+        const response = await axios.get(`${API_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        console.log('Current user info:', response.data);
+        
+        // Alert if role is not "Asisten Dosen"
+        if (response.data.role !== "Asisten Dosen") {
+          console.warn('User role is not "Asisten Dosen":', response.data.role);
+        }
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+      }
+    };
+    
+    checkUserRole();
+    
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch schedules where the user is assigned as a teaching assistant
+        // This endpoint will only return schedules for courses where the user is assigned
+        const schedulesData = await getAssistantSchedules();
+        setSchedules(schedulesData);
+
+        // If no schedules, no need to fetch sessions
+        if (schedulesData.length === 0) {
+          setActiveSessions([]);
+          setPastSessions([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // Create a map of course IDs that the teaching assistant is assigned to
+        const relevantScheduleIds = schedulesData.map(s => s.id);
+
+        // Fetch active sessions
+        try {
+          const activeSessionsData = await getActiveAttendanceSessions();
+          
+          // Filter active sessions to only those related to schedules where user is an assistant
+          const filteredActiveSessions = activeSessionsData.filter(
+            session => relevantScheduleIds.includes(session.courseScheduleId)
+          );
+          
+          setActiveSessions(filteredActiveSessions);
+        } catch (error) {
+          console.error("Error fetching active sessions:", error);
+          setActiveSessions([]);
+        }
+
+        // Fetch past sessions
+        try {
+          const pastSessionsData = await getAttendanceSessions();
+          
+          // Filter past sessions to only those related to schedules where user is an assistant
+          const filteredPastSessions = pastSessionsData.filter(
+            session => relevantScheduleIds.includes(session.courseScheduleId) && session.status !== "Aktif"
+          );
+          
+          setPastSessions(filteredPastSessions);
+        } catch (error) {
+          console.error("Error fetching past sessions:", error);
+          setPastSessions([]);
+        }
+
+        // Fetch academic years
+        await fetchAcademicYears();
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast.error("Gagal memuat data presensi");
+        // Set empty states to avoid loading
+        setSchedules([]);
+        setActiveSessions([]);
+        setPastSessions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Set up a polling interval to refresh active sessions
+    const intervalId = setInterval(() => {
+      if (activeTab === "active") {
+        const refreshActiveSessions = async () => {
+          try {
+            const activeSessionsData = await getActiveAttendanceSessions();
+            const relevantScheduleIds = schedules.map(s => s.id);
+            const filteredActiveSessions = activeSessionsData.filter(
+              session => relevantScheduleIds.includes(session.courseScheduleId)
+            );
+            setActiveSessions(filteredActiveSessions);
+          } catch (error) {
+            console.error("Error refreshing active sessions:", error);
+          }
+        };
+        refreshActiveSessions();
+      }
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [activeTab]);
+
+  // Filter schedules based on search term and day filter
+  const filteredSchedules = schedules.filter(schedule => {
+    const matchesSearch = searchTerm === "" || 
+      schedule.courseCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      schedule.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      schedule.room.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesDay = dayFilter === "all" || schedule.day.toLowerCase() === dayFilter.toLowerCase();
+    
+    return matchesSearch && matchesDay;
   });
 
-  // Mock data for development
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setSchedules([
-        {
-          id: 1,
-          courseCode: "IF210",
-          courseName: "Algoritma & Pemrograman",
-          lecturerName: "Dr. Parmonangan Rotua Togatorop",
-          day: "Senin",
-          startTime: "08:00",
-          endTime: "10:30",
-          room: "Ruang Lab 3",
-          date: "2023-10-16",
-          totalStudents: 42
-        },
-        {
-          id: 2,
-          courseCode: "IF310",
-          courseName: "Basis Data",
-          lecturerName: "Dr. Arlinta Christy Barus",
-          day: "Selasa",
-          startTime: "13:00",
-          endTime: "15:30",
-          room: "Ruang Lab 1",
-          date: "2023-10-17",
-          totalStudents: 38
-        }
-      ]);
-
-      setActiveSessions([
-        {
-          id: 101,
-          courseCode: "IF240",
-          courseName: "Struktur Data",
-          lecturerName: "Dr. Johannes Harungguan Sianipar",
-          startTime: "09:00",
-          endTime: "11:30",
-          room: "Ruang Lab 4",
-          attendanceType: "QR Code",
-          startedAt: "09:05",
-          status: "active",
-          attendedCount: 23,
-          totalStudents: 30,
-          remainingTime: 300 // 5 minutes remaining
-        }
-      ]);
-
-      setPastSessions([
-        {
-          id: 201,
-          courseCode: "IF210",
-          courseName: "Algoritma & Pemrograman",
-          lecturerName: "Dr. Parmonangan Rotua Togatorop",
-          date: "2023-10-09",
-          startTime: "08:00",
-          endTime: "10:30",
-          room: "Ruang Lab 3",
-          attendanceType: "QR Code",
-          attendedCount: 28,
-          totalStudents: 30,
-          duration: 15
-        },
-        {
-          id: 202,
-          courseCode: "IF310",
-          courseName: "Basis Data",
-          lecturerName: "Dr. Arlinta Christy Barus",
-          date: "2023-10-10",
-          startTime: "13:00",
-          endTime: "15:30",
-          room: "Ruang Lab 1",
-          attendanceType: "Face Recognition",
-          attendedCount: 25,
-          totalStudents: 28,
-          duration: 20
-        }
-      ]);
-
-      setIsLoading(false);
-    }, 1000);
-  }, []);
-
-  // Update remaining time for active sessions
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveSessions(prev => 
-        prev.map(session => {
-          if (session.remainingTime && session.remainingTime > 0) {
-            return { ...session, remainingTime: session.remainingTime - 1 };
-          }
-          return session;
-        })
-      );
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Format remaining time
-  const formatRemainingTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  // Navigate to attendance detail
+  const viewAttendanceDetail = (scheduleId: number) => {
+    router.push(`/dashboard/assistant/attendance/${scheduleId}`);
   };
 
-  // Function to view attendance list
-  const viewAttendanceList = (session: ActiveSession) => {
-    setSelectedSession(session);
-    setShowAttendanceList(true);
-  };
-
-  // Function to view QR code
-  const viewQRCode = (session: ActiveSession) => {
-    setSelectedSession(session);
-    setShowQRDialog(true);
-  };
-
-  // Open settings dialog for starting attendance
-  const openSettingsDialog = (schedule: Schedule) => {
-    setSelectedSchedule(schedule);
-    setAttendanceSettings({
-      type: "QR Code",
-      autoClose: true,
-      duration: 15,
-      allowLate: true,
-      lateThreshold: 10,
-      notes: ""
-    });
-    setShowSettingsDialog(true);
-  };
-
-  // Function to start a new attendance session with advanced settings
-  const startAttendanceSession = async () => {
-    if (!selectedSchedule) return;
-
+  // Format date
+  const formatDate = (dateString: string) => {
     try {
-      // In a real implementation, you would call the API to start a session
-      toast.success("Sesi presensi berhasil dimulai");
-      
-      // Calculate remaining time in seconds
-      const remainingTimeInSeconds = attendanceSettings.duration * 60;
-      
-      // Create new session
-      const newSession: ActiveSession = {
-        id: Date.now(),
-        courseCode: selectedSchedule.courseCode,
-        courseName: selectedSchedule.courseName,
-        lecturerName: selectedSchedule.lecturerName,
-        startTime: selectedSchedule.startTime,
-        endTime: selectedSchedule.endTime,
-        room: selectedSchedule.room,
-        attendanceType: attendanceSettings.type,
-        startedAt: new Date().toLocaleTimeString(),
-        status: "active",
-        attendedCount: 0,
-        totalStudents: selectedSchedule.totalStudents,
-        remainingTime: remainingTimeInSeconds
-      };
-      
-      setActiveSessions([...activeSessions, newSession]);
-      setShowSettingsDialog(false);
-      setActiveTab("active");
+      const date = parseISO(dateString);
+      return format(date, "d MMMM yyyy", { locale: idLocale });
     } catch (error) {
-      console.error("Error starting attendance session:", error);
-      toast.error("Gagal memulai sesi presensi");
+      return dateString;
     }
   };
 
-  // Function to end an active attendance session
-  const endAttendanceSession = async (sessionId: number) => {
+  // Calculate attendance rate
+  const calculateAttendanceRate = (session: AttendanceSession) => {
+    if (session.totalStudents === 0) return 0;
+    return ((session.attendedCount + session.lateCount) / session.totalStudents) * 100;
+  };
+
+  // Fetch academic years
+  const fetchAcademicYears = async () => {
     try {
-      // In a real implementation, you would call the API to end a session
-      toast.success("Sesi presensi berhasil diakhiri");
+      const token = typeof window !== 'undefined' ? 
+        localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
       
-      // Move from active to past sessions
-      const session = activeSessions.find(s => s.id === sessionId);
-      if (session) {
-        const pastSession: PastSession = {
-          ...session,
-          date: new Date().toISOString().split('T')[0],
-          duration: 15 // Default duration or could be stored in session
-        };
-        
-        setPastSessions([pastSession, ...pastSessions]);
-        setActiveSessions(activeSessions.filter(s => s.id !== sessionId));
+      const response = await axios.get(`${API_URL}/api/assistant/academic-years`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.data?.data) {
+        if (response.data.data.length > 0) {
+          setAcademicYears(response.data.data);
+          // Just use the first year in the list if available
+          setSelectedAcademicYear(response.data.data[0].id);
+        } else {
+          // Handle case when there are no academic years
+          console.log('No academic years found');
+          setAcademicYears([]);
+        }
       }
     } catch (error) {
-      console.error("Error ending attendance session:", error);
-      toast.error("Gagal mengakhiri sesi presensi");
+      console.error('Error fetching academic years:', error);
+      setAcademicYears([]);
     }
   };
 
@@ -305,7 +435,7 @@ export default function AssistantAttendancePage() {
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                 <div>
                   <h3 className="text-xl font-semibold text-black">Kelola Presensi</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Bantu dosen dalam mengelola presensi mahasiswa</p>
+                  <p className="text-sm text-muted-foreground mt-1">Pantau kehadiran mahasiswa di kelas yang Anda bantu</p>
                 </div>
                 <div>
                   <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -337,34 +467,34 @@ export default function AssistantAttendancePage() {
               <div className="mt-6">
                 {activeTab === "upcoming" && (
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-                      <div>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-between mb-4">
+                      <div className="relative w-full sm:w-[40%]">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Cari jadwal..."
+                          className="pl-10"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                       </div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
-                        <div className="relative w-full md:w-64">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Cari jadwal..."
-                            className="pl-8"
-                          />
-                        </div>
-                        <Select defaultValue="all">
-                          <SelectTrigger className="w-full md:w-[140px]">
+                      <div className="flex gap-3 items-center">
+                        <Select value={dayFilter} onValueChange={setDayFilter}>
+                          <SelectTrigger className="w-[240px] h-10">
                             <Filter className="h-4 w-4 mr-2" />
                             <SelectValue placeholder="Filter Hari" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">Semua Hari</SelectItem>
-                            <SelectItem value="mon">Senin</SelectItem>
-                            <SelectItem value="tue">Selasa</SelectItem>
-                            <SelectItem value="wed">Rabu</SelectItem>
-                            <SelectItem value="thu">Kamis</SelectItem>
-                            <SelectItem value="fri">Jumat</SelectItem>
+                            <SelectItem value="senin">Senin</SelectItem>
+                            <SelectItem value="selasa">Selasa</SelectItem>
+                            <SelectItem value="rabu">Rabu</SelectItem>
+                            <SelectItem value="kamis">Kamis</SelectItem>
+                            <SelectItem value="jumat">Jumat</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
-
+                    
                     {isLoading ? (
                       <div className="flex justify-center py-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -381,12 +511,11 @@ export default function AssistantAttendancePage() {
                               <TableHead className="font-bold text-black">Hari</TableHead>
                               <TableHead className="font-bold text-black">Jam</TableHead>
                               <TableHead className="font-bold text-black">Ruangan</TableHead>
-                              <TableHead className="font-bold text-black">Mahasiswa</TableHead>
-                              <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
+                              <TableHead className="w-[100px] text-right font-bold text-black">Aksi</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {schedules.map((schedule, index) => (
+                            {filteredSchedules.map((schedule, index) => (
                               <TableRow key={schedule.id}>
                                 <TableCell>{index + 1}</TableCell>
                                 <TableCell className="font-medium">{schedule.courseCode}</TableCell>
@@ -395,23 +524,22 @@ export default function AssistantAttendancePage() {
                                 <TableCell>{schedule.day}</TableCell>
                                 <TableCell>{schedule.startTime} - {schedule.endTime}</TableCell>
                                 <TableCell>{schedule.room}</TableCell>
-                                <TableCell>{schedule.totalStudents}</TableCell>
                                 <TableCell className="text-right">
                                   <Button 
                                     variant="default" 
                                     size="sm"
                                     className="bg-[#0687C9] hover:bg-[#0572aa]"
-                                    onClick={() => openSettingsDialog(schedule)}
+                                    onClick={() => viewAttendanceDetail(schedule.id)}
                                   >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Mulai Presensi
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Detail
                                   </Button>
                                 </TableCell>
                               </TableRow>
                             ))}
-                            {schedules.length === 0 && (
+                            {filteredSchedules.length === 0 && (
                               <TableRow>
-                                <TableCell colSpan={9} className="h-32 text-center">
+                                <TableCell colSpan={8} className="h-32 text-center">
                                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                                     <Calendar className="h-10 w-10 text-gray-300 mb-2" />
                                     <p>Tidak ada jadwal perkuliahan tersedia</p>
@@ -429,11 +557,6 @@ export default function AssistantAttendancePage() {
 
                 {activeTab === "active" && (
                   <div className="space-y-4">
-                    <div className="mb-6">
-                      <h4 className="text-lg font-medium text-black">Sesi Presensi Aktif</h4>
-                      <p className="text-sm text-muted-foreground mt-1">Sesi presensi yang sedang berlangsung</p>
-                    </div>
-                    
                     {isLoading ? (
                       <div className="flex justify-center py-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -445,133 +568,104 @@ export default function AssistantAttendancePage() {
                             <div className="flex flex-col items-center gap-2">
                               <Clock className="h-10 w-10 text-gray-300" />
                               <p>Tidak ada sesi presensi aktif</p>
-                              <p className="text-sm">Sesi presensi dimulai oleh dosen pengampu</p>
+                              <p className="text-sm">Dosen akan memulai sesi presensi saat perkuliahan berlangsung</p>
                             </div>
                           </div>
                         ) : (
-                          activeSessions.map((session) => (
-                            <Card key={session.id} className="border border-gray-200 overflow-hidden">
-                              <div className="bg-[#0687C9] h-1.5"></div>
-                              <CardContent className="p-4 sm:p-6">
-                                <div className="flex flex-col lg:flex-row lg:justify-between gap-4">
-                                  <div className="space-y-4">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <Badge 
-                                        variant="outline" 
-                                        className="bg-green-50 text-green-700 border-green-200 px-2 py-1"
-                                      >
-                                        <div className="flex items-center gap-1">
-                                          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                          <span>Aktif</span>
-                                        </div>
-                                      </Badge>
-                                      <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
-                                        {session.attendanceType}
-                                      </Badge>
-                                    </div>
-                                    
-                                    <div>
-                                      <h3 className="text-lg font-semibold">
-                                        {session.courseCode}: {session.courseName}
-                                      </h3>
-                                      <p className="text-sm text-muted-foreground">Dosen: {session.lecturerName}</p>
-                                      <div className="text-sm text-muted-foreground mt-1 space-y-1">
-                                        <div className="flex items-center">
-                                          <Clock className="h-4 w-4 mr-2" />
-                                          <span>{session.startTime} - {session.endTime}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-                                      <div className="w-full sm:w-48">
-                                        <div className="text-sm mb-1">
-                                          Kehadiran: <span className="font-medium">{session.attendedCount}/{session.totalStudents}</span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                          <div 
-                                            className="bg-[#0687C9] h-2.5 rounded-full" 
-                                            style={{ width: `${(session.attendedCount / session.totalStudents) * 100}%` }}
-                                          ></div>
-                                        </div>
+                          <div>
+                            {activeSessions.map((session) => (
+                              <Card key={session.id} className="border border-gray-200 overflow-hidden mb-4">
+                                <div className="bg-[#0687C9] h-1.5"></div>
+                                <CardContent className="p-4 sm:p-6">
+                                  <div className="flex flex-col lg:flex-row lg:justify-between gap-4">
+                                    <div className="space-y-4">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <Badge 
+                                          variant="outline" 
+                                          className="bg-green-50 text-green-700 border-green-200 px-2 py-1"
+                                        >
+                                          <div className="flex items-center gap-1">
+                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                            <span>Aktif</span>
+                                          </div>
+                                        </Badge>
+                                        <Badge 
+                                          variant="outline" 
+                                          className={
+                                            session.type === "QR Code" 
+                                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                                              : session.type === "Face Recognition"
+                                              ? "bg-purple-50 text-purple-700 border-purple-200" 
+                                              : "bg-orange-50 text-orange-700 border-orange-200"
+                                          }
+                                        >
+                                          {session.type === "QR Code" && <QrCode className="h-3.5 w-3.5 mr-1" />}
+                                          {session.type}
+                                        </Badge>
                                       </div>
                                       
-                                      {session.remainingTime !== undefined && (
-                                        <div className="flex items-center gap-2 bg-[#E6F3FB] px-3 py-2 rounded-md">
-                                          <TimerIcon className="h-4 w-4 text-[#0687C9]" />
-                                          <div>
-                                            <span className="text-sm text-muted-foreground">Sisa waktu:</span>
-                                            <span className="ml-1 font-semibold text-[#0687C9]">
-                                              {formatRemainingTime(session.remainingTime)}
-                                            </span>
-                                          </div>
+                                      <div>
+                                        <h3 className="text-lg font-semibold">{session.courseCode}: {session.courseName}</h3>
+                                        <p className="text-sm text-muted-foreground">{session.room}</p>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 gap-3 sm:flex sm:gap-4">
+                                        <div className="flex items-center gap-1.5">
+                                          <Calendar className="h-4 w-4 text-[#0687C9]" />
+                                          <span className="text-sm">{formatDate(session.date)}</span>
                                         </div>
-                                      )}
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock className="h-4 w-4 text-[#0687C9]" />
+                                          <span className="text-sm">{session.scheduleStartTime} - {session.scheduleEndTime}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <Timer className="h-4 w-4 text-[#0687C9]" />
+                                          <span className="text-sm">{session.duration} menit</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex flex-col gap-3">
+                                      <div className="flex items-center gap-1.5 text-sm">
+                                        <Users className="h-4 w-4 text-[#0687C9]" />
+                                        <span>Kehadiran: </span>
+                                        <span className="font-medium">{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
+                                        <span className="text-muted-foreground">({calculateAttendanceRate(session).toFixed(1)}%)</span>
+                                      </div>
+                                      
+                                      <div className="flex gap-2 mt-auto">
+                                        <Button 
+                                          variant="outline" 
+                                          className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
+                                          onClick={() => viewAttendanceDetail(session.courseScheduleId)}
+                                        >
+                                          <Eye className="h-4 w-4 mr-2" />
+                                          Lihat Detail
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
-                                  
-                                  <div className="flex flex-row sm:flex-col gap-2 sm:w-44">
-                                    <Button 
-                                      variant="default" 
-                                      className="flex-1 bg-[#0687C9] hover:bg-[#0572aa]"
-                                      onClick={() => viewQRCode(session)}
-                                    >
-                                      <QrCode className="h-4 w-4 mr-2" />
-                                      Lihat QR
-                                    </Button>
-                                    <Button 
-                                      variant="outline" 
-                                      className="flex-1 border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
-                                      onClick={() => viewAttendanceList(session)}
-                                    >
-                                      <Users className="h-4 w-4 mr-2" />
-                                      Daftar Hadir
-                                    </Button>
-                                    <Button 
-                                      variant="outline" 
-                                      className="flex-1 border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
-                                      onClick={() => endAttendanceSession(session.id)}
-                                    >
-                                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                                      Akhiri Sesi
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
                 )}
-
+                
                 {activeTab === "past" && (
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-                      <div>
-                        <h4 className="text-lg font-medium text-black">Riwayat Presensi</h4>
-                        <p className="text-sm text-muted-foreground mt-1">Riwayat sesi presensi yang telah selesai</p>
-                      </div>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <div className="relative w-full md:w-64">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Cari riwayat..."
-                            className="pl-8"
-                          />
-                        </div>
-                        <Select defaultValue="all">
-                          <SelectTrigger className="w-full md:w-[180px]">
-                            <Filter className="h-4 w-4 mr-2" />
-                            <SelectValue placeholder="Filter" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Semua Mata Kuliah</SelectItem>
-                            <SelectItem value="if210">IF210 - Algoritma</SelectItem>
-                            <SelectItem value="if310">IF310 - Basis Data</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-between mb-4">
+                      <div className="relative w-full sm:w-[40%]">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Cari riwayat presensi..."
+                          className="pl-10"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                       </div>
                     </div>
                     
@@ -588,44 +682,55 @@ export default function AssistantAttendancePage() {
                               <TableHead className="font-bold text-black">Tanggal</TableHead>
                               <TableHead className="w-[80px] font-bold text-black">Kode MK</TableHead>
                               <TableHead className="font-bold text-black">Mata Kuliah</TableHead>
-                              <TableHead className="font-bold text-black">Dosen</TableHead>
                               <TableHead className="font-bold text-black">Tipe Presensi</TableHead>
+                              <TableHead className="font-bold text-black">Durasi</TableHead>
                               <TableHead className="font-bold text-black">Kehadiran</TableHead>
                               <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {pastSessions.map((session, index) => (
+                            {pastSessions
+                              .filter(session => 
+                                !searchTerm || 
+                                formatDate(session.date).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                session.courseCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                session.courseName.toLowerCase().includes(searchTerm.toLowerCase())
+                              )
+                              .map((session, index) => (
                               <TableRow key={session.id}>
                                 <TableCell>{index + 1}</TableCell>
-                                <TableCell>{session.date}</TableCell>
+                                <TableCell>{formatDate(session.date)}</TableCell>
                                 <TableCell className="font-medium">{session.courseCode}</TableCell>
                                 <TableCell>{session.courseName}</TableCell>
-                                <TableCell>{session.lecturerName}</TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className={
-                                    session.attendanceType === "QR Code" 
-                                      ? "bg-blue-50 text-[#0687C9] border-[#0687C9]/20" 
-                                      : "bg-purple-50 text-purple-700 border-purple-200"
+                                    session.type === "QR Code" 
+                                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                                      : session.type === "Face Recognition"
+                                      ? "bg-purple-50 text-purple-700 border-purple-200" 
+                                      : "bg-orange-50 text-orange-700 border-orange-200"
                                   }>
-                                    {session.attendanceType}
+                                    {session.type}
                                   </Badge>
                                 </TableCell>
+                                <TableCell>{session.duration} menit</TableCell>
                                 <TableCell>
-                                  <div className="flex items-center">
-                                    <span>{session.attendedCount}/{session.totalStudents}</span>
-                                    <div className="w-20 bg-gray-200 rounded-full h-2 ml-2">
-                                      <div 
-                                        className="bg-[#0687C9] h-2 rounded-full" 
-                                        style={{ width: `${(session.attendedCount / session.totalStudents) * 100}%` }}
-                                      ></div>
-                                    </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    <span>{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({calculateAttendanceRate(session).toFixed(1)}%)
+                                    </span>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Button variant="ghost" size="sm">
-                                    <BarChart3 className="h-4 w-4 mr-2" />
-                                    Laporan
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-[#0687C9] hover:bg-[#E6F3FB] hover:text-[#0687C9]"
+                                    onClick={() => viewAttendanceDetail(session.courseScheduleId)}
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
                                   </Button>
                                 </TableCell>
                               </TableRow>
@@ -635,8 +740,8 @@ export default function AssistantAttendancePage() {
                                 <TableCell colSpan={8} className="h-32 text-center">
                                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                                     <FileText className="h-10 w-10 text-gray-300 mb-2" />
-                                    <p>Belum ada riwayat presensi</p>
-                                    <p className="text-sm">Riwayat presensi akan muncul di sini setelah sesi selesai</p>
+                                    <p>Tidak ada riwayat presensi</p>
+                                    <p className="text-sm">Riwayat presensi akan muncul di sini setelah sesi presensi selesai</p>
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -650,314 +755,6 @@ export default function AssistantAttendancePage() {
               </div>
             </div>
           </div>
-          
-          {/* QR Code Dialog */}
-          <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-semibold text-black">QR Code Presensi</DialogTitle>
-                <DialogDescription>
-                  Gunakan QR Code ini untuk melakukan presensi mahasiswa
-                </DialogDescription>
-              </DialogHeader>
-              
-              {selectedSession && (
-                <div className="py-4">
-                  <div className="text-center mb-4">
-                    <h3 className="font-semibold">{selectedSession.courseCode}: {selectedSession.courseName}</h3>
-                    <p className="text-sm text-muted-foreground">{selectedSession.startTime} - {selectedSession.endTime} | {selectedSession.room}</p>
-                  </div>
-                  
-                  <div className="flex justify-center my-4">
-                    {/* Placeholder for QR Code */}
-                    <div className="w-64 h-64 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                      <QrCode className="h-20 w-20 text-gray-400" />
-                    </div>
-                  </div>
-                  
-                  <div className="text-center text-sm text-muted-foreground">
-                    <p>QR Code akan berubah setiap 30 detik</p>
-                    <p className="mt-1">Sisa waktu sesi: {selectedSession.remainingTime && formatRemainingTime(selectedSession.remainingTime)}</p>
-                  </div>
-                  
-                  <div className="mt-6 flex justify-between items-center bg-[#E6F3FB] p-3 rounded-md">
-                    <div>
-                      <p className="text-sm font-medium text-black">Status Kehadiran:</p>
-                      <p className="text-sm">{selectedSession.attendedCount} dari {selectedSession.totalStudents} mahasiswa</p>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-[#0687C9] hover:bg-[#E6F3FB] border-[#0687C9]/20"
-                      onClick={() => {
-                        setShowQRDialog(false);
-                        setShowAttendanceList(true);
-                      }}
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      Lihat Daftar
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              <DialogFooter>
-                <Button variant="outline" className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]" onClick={() => setShowQRDialog(false)}>
-                  Tutup
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Student Attendance List Dialog */}
-          <Dialog open={showAttendanceList} onOpenChange={setShowAttendanceList}>
-            <DialogContent className="sm:max-w-[650px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-semibold text-black">Daftar Kehadiran Mahasiswa</DialogTitle>
-                <DialogDescription>
-                  {selectedSession && (
-                    <div className="mt-2">
-                      <p className="font-medium">{selectedSession.courseCode}: {selectedSession.courseName}</p>
-                      <div className="flex items-center text-sm text-muted-foreground mt-1">
-                        <Clock className="h-4 w-4 mr-1" />
-                        <span>{selectedSession.startTime} - {selectedSession.endTime} | {selectedSession.room}</span>
-                      </div>
-                    </div>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="py-4">
-                <div className="flex justify-between items-center mb-4">
-                  <div className="relative w-full max-w-sm">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Cari mahasiswa..." className="pl-8" />
-                  </div>
-                  <Badge className="ml-2 bg-[#0687C9]">
-                    {selectedSession?.attendedCount}/{selectedSession?.totalStudents} Hadir
-                  </Badge>
-                </div>
-                
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[50px] font-bold text-black">No</TableHead>
-                        <TableHead className="w-[100px] font-bold text-black">NIM</TableHead>
-                        <TableHead className="font-bold text-black">Nama</TableHead>
-                        <TableHead className="font-bold text-black">Status</TableHead>
-                        <TableHead className="font-bold text-black">Waktu Presensi</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {/* Mock data for student attendance */}
-                      <TableRow>
-                        <TableCell>1</TableCell>
-                        <TableCell>10120001</TableCell>
-                        <TableCell>Ahmad Rizky</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            Hadir
-                          </Badge>
-                        </TableCell>
-                        <TableCell>09:05</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>2</TableCell>
-                        <TableCell>10120002</TableCell>
-                        <TableCell>Budi Santoso</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            Hadir
-                          </Badge>
-                        </TableCell>
-                        <TableCell>09:08</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>3</TableCell>
-                        <TableCell>10120003</TableCell>
-                        <TableCell>Citra Dewi</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                            Terlambat
-                          </Badge>
-                        </TableCell>
-                        <TableCell>09:17</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>4</TableCell>
-                        <TableCell>10120004</TableCell>
-                        <TableCell>Dian Permata</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                            Belum Hadir
-                          </Badge>
-                        </TableCell>
-                        <TableCell>-</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>5</TableCell>
-                        <TableCell>10120005</TableCell>
-                        <TableCell>Eko Priyanto</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                            Belum Hadir
-                          </Badge>
-                        </TableCell>
-                        <TableCell>-</TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-              
-              <DialogFooter className="gap-2">
-                <Button 
-                  variant="outline" 
-                  className="text-[#0687C9] hover:bg-[#E6F3FB] border-[#0687C9]/20"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Unduh Laporan
-                </Button>
-                <Button className="bg-[#0687C9] hover:bg-[#0572aa]" onClick={() => setShowAttendanceList(false)}>
-                  Tutup
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Add Attendance Settings Dialog */}
-          <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-semibold text-black">Pengaturan Sesi Presensi</DialogTitle>
-                <DialogDescription>
-                  {selectedSchedule && (
-                    <div className="mt-2">
-                      <p className="font-medium">{selectedSchedule.courseCode}: {selectedSchedule.courseName}</p>
-                      <div className="flex items-center text-sm text-muted-foreground mt-1">
-                        <Calendar className="h-4 w-4 mr-1" />
-                        <span>{selectedSchedule.day}, {selectedSchedule.startTime} - {selectedSchedule.endTime}</span>
-                      </div>
-                    </div>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid gap-5 py-4">
-                <div className="grid grid-cols-1 gap-3">
-                  <Label htmlFor="attendance-type" className="font-medium">Tipe Presensi</Label>
-                  <Select 
-                    value={attendanceSettings.type} 
-                    onValueChange={(value: any) => setAttendanceSettings({...attendanceSettings, type: value})}
-                  >
-                    <SelectTrigger id="attendance-type" className="bg-white">
-                      <SelectValue placeholder="Pilih tipe presensi" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="QR Code">
-                        <div className="flex items-center">
-                          <QrCode className="h-4 w-4 mr-2" />
-                          QR Code
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Face Recognition">
-                        <div className="flex items-center">
-                          <ScanFace className="h-4 w-4 mr-2" />
-                          Pengenalan Wajah
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Manual">
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-2" />
-                          Manual
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-3">
-                    <Label className="font-medium">Durasi Presensi</Label>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Durasi: {attendanceSettings.duration} menit</span>
-                    </div>
-                    <Slider 
-                      value={[attendanceSettings.duration]} 
-                      min={5} 
-                      max={30} 
-                      step={5}
-                      onValueChange={(value: number[]) => setAttendanceSettings({...attendanceSettings, duration: value[0]})}
-                    />
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="auto-close" className="font-medium">Tutup Otomatis</Label>
-                      <Switch 
-                        id="auto-close" 
-                        checked={attendanceSettings.autoClose}
-                        onCheckedChange={(checked) => setAttendanceSettings({...attendanceSettings, autoClose: checked})}
-                      />
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Sesi akan otomatis ditutup setelah durasi berakhir
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="allow-late" className="font-medium">Izinkan Terlambat</Label>
-                      <Switch 
-                        id="allow-late" 
-                        checked={attendanceSettings.allowLate}
-                        onCheckedChange={(checked) => setAttendanceSettings({...attendanceSettings, allowLate: checked})}
-                      />
-                    </div>
-                    {attendanceSettings.allowLate && (
-                      <div className="mt-3">
-                        <Label className="text-sm">Batas Keterlambatan</Label>
-                        <div className="flex items-center mt-2">
-                          <Slider 
-                            value={[attendanceSettings.lateThreshold]} 
-                            min={5} 
-                            max={20} 
-                            step={5}
-                            onValueChange={(value: number[]) => setAttendanceSettings({...attendanceSettings, lateThreshold: value[0]})}
-                            className="flex-1 mr-4"
-                          />
-                          <span className="text-sm font-medium">{attendanceSettings.lateThreshold} menit</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <Label htmlFor="notes" className="font-medium">Catatan</Label>
-                    <Input 
-                      id="notes" 
-                      placeholder="Tambahkan catatan (opsional)" 
-                      value={attendanceSettings.notes}
-                      onChange={(e) => setAttendanceSettings({...attendanceSettings, notes: e.target.value})}
-                      className="bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              <DialogFooter className="gap-2">
-                <Button variant="outline" className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]" onClick={() => setShowSettingsDialog(false)}>
-                  Batal
-                </Button>
-                <Button className="bg-[#0687C9] hover:bg-[#0572aa]" onClick={startAttendanceSession}>
-                  Mulai Sesi
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </CardContent>
       </Card>
     </div>

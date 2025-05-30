@@ -220,7 +220,7 @@ class _TodayAttendanceHistoryPageState
             ),
             const SizedBox(height: 8),
             Text(
-              'Scan QR code untuk absen',
+              'Scan QR code atau gunakan Face Recognition untuk absen',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[400],

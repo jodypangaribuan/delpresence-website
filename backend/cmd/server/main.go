@@ -68,6 +68,7 @@ func main() {
 	courseHandler := handlers.NewCourseHandler()
 	studentGroupHandler := handlers.NewStudentGroupHandler()
 	lecturerAssignmentHandler := handlers.NewLecturerAssignmentHandler()
+	teachingAssistantAssignmentHandler := handlers.NewTeachingAssistantAssignmentHandler()
 	courseScheduleHandler := handlers.NewCourseScheduleHandler()
 	attendanceHandler := handlers.NewAttendanceHandler()
 
@@ -175,6 +176,15 @@ func main() {
 			adminRoutes.GET("/lecturers/:id/courses", lecturerAssignmentHandler.GetAssignmentsByLecturer)
 			adminRoutes.GET("/courses/:id/available-lecturers", lecturerAssignmentHandler.GetAvailableLecturers)
 
+			// Admin access to teaching assistant assignments
+			adminRoutes.GET("/courses/ta-assignments", teachingAssistantAssignmentHandler.GetAllTeachingAssistantAssignments)
+			adminRoutes.GET("/courses/ta-assignments/:id", teachingAssistantAssignmentHandler.GetTeachingAssistantAssignmentByID)
+			adminRoutes.POST("/courses/ta-assignments", teachingAssistantAssignmentHandler.CreateTeachingAssistantAssignment)
+			adminRoutes.DELETE("/courses/ta-assignments/:id", teachingAssistantAssignmentHandler.DeleteTeachingAssistantAssignment)
+			adminRoutes.GET("/courses/:id/teaching-assistants", teachingAssistantAssignmentHandler.GetAssignmentsByCourse)
+			adminRoutes.GET("/employees/:id/assigned-courses", teachingAssistantAssignmentHandler.GetAssignmentsByTeachingAssistant)
+			adminRoutes.GET("/courses/:id/available-teaching-assistants", teachingAssistantAssignmentHandler.GetAvailableTeachingAssistants)
+
 			// New endpoint to get lecturer for a course - use a more specific path to avoid conflict
 			adminRoutes.GET("/course-lecturers/course/:course_id", courseScheduleHandler.GetLecturerForCourse)
 		}
@@ -206,6 +216,12 @@ func main() {
 			lecturerRoutes.PUT("/attendance/sessions/:id/students/:studentId", attendanceHandler.MarkStudentAttendance)
 			lecturerRoutes.GET("/attendance/statistics/course/:courseScheduleId", attendanceHandler.GetAttendanceStatistics)
 			lecturerRoutes.GET("/attendance/qrcode/:id", attendanceHandler.GetQRCode)
+
+			// Teaching assistant management endpoints for lecturers
+			lecturerRoutes.GET("/ta-assignments", teachingAssistantAssignmentHandler.GetMyTeachingAssistantAssignments)
+			lecturerRoutes.POST("/ta-assignments", teachingAssistantAssignmentHandler.CreateTeachingAssistantAssignment)
+			lecturerRoutes.DELETE("/ta-assignments/:id", teachingAssistantAssignmentHandler.DeleteTeachingAssistantAssignment)
+			lecturerRoutes.GET("/courses/:id/available-teaching-assistants", teachingAssistantAssignmentHandler.GetAvailableTeachingAssistants)
 		}
 
 		// Employee routes (replacing assistant routes)
@@ -213,6 +229,27 @@ func main() {
 		employeeRoutes.Use(middleware.RoleMiddleware("Pegawai"))
 		{
 			// Employee routes go here
+			// Teaching assistant can view their assigned courses
+			employeeRoutes.GET("/assigned-courses", teachingAssistantAssignmentHandler.GetAssignmentsByTeachingAssistant)
+
+			// Other employee-specific routes can be added here
+		}
+
+		// Assistant routes
+		assistantRoutes := authRequired.Group("/assistant")
+		assistantRoutes.Use(middleware.RoleMiddleware("Asisten Dosen", "asisten dosen"))
+		{
+			// Assistant can view their assigned schedules
+			assistantRoutes.GET("/schedules", teachingAssistantAssignmentHandler.GetMyAssignedSchedules)
+
+			// Get academic years (needed for filtering courses and schedules)
+			assistantRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
+
+			// Attendance management routes for assistants
+			assistantRoutes.GET("/attendance/sessions/active", attendanceHandler.GetActiveAttendanceSessions)
+			assistantRoutes.GET("/attendance/sessions", attendanceHandler.GetAttendanceSessions)
+			assistantRoutes.GET("/attendance/sessions/:id", attendanceHandler.GetAttendanceSessionDetails)
+			assistantRoutes.GET("/attendance/sessions/:id/students", attendanceHandler.GetStudentAttendances)
 		}
 
 		// Student routes

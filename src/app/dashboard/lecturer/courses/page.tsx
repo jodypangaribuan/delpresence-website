@@ -28,6 +28,7 @@ import axios from "axios";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { API_URL } from "@/utils/env";
+import React from "react";
 
 // Interface for academic year
 interface AcademicYear {
@@ -247,8 +248,20 @@ export default function LecturerCoursesPage() {
   useEffect(() => {
     if (selectedAcademicYearId) {
       fetchMyCourses();
+      // Reset semester filter when academic year changes
+      setSemesterFilter("all");
     }
   }, [selectedAcademicYearId]);
+
+  // Get unique semesters for the filter - properly extracted from actual data
+  const uniqueSemesters = React.useMemo(() => {
+    const semesterValues = courses
+      .filter(course => course.semester !== undefined && course.semester !== null)
+      .map(course => course.semester);
+    
+    // Use Set to get unique values and sort them numerically
+    return [...new Set(semesterValues)].sort((a, b) => a - b);
+  }, [courses]);
 
   // Filter courses based on search query and semester filter
   const filteredCourses = courses
@@ -258,9 +271,9 @@ export default function LecturerCoursesPage() {
       
       // Then filter by search query
       if (searchQuery) {
-      const courseCode = (course.code || '').toLowerCase();
-      const courseName = (course.name || '').toLowerCase();
-      const query = searchQuery.toLowerCase();
+        const courseCode = (course.code || '').toLowerCase();
+        const courseName = (course.name || '').toLowerCase();
+        const query = searchQuery.toLowerCase();
       
         if (!courseCode.includes(query) && !courseName.includes(query)) {
           return false;
@@ -269,7 +282,7 @@ export default function LecturerCoursesPage() {
       
       // Filter by semester if applicable
       if (semesterFilter !== 'all') {
-        return course.semester.toString() === semesterFilter;
+        return course.semester?.toString() === semesterFilter;
       }
       
       return true;
@@ -282,9 +295,6 @@ export default function LecturerCoursesPage() {
     return academicYear ? `${academicYear.name} - ${academicYear.semester}` : "";
   };
 
-  // Get unique semesters for the filter
-  const uniqueSemesters = [...new Set(courses.map(course => course.semester))].sort();
-  
   // View course details
   const viewCourseDetails = (course: Course) => {
     setSelectedCourse(course);
@@ -313,35 +323,38 @@ export default function LecturerCoursesPage() {
           <div className="bg-white rounded-md border border-gray-100 shadow-sm">
             <div className="p-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-              <div>
+                <div>
                   <h3 className="text-xl font-semibold text-black">Mata Kuliah Saya</h3>
                   <p className="text-sm text-muted-foreground mt-1">Daftar mata kuliah yang Anda ampu pada tahun akademik {getSelectedAcademicYearName()}</p>
+                </div>
               </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
-                  <div className="relative w-full md:w-64">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Cari mata kuliah..."
-                      className="pl-8"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-              </div>
-                      <Select value={selectedAcademicYearId} onValueChange={setSelectedAcademicYearId}>
-                    <SelectTrigger className="w-full md:w-[180px]">
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-between mb-4">
+                <div className="relative w-full sm:w-[40%]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari mata kuliah..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-3 items-center">
+                  <Select value={selectedAcademicYearId} onValueChange={setSelectedAcademicYearId}>
+                    <SelectTrigger className="w-[240px] h-10">
                       <Calendar className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Tahun Akademik" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {academicYears.map((year) => (
-                            <SelectItem key={year.id} value={year.id.toString()}>
-                              {`${year.name} - ${year.semester}`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {academicYears.map((year) => (
+                        <SelectItem key={year.id} value={year.id.toString()}>
+                          {`${year.name} - ${year.semester}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select value={semesterFilter} onValueChange={setSemesterFilter}>
-                    <SelectTrigger className="w-full md:w-[140px]">
+                    <SelectTrigger className="w-[200px] h-10">
                       <Filter className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Semester" />
                     </SelectTrigger>
@@ -354,8 +367,8 @@ export default function LecturerCoursesPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                    </div>
-                  </div>
+                </div>
+              </div>
 
               {/* Courses list */}
               {isLoading ? (

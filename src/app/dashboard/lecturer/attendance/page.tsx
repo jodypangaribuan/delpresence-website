@@ -33,8 +33,43 @@ import { Slider } from "@/components/ui/slider";
 import { api } from "@/utils/api";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import * as attendanceApi from "@/utils/attendance-api";
-import { AttendanceSession, AttendanceSettings } from "@/utils/attendance-api";
+
+// AttendanceSession and AttendanceSettings interfaces
+interface AttendanceSettings {
+  type: "QR Code" | "Face Recognition" | "Keduanya";
+  autoClose: boolean;
+  duration: number;
+  allowLate: boolean;
+  lateThreshold: number;
+  notes: string;
+}
+
+interface AttendanceSession {
+  id: number;
+  courseScheduleId: number;
+  courseCode: string;
+  courseName: string;
+  room: string;
+  date: string;
+  startTime: string;
+  endTime?: string;
+  scheduleStartTime: string;
+  scheduleEndTime: string;
+  type: string;
+  status: string;
+  autoClose: boolean;
+  duration: number;
+  allowLate: boolean;
+  lateThreshold: number;
+  notes: string;
+  qrCodeUrl?: string;
+  totalStudents: number;
+  attendedCount: number;
+  lateCount: number;
+  absentCount: number;
+  excusedCount: number;
+  createdAt: string;
+}
 
 interface Schedule {
   id: number;
@@ -57,6 +92,157 @@ interface PastSession extends AttendanceSession {
   // No additional fields needed
 }
 
+// Define our interface for raw attendance session data from API
+interface AttendanceSessionData {
+  id: number;
+  course_schedule_id: number;
+  course_code: string;
+  course_name: string;
+  room: string;
+  date: string;
+  start_time: string;
+  end_time?: string;
+  schedule_start_time: string;
+  schedule_end_time: string;
+  type: string;
+  status: string;
+  auto_close: boolean;
+  duration: number;
+  allow_late: boolean;
+  late_threshold: number;
+  notes: string;
+  qr_code_url?: string;
+  total_students: number;
+  attended_count: number;
+  late_count: number;
+  absent_count: number;
+  excused_count: number;
+  created_at: string;
+}
+
+// Direct API functions to replace attendance-api.ts
+const createAttendanceSession = async (
+  courseScheduleId: number,
+  date: string,
+  type: string,
+  settings: Partial<{
+    autoClose: boolean;
+    duration: number;
+    allowLate: boolean;
+    lateThreshold: number;
+    notes: string;
+  }>
+): Promise<AttendanceSession> => {
+  const mappedType = type === "QR Code" ? "QR_CODE" : 
+                    type === "Face Recognition" ? "FACE_RECOGNITION" : 
+                    type === "Keduanya" ? "BOTH" : "QR_CODE";
+  
+  const response = await api<AttendanceSessionData>('/lecturer/attendance/sessions', {
+    method: 'POST',
+    body: {
+      course_schedule_id: courseScheduleId,
+      type: mappedType,
+      date,
+      settings: {
+        autoClose: settings.autoClose,
+        duration: settings.duration,
+        allowLate: settings.allowLate,
+        lateThreshold: settings.lateThreshold,
+        notes: settings.notes
+      }
+    }
+  });
+  
+  return mapSessionFromApi(response);
+};
+
+const getActiveAttendanceSessions = async (): Promise<AttendanceSession[]> => {
+  const response = await api<any>('/lecturer/attendance/sessions/active');
+  // Handle different response formats
+  const data = Array.isArray(response) ? response : response?.data || response?.sessions || [];
+  return data.map((session: AttendanceSessionData) => mapSessionFromApi(session));
+};
+
+const getAttendanceSessions = async (startDate?: string, endDate?: string): Promise<AttendanceSession[]> => {
+  let endpoint = '/lecturer/attendance/sessions';
+  if (startDate || endDate) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    endpoint += `?${params.toString()}`;
+  }
+  
+  const response = await api<any>(endpoint);
+  // Handle different response formats
+  const data = Array.isArray(response) ? response : response?.data || response?.sessions || [];
+  return data.map((session: AttendanceSessionData) => mapSessionFromApi(session));
+};
+
+const getAttendanceSessionDetails = async (sessionId: number): Promise<AttendanceSession> => {
+  const response = await api<any>(`/lecturer/attendance/sessions/${sessionId}`);
+  // Handle different response formats
+  const sessionData = response?.data || response;
+  return mapSessionFromApi(sessionData as AttendanceSessionData);
+};
+
+const closeAttendanceSession = async (sessionId: number): Promise<void> => {
+  await api(`/lecturer/attendance/sessions/${sessionId}/close`, {
+    method: 'PUT'
+  });
+};
+
+const getQRCodeUrl = (sessionId: number): string => {
+  return `/api/lecturer/attendance/qrcode/${sessionId}`;
+};
+
+// Mapping function to ensure consistent format
+const mapSessionFromApi = (session: AttendanceSessionData): AttendanceSession => {
+  return {
+    id: session.id,
+    courseScheduleId: session.course_schedule_id,
+    courseCode: session.course_code,
+    courseName: session.course_name,
+    room: session.room,
+    date: session.date,
+    startTime: session.start_time,
+    endTime: session.end_time,
+    scheduleStartTime: session.schedule_start_time,
+    scheduleEndTime: session.schedule_end_time,
+    type: mapTypeFromApi(session.type),
+    status: mapStatusFromApi(session.status),
+    autoClose: session.auto_close,
+    duration: session.duration,
+    allowLate: session.allow_late,
+    lateThreshold: session.late_threshold,
+    notes: session.notes,
+    qrCodeUrl: session.qr_code_url,
+    totalStudents: session.total_students,
+    attendedCount: session.attended_count,
+    lateCount: session.late_count,
+    absentCount: session.absent_count,
+    excusedCount: session.excused_count,
+    createdAt: session.created_at
+  };
+};
+
+const mapTypeFromApi = (type: string): string => {
+  switch (type) {
+    case 'QR_CODE': return 'QR Code';
+    case 'FACE_RECOGNITION': return 'Face Recognition';
+    case 'BOTH': return 'Keduanya';
+    default: return type;
+  }
+};
+
+const mapStatusFromApi = (status: string): string => {
+  switch (status) {
+    case 'ACTIVE': return 'active';
+    case 'CLOSED': return 'closed';
+    case 'CANCELED': return 'canceled';
+    default: return status;
+  }
+};
+
 export default function AttendancePage() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
@@ -73,6 +259,30 @@ export default function AttendancePage() {
     lateThreshold: 10,
     notes: ""
   });
+  // Store any potential server-client time offset
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
+
+  // Function to estimate server-client time difference
+  const calculateServerTimeOffset = (serverTime: string) => {
+    if (!serverTime) return 0;
+    
+    try {
+      const serverTimeMs = new Date(serverTime).getTime();
+      const clientTimeMs = Date.now();
+      const offset = serverTimeMs - clientTimeMs;
+      
+      // Only update if the offset is significant (more than 2 seconds)
+      if (Math.abs(offset) > 2000) {
+        console.log("Server time offset detected:", offset, "ms");
+        setServerTimeOffset(offset);
+      }
+      
+      return offset;
+    } catch (error) {
+      console.error("Error calculating server time offset:", error);
+      return 0;
+    }
+  };
 
   // Load data from API
   useEffect(() => {
@@ -119,7 +329,7 @@ export default function AttendancePage() {
         }
 
         // Fetch active sessions
-        const activeSessionsResponse = await attendanceApi.getActiveAttendanceSessions();
+        const activeSessionsResponse = await getActiveAttendanceSessions();
         // Add remainingTime to active sessions
         const activeWithTime = activeSessionsResponse.map(session => {
           const remainingTime = calculateRemainingTime(session);
@@ -132,7 +342,7 @@ export default function AttendancePage() {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
         
-        const pastSessionsResponse = await attendanceApi.getAttendanceSessions(
+        const pastSessionsResponse = await getAttendanceSessions(
           thirtyDaysAgo.toISOString().split('T')[0],
           today.toISOString().split('T')[0]
         );
@@ -158,35 +368,149 @@ export default function AttendancePage() {
   const calculateRemainingTime = (session: AttendanceSession): number => {
     if (session.status !== 'active') return 0;
     
-    const startTime = new Date(session.startTime).getTime();
-    const durationMs = session.duration * 60 * 1000;
-    const endTime = startTime + durationMs;
-    const now = Date.now();
-    
-    const remainingMs = endTime - now;
-    return remainingMs > 0 ? Math.floor(remainingMs / 1000) : 0;
+    try {
+      // Handle ISO date string from server - ensure proper parsing
+      if (!session.startTime) {
+        console.warn("Session has no start time:", session.id);
+        return session.duration * 60; // Default to full duration
+      }
+      
+      // Parse the startTime string to a Date object
+      const startTimeDate = new Date(session.startTime);
+      
+      // Validate the parsed date
+      if (isNaN(startTimeDate.getTime())) {
+        console.warn("Invalid start time:", session.startTime);
+        return session.duration * 60; // Default to full duration
+      }
+      
+      // Convert duration from minutes to milliseconds
+      const durationMs = session.duration * 60 * 1000;
+      
+      // Calculate the end time by adding duration to start time
+      const endTime = startTimeDate.getTime() + durationMs;
+      
+      // Get the current time (adjusted for any server time difference)
+      const clientNow = Date.now();
+      const adjustedNow = clientNow + serverTimeOffset;
+      
+      // Debug information
+      console.log("Time calculation for session", session.id, {
+        startTime: startTimeDate.toISOString(),
+        duration: session.duration,
+        endTime: new Date(endTime).toISOString(),
+        clientTime: new Date(clientNow).toISOString(),
+        adjustedTime: new Date(adjustedNow).toISOString(),
+        serverOffset: serverTimeOffset,
+        remainingMs: endTime - adjustedNow,
+        remainingSec: Math.floor((endTime - adjustedNow) / 1000)
+      });
+      
+      // Calculate remaining milliseconds (with server time adjustment)
+      const remainingMs = endTime - adjustedNow;
+      
+      // Return remaining seconds, minimum 0
+      return Math.max(0, Math.floor(remainingMs / 1000));
+    } catch (error) {
+      console.error("Error calculating remaining time:", error, {
+        sessionId: session.id,
+        startTime: session.startTime,
+        duration: session.duration
+      });
+      // Default to full duration to prevent immediate auto-close
+      return session.duration * 60;
+    }
   };
 
   // Update remaining time for active sessions
   useEffect(() => {
-    const timer = setInterval(() => {
+      let isComponentMounted = true;
+    
+    // Function to fetch active sessions and sync with the server
+    const fetchActiveSessions = async () => {
+      if (!isComponentMounted) return;
+      
+      try {
+        const activeSessionsResponse = await getActiveAttendanceSessions();
+        console.log("Active sessions from server:", activeSessionsResponse);
+        
+        // Check if we have any active sessions to synchronize time with
+        if (activeSessionsResponse.length > 0 && activeSessionsResponse[0].createdAt) {
+          // Use the most recent session's creation time to estimate server time
+          calculateServerTimeOffset(activeSessionsResponse[0].createdAt);
+        }
+        
+        // Force an immediate recalculation of remaining time for all sessions
+        // This ensures we're in sync with the server
+        const activeWithTime = activeSessionsResponse.map(session => {
+          const remainingTime = calculateRemainingTime(session);
+          return { ...session, remainingTime };
+        });
+        
+        if (isComponentMounted) {
+          setActiveSessions(activeWithTime);
+        }
+      } catch (error) {
+        console.error("Error fetching active sessions:", error);
+      }
+    };
+    
+    // Set up periodic sync with the server
+    const syncWithServer = () => {
+      // Immediate sync
+      fetchActiveSessions();
+      
+      // Set up regular sync intervals
+      // We'll sync more frequently at first to ensure we're accurate
+      const shortIntervalSync = setInterval(() => {
+        fetchActiveSessions();
+      }, 5000); // Every 5 seconds for the first minute
+      
+      // After a minute, switch to less frequent updates
+      setTimeout(() => {
+        clearInterval(shortIntervalSync);
+        setInterval(() => {
+          fetchActiveSessions();
+        }, 30000); // Every 30 seconds thereafter
+      }, 60000);
+    };
+    
+    // Initial server sync
+    syncWithServer();
+
+    // Set up timer to update countdown every second
+    const countdownTimer = setInterval(() => {
+      if (!isComponentMounted) return;
+      
       setActiveSessions(prev => 
         prev.map(session => {
-          if (session.remainingTime && session.remainingTime > 0) {
-            return { ...session, remainingTime: session.remainingTime - 1 };
-          } else if (session.remainingTime === 0) {
-            // Auto close session when time expires
-            if (session.autoClose) {
-              endAttendanceSession(session.id);
-              return session;
-            }
+          if (session.status !== 'active') return session;
+          
+          // Recalculate remaining time based on server start time and duration
+          // This ensures an accurate countdown that matches the server
+          const newRemainingTime = calculateRemainingTime(session);
+          
+          // Auto-close sessions if timer has reached zero
+          if (newRemainingTime === 0 && session.autoClose) {
+            // End the session on the server
+            closeAttendanceSession(session.id).catch(err => 
+              console.error("Failed to end session automatically:", err)
+            );
+            
+            // Update local state to show session as closed
+            return { ...session, status: 'closed', remainingTime: 0 };
           }
-          return session;
+          
+          return { ...session, remainingTime: newRemainingTime };
         })
       );
     }, 1000);
 
-    return () => clearInterval(timer);
+    // Cleanup function
+    return () => {
+      isComponentMounted = false;
+      clearInterval(countdownTimer);
+    };
   }, []);
 
   // Open settings dialog for starting attendance
@@ -211,20 +535,57 @@ export default function AttendancePage() {
       setIsLoading(true);
       const today = new Date().toISOString().split('T')[0];
       
-      const newSession = await attendanceApi.createAttendanceSession(
+      console.log("Creating new attendance session with settings:", {
+        scheduleId: selectedSchedule.id,
+        date: today,
+        type: attendanceSettings.type,
+        settings: attendanceSettings
+      });
+      
+      // Record client time before API call
+      const clientStartTime = new Date();
+      
+      const newSession = await createAttendanceSession(
         selectedSchedule.id,
         today,
         attendanceSettings.type,
         attendanceSettings
       );
       
-      // Add remaining time for frontend display
+      console.log("New session created:", newSession);
+      
+      // If the server provides a creation time, use it to adjust our clock offset
+      if (newSession.createdAt) {
+        calculateServerTimeOffset(newSession.createdAt);
+      }
+      
+      // If the server doesn't provide a startTime, estimate it
+      if (!newSession.startTime && newSession.createdAt) {
+        console.log("Session doesn't have a start time, using createdAt time");
+        newSession.startTime = newSession.createdAt;
+      }
+      
+      // Calculate the actual remaining time based on server information
+      const actualRemainingTime = calculateRemainingTime(newSession);
+      
+      // Add the remaining time property for proper display
       const sessionWithTime: ActiveSession = {
         ...newSession,
-        remainingTime: attendanceSettings.duration * 60
+        // Use the calculated time if we have a valid startTime from server
+        // otherwise fallback to the full duration
+        remainingTime: newSession.startTime 
+          ? actualRemainingTime
+          : attendanceSettings.duration * 60 // Full duration in seconds
       };
       
-      setActiveSessions([...activeSessions, sessionWithTime]);
+      console.log("Session with calculated time:", {
+        sessionId: sessionWithTime.id,
+        startTime: sessionWithTime.startTime,
+        remainingTime: sessionWithTime.remainingTime,
+        duration: sessionWithTime.duration
+      });
+      
+      setActiveSessions(prev => [...prev, sessionWithTime]);
       setShowSettingsDialog(false);
       setActiveTab("active");
       toast.success("Sesi presensi berhasil dimulai");
@@ -240,10 +601,10 @@ export default function AttendancePage() {
   const endAttendanceSession = async (sessionId: number) => {
     try {
       setIsLoading(true);
-      await attendanceApi.closeAttendanceSession(sessionId);
+      await closeAttendanceSession(sessionId);
       
       // Get updated session details
-      const updatedSession = await attendanceApi.getAttendanceSessionDetails(sessionId);
+      const updatedSession = await getAttendanceSessionDetails(sessionId);
       
       // Move from active to past sessions
       setPastSessions([updatedSession, ...pastSessions]);
@@ -260,9 +621,21 @@ export default function AttendancePage() {
 
   // Format remaining time
   const formatRemainingTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    // Ensure seconds is a valid number
+    if (typeof seconds !== 'number' || isNaN(seconds)) {
+      console.warn("Invalid remaining time:", seconds);
+      return "00:00";
+    }
+    
+    // Ensure positive value
+    const positiveSeconds = Math.max(0, seconds);
+    
+    // Calculate minutes and seconds
+    const minutes = Math.floor(positiveSeconds / 60);
+    const remainingSeconds = Math.floor(positiveSeconds % 60);
+    
+    // Format with leading zeros
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -306,19 +679,17 @@ export default function AttendancePage() {
               <div className="mt-6">
                 {activeTab === "upcoming" && (
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-                      <div>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-between mb-4">
+                      <div className="relative w-full sm:w-[40%]">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Cari jadwal..."
+                          className="pl-10"
+                        />
                       </div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
-                        <div className="relative w-full md:w-64">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Cari jadwal..."
-                            className="pl-8"
-                          />
-                        </div>
+                      <div className="flex gap-3 items-center">
                         <Select defaultValue="all">
-                          <SelectTrigger className="w-full md:w-[180px]">
+                          <SelectTrigger className="w-[240px] h-10">
                             <Filter className="h-4 w-4 mr-2" />
                             <SelectValue placeholder="Filter Hari" />
                           </SelectTrigger>
@@ -396,11 +767,6 @@ export default function AttendancePage() {
 
                 {activeTab === "active" && (
                   <div className="space-y-4">
-                    <div className="mb-6">
-                      <h4 className="text-lg font-medium text-black">Sesi Presensi Aktif</h4>
-                      <p className="text-sm text-muted-foreground mt-1">Pantau sesi presensi yang sedang berlangsung</p>
-                    </div>
-                    
                     {isLoading ? (
                       <div className="flex justify-center py-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -445,7 +811,7 @@ export default function AttendancePage() {
                                         <div className="text-sm text-muted-foreground mt-1 space-y-1">
                                           <div className="flex items-center">
                                             <Clock className="h-4 w-4 mr-2" />
-                                            <span>{session.startTime} - {session.endTime || session.scheduleEndTime}</span>
+                                            <span>{session.scheduleStartTime} - {session.scheduleEndTime}</span>
                                           </div>
                                           <div className="flex items-center">
                                             <QrCode className="h-4 w-4 mr-2" />
@@ -467,29 +833,32 @@ export default function AttendancePage() {
                                           </div>
                                         </div>
                                         
-                                        {session.remainingTime !== undefined && session.remainingTime > 0 && (
-                                          <div className="flex items-center gap-2 bg-[#E6F3FB] px-3 py-2 rounded-md">
-                                            <TimerIcon className="h-4 w-4 text-[#0687C9]" />
-                                            <div>
-                                              <span className="text-sm text-muted-foreground">Sisa waktu:</span>
-                                              <span className="ml-1 font-semibold text-[#0687C9]">
-                                                {formatRemainingTime(session.remainingTime)}
-                                              </span>
-                                            </div>
+                                        {/* Always show the timer for active sessions */}
+                                        <div className="flex items-center gap-2 bg-[#E6F3FB] px-3 py-2 rounded-md">
+                                          <TimerIcon className="h-4 w-4 text-[#0687C9]" />
+                                          <div>
+                                            <span className="text-sm text-muted-foreground">Sisa waktu:</span>
+                                            <span className="ml-1 font-semibold text-[#0687C9]">
+                                              {session.status === 'active' 
+                                                ? formatRemainingTime(session.remainingTime || 0)
+                                                : `${session.duration}:00`}
+                                            </span>
                                           </div>
-                                        )}
+                                        </div>
                                       </div>
                                     </div>
                                     
                                     <div className="flex flex-row sm:flex-col gap-2 sm:w-44">
-                                      <Button 
-                                        variant="default" 
-                                        className="flex-1 bg-[#0687C9] hover:bg-[#0572aa]"
-                                        onClick={() => window.open(attendanceApi.getQRCodeUrl(session.id), '_blank')}
-                                      >
-                                        <QrCode className="h-4 w-4 mr-2" />
-                                        Lihat QR
-                                      </Button>
+                                      {(session.type === "QR Code" || session.type === "Keduanya") && (
+                                        <Button 
+                                          variant="default" 
+                                          className="flex-1 bg-[#0687C9] hover:bg-[#0572aa]"
+                                          onClick={() => window.open(getQRCodeUrl(session.id), '_blank')}
+                                        >
+                                          <QrCode className="h-4 w-4 mr-2" />
+                                          Lihat QR
+                                        </Button>
+                                      )}
                                       <Button 
                                         variant="outline" 
                                         className="flex-1 border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
@@ -513,10 +882,6 @@ export default function AttendancePage() {
                 {activeTab === "past" && (
                   <div className="space-y-4">
                     <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-                      <div>
-                        <h4 className="text-lg font-medium text-black">Riwayat Sesi Presensi</h4>
-                        <p className="text-sm text-muted-foreground mt-1">Rekam jejak sesi presensi yang telah selesai</p>
-                      </div>
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <div className="relative w-full md:w-64">
                           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -590,8 +955,9 @@ export default function AttendancePage() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Button 
-                                    variant="ghost" 
-                                    size="sm" 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
                                     onClick={() => window.location.href = `/dashboard/lecturer/attendance/detail/${session.id}`}
                                   >
                                     <FileText className="h-4 w-4 mr-2" />

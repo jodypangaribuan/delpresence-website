@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"fmt"
+
 	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/models"
 	"gorm.io/gorm"
@@ -57,35 +58,35 @@ func (r *CourseScheduleRepository) Create(schedule models.CourseSchedule) (model
 func (r *CourseScheduleRepository) Update(schedule models.CourseSchedule) (models.CourseSchedule, error) {
 	// First, log the changes for debugging
 	fmt.Printf("Updating schedule ID=%d: student_group_id=%d\n", schedule.ID, schedule.StudentGroupID)
-	
+
 	// Use a more explicit update method to ensure student_group_id gets updated
 	tx := r.db.Begin()
-	
+
 	// Update the specific fields we want to ensure are updated
 	updateErr := tx.Model(&models.CourseSchedule{}).Where("id = ?", schedule.ID).Updates(map[string]interface{}{
-		"course_id":       schedule.CourseID,
-		"room_id":         schedule.RoomID,
-		"day":             schedule.Day,
-		"start_time":      schedule.StartTime,
-		"end_time":        schedule.EndTime,
-		"lecturer_id":     schedule.UserID,
+		"course_id":        schedule.CourseID,
+		"room_id":          schedule.RoomID,
+		"day":              schedule.Day,
+		"start_time":       schedule.StartTime,
+		"end_time":         schedule.EndTime,
+		"lecturer_id":      schedule.UserID,
 		"student_group_id": schedule.StudentGroupID,
 		"academic_year_id": schedule.AcademicYearID,
-		"capacity":        schedule.Capacity,
-		"enrolled":        schedule.Enrolled,
-		"updated_at":      schedule.UpdatedAt,
+		"capacity":         schedule.Capacity,
+		"enrolled":         schedule.Enrolled,
+		"updated_at":       schedule.UpdatedAt,
 	}).Error
-	
+
 	if updateErr != nil {
 		tx.Rollback()
 		return schedule, updateErr
 	}
-	
+
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		return schedule, err
 	}
-	
+
 	// Reload the schedule to get the fresh data
 	var updatedSchedule models.CourseSchedule
 	err := r.db.
@@ -96,10 +97,10 @@ func (r *CourseScheduleRepository) Update(schedule models.CourseSchedule) (model
 		Preload("StudentGroup").
 		Preload("AcademicYear").
 		First(&updatedSchedule, schedule.ID).Error
-	
+
 	// Log the updated schedule for debugging
 	fmt.Printf("After update, schedule ID=%d: student_group_id=%d\n", updatedSchedule.ID, updatedSchedule.StudentGroupID)
-	
+
 	return updatedSchedule, err
 }
 
@@ -126,7 +127,7 @@ func (r *CourseScheduleRepository) GetByAcademicYear(academicYearID uint) ([]mod
 // GetByLecturer returns course schedules by lecturer ID
 func (r *CourseScheduleRepository) GetByLecturer(userID uint) ([]models.CourseSchedule, error) {
 	var schedules []models.CourseSchedule
-	
+
 	// First try with lecturer_id directly
 	err := r.db.
 		Preload("Course").
@@ -137,24 +138,24 @@ func (r *CourseScheduleRepository) GetByLecturer(userID uint) ([]models.CourseSc
 		Preload("AcademicYear").
 		Where("lecturer_id = ?", userID).
 		Find(&schedules).Error
-	
+
 	if err != nil || len(schedules) == 0 {
 		// Try another approach - find assignments for this lecturer and then find schedules
 		fmt.Printf("No schedules found directly for lecturer_id=%d, trying assignments\n", userID)
-		
-			// Get lecturer record
-	lecturerRepo := NewLecturerRepository()
-	lecturer, err := lecturerRepo.GetByUserID(int(userID))
-	
-	if err == nil && lecturer.ID > 0 {
-		// Find assignments for this lecturer
-		assignmentRepo := NewLecturerAssignmentRepository()
-		assignments, err := assignmentRepo.GetByLecturerID(lecturer.UserID, 0) // 0 means all academic years
-			
+
+		// Get lecturer record
+		lecturerRepo := NewLecturerRepository()
+		lecturer, err := lecturerRepo.GetByUserID(int(userID))
+
+		if err == nil && lecturer.ID > 0 {
+			// Find assignments for this lecturer
+			assignmentRepo := NewLecturerAssignmentRepository()
+			assignments, err := assignmentRepo.GetByLecturerID(lecturer.UserID, 0) // 0 means all academic years
+
 			if err == nil && len(assignments) > 0 {
 				// For each assignment, find schedules
 				var allSchedules []models.CourseSchedule
-				
+
 				for _, assignment := range assignments {
 					var courseSchedules []models.CourseSchedule
 					r.db.
@@ -166,24 +167,24 @@ func (r *CourseScheduleRepository) GetByLecturer(userID uint) ([]models.CourseSc
 						Preload("AcademicYear").
 						Where("course_id = ?", assignment.CourseID).
 						Find(&courseSchedules)
-					
+
 					allSchedules = append(allSchedules, courseSchedules...)
 				}
-				
+
 				if len(allSchedules) > 0 {
 					return allSchedules, nil
 				}
 			}
 		}
 	}
-	
+
 	return schedules, err
 }
 
 // GetByLecturerAndAcademicYear returns course schedules by lecturer ID and academic year ID
 func (r *CourseScheduleRepository) GetByLecturerAndAcademicYear(userID uint, academicYearID uint) ([]models.CourseSchedule, error) {
 	var schedules []models.CourseSchedule
-	
+
 	// First try with lecturer_id directly
 	err := r.db.
 		Preload("Course").
@@ -194,24 +195,24 @@ func (r *CourseScheduleRepository) GetByLecturerAndAcademicYear(userID uint, aca
 		Preload("AcademicYear").
 		Where("lecturer_id = ? AND academic_year_id = ?", userID, academicYearID).
 		Find(&schedules).Error
-	
+
 	if err != nil || len(schedules) == 0 {
 		// Try another approach - find assignments for this lecturer and then find schedules
 		fmt.Printf("No schedules found directly for lecturer_id=%d and academic_year_id=%d, trying assignments\n", userID, academicYearID)
-		
-			// Get lecturer record
-	lecturerRepo := NewLecturerRepository()
-	lecturer, err := lecturerRepo.GetByUserID(int(userID))
-	
-	if err == nil && lecturer.ID > 0 {
-		// Find assignments for this lecturer
-		assignmentRepo := NewLecturerAssignmentRepository()
-		assignments, err := assignmentRepo.GetByLecturerID(lecturer.UserID, academicYearID)
-			
+
+		// Get lecturer record
+		lecturerRepo := NewLecturerRepository()
+		lecturer, err := lecturerRepo.GetByUserID(int(userID))
+
+		if err == nil && lecturer.ID > 0 {
+			// Find assignments for this lecturer
+			assignmentRepo := NewLecturerAssignmentRepository()
+			assignments, err := assignmentRepo.GetByLecturerID(lecturer.UserID, academicYearID)
+
 			if err == nil && len(assignments) > 0 {
 				// For each assignment, find schedules
 				var allSchedules []models.CourseSchedule
-				
+
 				for _, assignment := range assignments {
 					var courseSchedules []models.CourseSchedule
 					r.db.
@@ -223,17 +224,17 @@ func (r *CourseScheduleRepository) GetByLecturerAndAcademicYear(userID uint, aca
 						Preload("AcademicYear").
 						Where("course_id = ? AND academic_year_id = ?", assignment.CourseID, academicYearID).
 						Find(&courseSchedules)
-					
+
 					allSchedules = append(allSchedules, courseSchedules...)
 				}
-				
+
 				if len(allSchedules) > 0 {
 					return allSchedules, nil
 				}
 			}
 		}
 	}
-	
+
 	return schedules, err
 }
 
@@ -319,15 +320,15 @@ func (r *CourseScheduleRepository) CheckScheduleConflict(roomID uint, day string
 		Where("room_id = ? AND day = ?", roomID, day).
 		Where("(start_time < ? AND end_time > ?) OR (start_time < ? AND end_time > ?) OR (start_time >= ? AND end_time <= ?)",
 			endTime, startTime, endTime, startTime, startTime, endTime)
-	
+
 	// Exclude the current schedule if updating
 	if scheduleID != nil {
 		query = query.Where("id <> ?", *scheduleID)
 	}
-	
+
 	var count int64
 	err := query.Count(&count).Error
-	
+
 	return count > 0, err
 }
 
@@ -337,15 +338,15 @@ func (r *CourseScheduleRepository) CheckLecturerScheduleConflict(userID uint, da
 		Where("lecturer_id = ? AND day = ?", userID, day).
 		Where("(start_time < ? AND end_time > ?) OR (start_time < ? AND end_time > ?) OR (start_time >= ? AND end_time <= ?)",
 			endTime, startTime, endTime, startTime, startTime, endTime)
-	
+
 	// Exclude the current schedule if updating
 	if scheduleID != nil {
 		query = query.Where("id <> ?", *scheduleID)
 	}
-	
+
 	var count int64
 	err := query.Count(&count).Error
-	
+
 	return count > 0, err
 }
 
@@ -355,15 +356,15 @@ func (r *CourseScheduleRepository) CheckStudentGroupScheduleConflict(studentGrou
 		Where("student_group_id = ? AND day = ?", studentGroupID, day).
 		Where("(start_time < ? AND end_time > ?) OR (start_time < ? AND end_time > ?) OR (start_time >= ? AND end_time <= ?)",
 			endTime, startTime, endTime, startTime, startTime, endTime)
-	
+
 	// Exclude the current schedule if updating
 	if scheduleID != nil {
 		query = query.Where("id <> ?", *scheduleID)
 	}
-	
+
 	var count int64
 	err := query.Count(&count).Error
-	
+
 	return count > 0, err
 }
 
@@ -376,26 +377,26 @@ func (r *CourseScheduleRepository) UpdateSchedulesForCourseInAcademicYear(course
 	if err != nil {
 		return err
 	}
-	
+
 	// If no schedules found, there's nothing to update
 	if len(schedules) == 0 {
 		return nil
 	}
-	
+
 	// Update schedules one by one to ensure proper handling of associations
 	for _, schedule := range schedules {
 		// Update the lecturer_id field
 		schedule.UserID = newUserID
-		
+
 		// Save the updated schedule - this will trigger any hooks and handle associations
 		if err := r.db.Save(&schedule).Error; err != nil {
 			return err
 		}
-		
+
 		// Log successful update
 		fmt.Printf("Updated schedule ID %d to use lecturer_id %d\n", schedule.ID, newUserID)
 	}
-	
+
 	return nil
 }
 
@@ -426,18 +427,18 @@ func (r *CourseScheduleRepository) UpdateSchedulesForRoom(roomID uint, capacity 
 	result := r.db.Model(&models.CourseSchedule{}).
 		Where("room_id = ?", roomID).
 		Update("capacity", capacity)
-	
+
 	if result.Error != nil {
 		return result.Error
 	}
-	
-	fmt.Printf("Updated %d course schedules for room_id=%d with capacity=%d\n", 
+
+	fmt.Printf("Updated %d course schedules for room_id=%d with capacity=%d\n",
 		result.RowsAffected, roomID, capacity)
-	
+
 	return nil
 }
 
 // DB returns the database instance
 func (r *CourseScheduleRepository) DB() *gorm.DB {
 	return r.db
-} 
+}

@@ -1,252 +1,349 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Filter, UserCog, Calendar, Trash2, User, AlertCircle } from "lucide-react";
+import { Search, Filter, UserCog, Calendar, Trash2, User, AlertCircle, Loader2, UserMinus, MoreHorizontal } from "lucide-react";
 import { SelectValue, SelectTrigger, SelectContent, SelectItem, Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { api } from "@/utils/api";
 import { toast } from "sonner";
+import axios from "axios";
+import { API_URL } from "@/utils/env";
+
+interface Course {
+  id: number;
+  uuid: string;
+  code: string;
+  name: string;
+  semester: number;
+}
 
 interface Schedule {
   id: number;
-  courseCode: string;
-  courseName: string;
+  course_id: number;
+  course_code: string;
+  course_name: string;
   day: string;
   time: string;
   room: string;
   assigned: boolean;
-  assistantId?: number;
-  assistantName?: string;
+  assistant_id?: number;
+  assistant_name?: string;
 }
 
-interface Assistant {
+interface Employee {
   id: number;
-  name: string;
-  nim: string;
+  employee_id: number;
+  user_id: number;
+  full_name: string;
+  nip: string;
   email: string;
-  program: string;
-  semester: number;
+  position: string;
+  department: string;
+  employment_type: string;
+}
+
+interface TeachingAssistantAssignment {
+  id: number;
+  user_id: number;
+  course_id: number;
+  academic_year_id: number;
+  assigned_by_id: number;
+  created_at: string;
+  updated_at: string;
+  
+  // Nested objects (from response)
+  employee?: Employee;
+  course?: Course;
+  
+  // Response fields
+  employee_name?: string;
+  employee_nip?: string;
+  employee_email?: string;
+  employee_position?: string;
+  course_name?: string;
+  course_code?: string;
+  course_semester?: number;
 }
 
 export default function AssistantsPage() {
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [assistants, setAssistants] = useState<Assistant[]>([]);
-  const [filteredAssistants, setFilteredAssistants] = useState<Assistant[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [assignments, setAssignments] = useState<TeachingAssistantAssignment[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [scheduleSearchTerm, setScheduleSearchTerm] = useState("");
-  const [dayFilter, setDayFilter] = useState("all");
-  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+  const [courseSearchTerm, setCourseSearchTerm] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const pageSizeOptions = [5, 10, 20, 50];
+  
+  // Token for API requests
+  const token = typeof window !== 'undefined' ? 
+    localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
 
-  // Mock data for development
+  // Reset pagination when dialog opens, search term changes, or page size changes
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setSchedules([
-        {
-          id: 1,
-          courseCode: "IF210",
-          courseName: "Algoritma & Pemrograman",
-          day: "Senin",
-          time: "08:00 - 10:30",
-          room: "Ruang Lab 3",
-          assigned: true,
-          assistantId: 101,
-          assistantName: "Alexander Manurung"
-        },
-        {
-          id: 2,
-          courseCode: "IF310",
-          courseName: "Basis Data",
-          day: "Selasa",
-          time: "13:00 - 15:30",
-          room: "Ruang Lab 1",
-          assigned: false
-        },
-        {
-          id: 3,
-          courseCode: "IF402",
-          courseName: "Pemrograman Mobile",
-          day: "Rabu",
-          time: "10:00 - 12:30",
-          room: "Ruang Lab 2",
-          assigned: false
-        },
-        {
-          id: 4,
-          courseCode: "IF240",
-          courseName: "Struktur Data",
-          day: "Kamis",
-          time: "09:00 - 11:30",
-          room: "Ruang Lab 4",
-          assigned: true,
-          assistantId: 102,
-          assistantName: "Jessica Sitanggang"
+    setCurrentPage(1);
+  }, [isDialogOpen, searchTerm, pageSize]);
+
+  // Fetch all lecturer's courses
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setIsLoading(true);
+      try {
+        const response = await axios.get(`${API_URL}/api/lecturer/courses`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.data.status === "success") {
+          setCourses(response.data.data.map((assignment: any) => assignment.course));
         }
-      ]);
-
-      setAssistants([
-        {
-          id: 101,
-          name: "Alexander Manurung",
-          nim: "12S20001",
-          email: "alexander@del.ac.id",
-          program: "S1 Informatika",
-          semester: 7
-        },
-        {
-          id: 102,
-          name: "Jessica Sitanggang",
-          nim: "12S20002",
-          email: "jessica@del.ac.id",
-          program: "S1 Informatika",
-          semester: 7
-        },
-        {
-          id: 103,
-          name: "David Hutapea",
-          nim: "12S20003",
-          email: "david@del.ac.id",
-          program: "S1 Sistem Informasi",
-          semester: 5
-        },
-        {
-          id: 104,
-          name: "Sarah Sibuea",
-          nim: "12S20004",
-          email: "sarah@del.ac.id",
-          program: "S1 Informatika",
-          semester: 5
-        },
-        {
-          id: 105,
-          name: "Jonathan Simanjuntak",
-          nim: "12S20005",
-          email: "jonathan@del.ac.id",
-          program: "S1 Informatika",
-          semester: 7
+      } catch (error) {
+        console.error("Error fetching courses:", error);
+        toast.error("Gagal memuat data mata kuliah");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCourses();
+  }, [token]);
+  
+  // Fetch teaching assistant assignments
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      setIsLoading(true);
+      try {
+        const response = await axios.get(`${API_URL}/api/lecturer/ta-assignments`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.data.status === "success") {
+          setAssignments(response.data.data);
         }
-      ]);
-
-      setFilteredAssistants([...assistants]);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
-
-  // Filter assistants based on search term
+      } catch (error) {
+        console.error("Error fetching assignments:", error);
+        toast.error("Gagal memuat data penugasan asisten dosen");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchAssignments();
+  }, [token]);
+  
+  // Filter employees based on search term
   useEffect(() => {
     if (searchTerm === "") {
-      setFilteredAssistants(assistants);
+      setFilteredEmployees(employees);
     } else {
-      const filtered = assistants.filter(
-        (assistant) =>
-          assistant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          assistant.nim.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          assistant.email.toLowerCase().includes(searchTerm.toLowerCase())
+      const filtered = employees.filter(
+        (employee) =>
+          employee.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          employee.nip.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          employee.email.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      setFilteredAssistants(filtered);
+      setFilteredEmployees(filtered);
     }
-  }, [searchTerm, assistants]);
+  }, [searchTerm, employees]);
 
-  // Filter schedules based on search term and day filter
-  const filteredSchedules = schedules.filter(schedule => {
-    const matchesSearch = scheduleSearchTerm === "" || 
-      schedule.courseName.toLowerCase().includes(scheduleSearchTerm.toLowerCase()) ||
-      schedule.courseCode.toLowerCase().includes(scheduleSearchTerm.toLowerCase());
+  // Filter courses based on search term
+  const filteredCourses = courses.filter(course => {
+    const matchesSearch = courseSearchTerm === "" || 
+      course.name.toLowerCase().includes(courseSearchTerm.toLowerCase()) ||
+      course.code.toLowerCase().includes(courseSearchTerm.toLowerCase());
     
-    const matchesDay = dayFilter === "all" || schedule.day.toLowerCase() === dayFilter.toLowerCase();
-    
-    return matchesSearch && matchesDay;
+    return matchesSearch;
   });
 
-  // Function to open assignment dialog
-  const openAssignmentDialog = (schedule: Schedule) => {
-    setSelectedSchedule(schedule);
-    setIsDialogOpen(true);
+  // Get paginated employees
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredEmployees.slice(startIndex, startIndex + pageSize);
+  }, [filteredEmployees, currentPage, pageSize]);
+
+  // Calculate total pages
+  const totalPages = useMemo(() => 
+    Math.ceil(filteredEmployees.length / pageSize), 
+    [filteredEmployees, pageSize]
+  );
+
+  // Navigation functions
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      // Scroll to top of list when changing pages
+      if (typeof document !== 'undefined') {
+        const listContainer = document.querySelector('.max-h-\\[300px\\]');
+        if (listContainer) {
+          listContainer.scrollTop = 0;
+        }
+      }
+    }
   };
 
-  // Function to assign assistant to schedule
-  const assignAssistant = async (assistantId: number) => {
-    if (!selectedSchedule) return;
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      // Scroll to top of list when changing pages
+      if (typeof document !== 'undefined') {
+        const listContainer = document.querySelector('.max-h-\\[300px\\]');
+        if (listContainer) {
+          listContainer.scrollTop = 0;
+        }
+      }
+    }
+  };
+
+  // Function to open assignment dialog
+  const openAssignmentDialog = async (course: Course) => {
+    setSelectedCourse(course);
+    setIsDialogOpen(true);
+    setIsLoadingEmployees(true);
+    
+    try {
+      // Fetch available teaching assistants for this course
+      const response = await axios.get(`${API_URL}/api/lecturer/courses/${course.id}/available-teaching-assistants`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.data.status === "success") {
+        setEmployees(response.data.data);
+        setFilteredEmployees(response.data.data);
+      } else {
+        setEmployees([]);
+        setFilteredEmployees([]);
+      }
+    } catch (error) {
+      console.error("Error fetching available teaching assistants:", error);
+      toast.error("Gagal memuat data asisten dosen yang tersedia");
+      setEmployees([]);
+      setFilteredEmployees([]);
+    } finally {
+      setIsLoadingEmployees(false);
+    }
+  };
+
+  // Function to assign teaching assistant to course
+  const assignAssistant = async (employeeId: number) => {
+    if (!selectedCourse) return;
     
     setIsAssigning(true);
     try {
-      // In a real implementation, you would call the API to assign the assistant
-      // await api(`/lecturer/schedules/${selectedSchedule.id}/assign`, {
-      //   method: 'POST',
-      //   body: { assistantId }
-      // });
+      const response = await axios.post(
+        `${API_URL}/api/lecturer/ta-assignments`, 
+        { 
+          employee_id: employeeId,
+          course_id: selectedCourse.id
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (response.data.status === "success") {
+        // Refresh assignments list
+        const assignmentsResponse = await axios.get(`${API_URL}/api/lecturer/ta-assignments`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (assignmentsResponse.data.status === "success") {
+          setAssignments(assignmentsResponse.data.data);
+        }
+        
+        toast.success(`Asisten berhasil ditugaskan ke mata kuliah ${selectedCourse.code}`);
+      } else {
+        toast.error("Gagal menugaskan asisten dosen");
+      }
       
-      // Find assistant info
-      const assistant = assistants.find(a => a.id === assistantId);
-      
-      // Update schedules state
-      setSchedules(schedules.map(schedule => 
-        schedule.id === selectedSchedule.id 
-          ? { 
-              ...schedule, 
-              assigned: true, 
-              assistantId: assistantId,
-              assistantName: assistant?.name || "Unknown"
-            } 
-          : schedule
-      ));
-      
-      toast.success(`Asisten berhasil ditugaskan ke mata kuliah ${selectedSchedule.courseCode}`);
       setIsDialogOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error assigning assistant:", error);
+      
+      // Show specific error message if available
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
       toast.error("Gagal menugaskan asisten dosen");
+      }
     } finally {
       setIsAssigning(false);
     }
   };
 
-  // Function to remove assistant from schedule
-  const removeAssistant = async (scheduleId: number) => {
+  // Function to remove assistant from course
+  const removeAssistant = async (assignmentId: number) => {
     try {
-      // In a real implementation, you would call the API to remove the assistant
-      // await api(`/lecturer/schedules/${scheduleId}/remove-assistant`, {
-      //   method: 'POST'
-      // });
+      const response = await axios.delete(`${API_URL}/api/lecturer/ta-assignments/${assignmentId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Update schedules state
-      setSchedules(schedules.map(schedule => 
-        schedule.id === scheduleId 
-          ? { 
-              ...schedule, 
-              assigned: false,
-              assistantId: undefined,
-              assistantName: undefined
-            } 
-          : schedule
-      ));
-      
-      toast.success("Asisten dosen berhasil dihapus dari mata kuliah");
+      if (response.data.status === "success") {
+        // Update assignments state
+        setAssignments(assignments.filter(assignment => assignment.id !== assignmentId));
+        toast.success("Asisten dosen berhasil dihapus dari mata kuliah");
+      } else {
+        toast.error("Gagal menghapus asisten dosen");
+      }
     } catch (error) {
       console.error("Error removing assistant:", error);
       toast.error("Gagal menghapus asisten dosen");
     }
   };
 
+  // Map assignments to courses for display
+  const coursesWithAssignments = filteredCourses.map(course => {
+    const assignment = assignments.find(a => a.course_id === course.id);
+    return {
+      ...course,
+      assigned: !!assignment && assignment.user_id !== 0,
+      has_assignment: !!assignment, // Track if there's any assignment record
+      assignment_id: assignment?.id,
+      assistant_id: assignment?.user_id,
+      assistant_name: assignment?.employee_name || assignment?.employee?.full_name,
+      is_released: !!assignment && assignment.user_id === 0
+    };
+  });
+
+  // Handle page size change
+  const handlePageSizeChange = (value: string) => {
+    setPageSize(Number(value));
+  };
+
   return (
     <div className="space-y-6">
       <Card className="border border-gray-100 shadow-sm">
         <CardContent className="p-6">
-          {/* Schedule Table with Assistant Assignments */}
           <div className="bg-white rounded-md border border-gray-100 shadow-sm">
             <div className="p-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
@@ -254,30 +351,17 @@ export default function AssistantsPage() {
                   <h3 className="text-xl font-semibold text-black">Kelola Asisten Dosen</h3>
                   <p className="text-sm text-muted-foreground mt-1">Kelola penugasan asisten dosen untuk mata kuliah yang Anda ampu</p>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
-                  <div className="relative w-full md:w-64">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Cari mata kuliah..."
-                      className="pl-8"
-                      value={scheduleSearchTerm}
-                      onChange={(e) => setScheduleSearchTerm(e.target.value)}
-                    />
-                  </div>
-                  <Select value={dayFilter} onValueChange={setDayFilter}>
-                    <SelectTrigger className="w-full md:w-[180px]">
-                      <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Filter Hari" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Hari</SelectItem>
-                      <SelectItem value="Senin">Senin</SelectItem>
-                      <SelectItem value="Selasa">Selasa</SelectItem>
-                      <SelectItem value="Rabu">Rabu</SelectItem>
-                      <SelectItem value="Kamis">Kamis</SelectItem>
-                      <SelectItem value="Jumat">Jumat</SelectItem>
-                    </SelectContent>
-                  </Select>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-between mb-4">
+                <div className="relative w-full sm:w-[40%]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari mata kuliah..."
+                    className="pl-10"
+                    value={courseSearchTerm}
+                    onChange={(e) => setCourseSearchTerm(e.target.value)}
+                  />
                 </div>
               </div>
                   
@@ -293,30 +377,26 @@ export default function AssistantsPage() {
                         <TableHead className="w-[50px] font-bold text-black">No</TableHead>
                         <TableHead className="w-[80px] font-bold text-black">Kode MK</TableHead>
                         <TableHead className="font-bold text-black">Mata Kuliah</TableHead>
-                        <TableHead className="font-bold text-black">Hari</TableHead>
-                        <TableHead className="font-bold text-black">Jam</TableHead>
-                        <TableHead className="font-bold text-black">Ruangan</TableHead>
+                        <TableHead className="font-bold text-black">Semester</TableHead>
                         <TableHead className="font-bold text-black">Asisten Dosen</TableHead>
                         <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredSchedules.map((schedule, index) => (
-                        <TableRow key={schedule.id}>
+                      {coursesWithAssignments.map((course, index) => (
+                        <TableRow key={course.id}>
                           <TableCell>{index + 1}</TableCell>
-                          <TableCell className="font-medium">{schedule.courseCode}</TableCell>
-                          <TableCell>{schedule.courseName}</TableCell>
-                          <TableCell>{schedule.day}</TableCell>
-                          <TableCell>{schedule.time}</TableCell>
-                          <TableCell>{schedule.room}</TableCell>
+                          <TableCell className="font-medium">{course.code}</TableCell>
+                          <TableCell>{course.name}</TableCell>
+                          <TableCell>{course.semester}</TableCell>
                           <TableCell>
-                            {schedule.assigned ? (
+                            {course.assigned ? (
                               <div className="flex items-center">
                                 <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-2">
                                   <User className="h-4 w-4 text-blue-800" />
                                 </div>
                                 <div>
-                                  <span className="font-medium">{schedule.assistantName}</span>
+                                  <span className="font-medium">{course.assistant_name}</span>
                                   <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
                                     Ditugaskan
                                   </Badge>
@@ -332,22 +412,22 @@ export default function AssistantsPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            {schedule.assigned ? (
+                            {course.has_assignment ? (
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                onClick={() => removeAssistant(schedule.id)}
+                                onClick={() => removeAssistant(course.assignment_id!)}
                                 className="text-red-500 hover:text-red-700 hover:bg-red-50"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
-                                Hapus
+                                Hapus Penugasan
                               </Button>
                             ) : (
                               <Button 
                                 variant="default" 
                                 size="sm"
                                 className="bg-[#0687C9] hover:bg-[#0572aa]"
-                                onClick={() => openAssignmentDialog(schedule)}
+                                onClick={() => openAssignmentDialog(course)}
                               >
                                 <UserCog className="h-4 w-4 mr-2" />
                                 Tugaskan
@@ -356,16 +436,16 @@ export default function AssistantsPage() {
                           </TableCell>
                         </TableRow>
                       ))}
-                      {filteredSchedules.length === 0 && (
+                      {coursesWithAssignments.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="h-32 text-center">
+                          <TableCell colSpan={6} className="h-32 text-center">
                             <div className="flex flex-col items-center justify-center text-muted-foreground">
                               <Calendar className="h-10 w-10 text-gray-300 mb-2" />
-                              <p>{schedules.length === 0 ? 
-                                "Tidak ada jadwal yang tersedia" : 
-                                "Tidak ada jadwal yang sesuai dengan filter"}
+                              <p>{courses.length === 0 ? 
+                                "Tidak ada mata kuliah yang tersedia" : 
+                                "Tidak ada mata kuliah yang sesuai dengan filter"}
                               </p>
-                              <p className="text-sm">Jadwal akan muncul di sini saat tersedia</p>
+                              <p className="text-sm">Mata kuliah akan muncul di sini saat tersedia</p>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -385,16 +465,14 @@ export default function AssistantsPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-black">Pilih Asisten Dosen</DialogTitle>
             <DialogDescription>
-              {selectedSchedule && (
-                <div className="mt-2">
-                  <p className="font-medium">{selectedSchedule.courseCode}: {selectedSchedule.courseName}</p>
-                  <div className="flex items-center text-sm text-muted-foreground mt-1">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    <span>{selectedSchedule.day}, {selectedSchedule.time}</span>
-                  </div>
-                </div>
-              )}
+              Pilih asisten dosen untuk mata kuliah ini
             </DialogDescription>
+            {selectedCourse && (
+              <div className="mt-2">
+                <p className="font-medium">{selectedCourse.code}: {selectedCourse.name}</p>
+                <p className="text-sm text-muted-foreground mt-1">Semester {selectedCourse.semester}</p>
+              </div>
+            )}
           </DialogHeader>
           
           <div className="relative w-full mb-4">
@@ -408,41 +486,119 @@ export default function AssistantsPage() {
           </div>
           
           <div className="max-h-[300px] overflow-y-auto">
-            {filteredAssistants.length === 0 ? (
+            {isLoadingEmployees ? (
+              <div className="flex justify-center py-8">
+                <div className="flex flex-col items-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#0687C9] mb-2" />
+                  <span className="text-sm text-muted-foreground">Memuat data asisten dosen...</span>
+                </div>
+              </div>
+            ) : filteredEmployees.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground flex flex-col items-center">
                 <AlertCircle className="h-10 w-10 text-amber-500 mb-2" />
-                <p>Tidak ada asisten dosen yang sesuai dengan pencarian</p>
-                <p className="text-sm mt-1">Coba dengan kata kunci lain</p>
+                <p>Tidak ada asisten dosen yang tersedia</p>
+                {searchTerm ? (
+                  <p className="text-sm mt-1">Tidak ada hasil untuk pencarian "{searchTerm}"</p>
+                ) : (
+                  <p className="text-sm mt-1">Asisten dosen harus disinkronkan terlebih dahulu oleh admin</p>
+                )}
               </div>
             ) : (
+              <>
+                <div className="text-sm text-muted-foreground mb-2">
+                  Menampilkan {paginatedEmployees.length} dari {filteredEmployees.length} asisten dosen
+                </div>
               <div className="space-y-2">
-                {filteredAssistants.map((assistant) => (
+                  {paginatedEmployees.map((employee) => (
                   <div 
-                    key={assistant.id}
+                      key={employee.id}
                     className="flex items-center p-3 border border-gray-100 hover:bg-[#E6F3FB] rounded-lg cursor-pointer transition-colors"
-                    onClick={() => assignAssistant(assistant.id)}
+                      onClick={() => assignAssistant(employee.id)}
                   >
                     <div className="h-10 w-10 rounded-full bg-[#E6F3FB] flex items-center justify-center mr-3">
                       <User className="h-5 w-5 text-[#0687C9]" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{assistant.name}</p>
+                        <p className="font-medium">{employee.full_name}</p>
                       <div className="flex flex-wrap items-center text-sm text-muted-foreground">
-                        <span>{assistant.nim}</span>
+                          <span>{employee.nip || "NIP: -"}</span>
+                          {employee.position && (
+                            <>
+                              <span className="mx-1.5">•</span>
+                              <span>{employee.position}</span>
+                            </>
+                          )}
+                          {employee.department && (
+                            <>
+                              <span className="mx-1.5">•</span>
+                              <span>{employee.department}</span>
+                            </>
+                          )}
                         <span className="mx-1.5">•</span>
-                        <span>{assistant.program}</span>
-                        <Badge className="ml-2 bg-[#E6F3FB] text-[#0687C9] border-[#0687C9]/20">Semester {assistant.semester}</Badge>
-                      </div>
+                          <span className="text-xs text-blue-600">User ID: {employee.user_id}</span>
+                        </div>
                     </div>
                   </div>
                 ))}
               </div>
+              </>
             )}
           </div>
           
+          {/* Pagination controls - only show if there are multiple pages */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row gap-4 mt-4">
+              <div className="flex justify-between items-center w-full">
+                <Button 
+                  variant="outline" 
+                  className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]" 
+                  disabled={currentPage === 1 || isAssigning}
+                  onClick={goToPreviousPage}
+                >
+                  <span className="mr-1">←</span> Sebelumnya
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Halaman {currentPage} dari {totalPages}
+                </span>
+                <Button 
+                  variant="outline" 
+                  className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]" 
+                  disabled={currentPage === totalPages || isAssigning}
+                  onClick={goToNextPage}
+                >
+                  Selanjutnya <span className="ml-1">→</span>
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  Tampilkan:
+                </span>
+                <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageSizeOptions.map(size => (
+                      <SelectItem key={size} value={size.toString()}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
           <DialogFooter className="gap-2">
             <DialogClose asChild>
-              <Button variant="outline" className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]">Batal</Button>
+              <Button 
+                variant="outline" 
+                className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]" 
+                disabled={isAssigning}
+              >
+                Batal
+              </Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>

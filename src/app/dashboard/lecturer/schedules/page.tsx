@@ -55,7 +55,6 @@ export default function LecturerSchedulePage() {
   const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [dayFilter, setDayFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
@@ -162,7 +161,7 @@ export default function LecturerSchedulePage() {
     });
   };
 
-  // Filter schedules based on search term, day and status filters
+  // Filter schedules based on search term and day filter
   useEffect(() => {
     let filtered = schedules;
     
@@ -181,13 +180,8 @@ export default function LecturerSchedulePage() {
       filtered = filtered.filter(schedule => schedule.day.toLowerCase() === dayFilter.toLowerCase());
     }
     
-    // Apply status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(schedule => schedule.status === statusFilter);
-    }
-    
     setFilteredSchedules(filtered);
-  }, [searchTerm, dayFilter, statusFilter, schedules]);
+  }, [searchTerm, dayFilter, schedules]);
 
   // Function to view schedule details
   const viewScheduleDetails = (schedule: Schedule) => {
@@ -211,9 +205,21 @@ export default function LecturerSchedulePage() {
                   <h3 className="text-xl font-semibold text-black">Jadwal Mengajar</h3>
                   <p className="text-sm text-muted-foreground mt-1">Daftar jadwal mengajar mata kuliah yang Anda ampu</p>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:space-x-2">
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-between mb-4">
+                <div className="relative w-full sm:w-[40%]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari mata kuliah..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-3 items-center">
                   <Select value={selectedAcademicYear.toString()} onValueChange={(value) => setSelectedAcademicYear(value === 'all' ? 'all' : parseInt(value))}>
-                    <SelectTrigger className="w-full md:w-[200px]">
+                    <SelectTrigger className="w-[200px] h-10">
                       <Calendar className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Tahun Akademik" />
                     </SelectTrigger>
@@ -226,18 +232,8 @@ export default function LecturerSchedulePage() {
                       ))}
                     </SelectContent>
                   </Select>
-
-                  <div className="relative w-full md:w-64">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Cari mata kuliah..."
-                      className="pl-8"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
                   <Select value={dayFilter} onValueChange={setDayFilter}>
-                    <SelectTrigger className="w-full md:w-[140px]">
+                    <SelectTrigger className="w-[150px] h-10">
                       <Filter className="h-4 w-4 mr-2" />
                       <SelectValue placeholder="Filter Hari" />
                     </SelectTrigger>
@@ -248,19 +244,6 @@ export default function LecturerSchedulePage() {
                       <SelectItem value="rabu">Rabu</SelectItem>
                       <SelectItem value="kamis">Kamis</SelectItem>
                       <SelectItem value="jumat">Jumat</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full md:w-[140px]">
-                      <Clock className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Status</SelectItem>
-                      <SelectItem value="upcoming">Akan Datang</SelectItem>
-                      <SelectItem value="today">Hari Ini</SelectItem>
-                      <SelectItem value="active">Sedang Berlangsung</SelectItem>
-                      <SelectItem value="completed">Selesai</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -390,12 +373,10 @@ export default function LecturerSchedulePage() {
               <div className="mt-6 pt-4 border-t border-gray-100">
                 <div className="flex justify-between">
                   <p className="text-sm font-medium">Peran Anda: <span className="text-[#0687C9]">Dosen Pengampu</span></p>
-                  {(selectedSchedule.status === "today" || selectedSchedule.status === "upcoming") && (
-                    <Button variant="outline" size="sm" className="text-[#0687C9] hover:bg-[#E6F3FB] border-[#0687C9]/20">
-                      <FileCheck className="h-4 w-4 mr-2" />
-                      Laporan Absensi
-                    </Button>
-                  )}
+                  <Button variant="outline" size="sm" className="text-[#0687C9] hover:bg-[#E6F3FB] border-[#0687C9]/20">
+                    <FileCheck className="h-4 w-4 mr-2" />
+                    Laporan Absensi
+                  </Button>
                 </div>
               </div>
             </div>
@@ -405,12 +386,10 @@ export default function LecturerSchedulePage() {
             <Button variant="outline" className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]" onClick={() => setShowDetails(false)}>
               Tutup
             </Button>
-            {selectedSchedule && (selectedSchedule.status === "today" || selectedSchedule.status === "active") && (
-              <Button className="bg-[#0687C9] hover:bg-[#0572aa]">
-                <Clock className="h-4 w-4 mr-2" />
-                Mulai Mengajar
-              </Button>
-            )}
+            <Button className="bg-[#0687C9] hover:bg-[#0572aa]">
+              <Clock className="h-4 w-4 mr-2" />
+              Mulai Mengajar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
