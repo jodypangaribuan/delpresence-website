@@ -157,9 +157,26 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
         ),
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: _fetchSchedules,
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(100),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(100),
+                onTap: () {
+                  _fetchAcademicYears(); // This fetches academic years first, then schedules
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: Icon(
+                    Icons.refresh_rounded,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
         bottom: PreferredSize(
@@ -174,7 +191,6 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
       body: Column(
         children: [
           _buildTodayHeader(),
-          _buildAcademicYearSelector(),
           Expanded(
             child: _buildScheduleList(),
           ),
@@ -198,29 +214,59 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-      color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Colors.grey[200]!, width: 1),
-        ),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            offset: const Offset(0, 2),
+            blurRadius: 5,
+            spreadRadius: 0,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Hari Ini',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today_rounded,
+                size: 16,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Jadwal Hari Ini',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            formattedDate,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
-            ),
+          ),
           const SizedBox(height: 4),
           Text(
-              formattedDate,
-              style: TextStyle(
-                fontSize: 14,
+            // Get active academic year name
+            _academicYears.isNotEmpty 
+                ? _academicYears.firstWhere(
+                    (year) => year['is_active'] == true,
+                    orElse: () => _academicYears.first,
+                  )['name'].toString()
+                : 'Tahun Akademik Aktif',
+            style: TextStyle(
+              fontSize: 12,
               color: Colors.grey[600],
             ),
           ),
@@ -248,33 +294,6 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
     }
   }
   
-  Widget _buildAcademicYearSelector() {
-    if (_academicYears.isEmpty) return const SizedBox.shrink();
-    
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: DropdownButton<int>(
-        isExpanded: true,
-        value: _selectedAcademicYearId,
-        hint: const Text('Pilih Tahun Akademik'),
-        onChanged: (int? newValue) {
-          setState(() {
-            _selectedAcademicYearId = newValue;
-          });
-          _fetchSchedules();
-        },
-        items: _academicYears.map<DropdownMenuItem<int>>((year) {
-          return DropdownMenuItem<int>(
-            value: year['id'],
-            child: Text(
-              '${year['name']} ${year['is_active'] == true ? "(Aktif)" : ""}',
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
   Widget _buildScheduleList() {
     if (_isLoading) {
       return const Center(
@@ -329,35 +348,6 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
                 color: Colors.grey,
               ),
             ),
-            if (_academicYears.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              const Text(
-                'Pilih Tahun Akademik:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              DropdownButton<int>(
-                value: _selectedAcademicYearId,
-                hint: const Text('Pilih Tahun Akademik'),
-                onChanged: (int? newValue) {
-                  setState(() {
-                    _selectedAcademicYearId = newValue;
-                  });
-                  _fetchSchedules();
-                },
-                items: _academicYears.map<DropdownMenuItem<int>>((year) {
-                  return DropdownMenuItem<int>(
-                    value: year['id'],
-                    child: Text(
-                      '${year['name']} ${year['is_active'] == true ? "(Aktif)" : ""}',
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
           ],
         ),
       );

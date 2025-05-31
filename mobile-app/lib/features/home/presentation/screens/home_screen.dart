@@ -19,6 +19,146 @@ import 'course_list_screen.dart';
 import 'profile_screen.dart';
 import '../../../../features/settings/presentation/screens/settings_screen.dart';
 import 'dart:async';
+import 'package:flutter/cupertino.dart';
+import 'dart:math' as math;
+
+// Custom refresh indicator controller class
+class IndicatorController extends ChangeNotifier {
+  bool _isLoading = false;
+  double _value = 0.0;
+
+  bool get isLoading => _isLoading;
+  double get value => _value;
+
+  set value(double val) {
+    _value = val;
+    notifyListeners();
+  }
+
+  void startLoading() {
+    _isLoading = true;
+    notifyListeners();
+  }
+
+  void stopLoading() {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+// Custom refresh indicator widget
+class CustomRefreshIndicator extends StatefulWidget {
+  final Widget child;
+  final Future<void> Function() onRefresh;
+  final Widget Function(BuildContext, Widget, IndicatorController) builder;
+
+  const CustomRefreshIndicator({
+    Key? key,
+    required this.child,
+    required this.onRefresh,
+    required this.builder,
+  }) : super(key: key);
+
+  @override
+  State<CustomRefreshIndicator> createState() => _CustomRefreshIndicatorState();
+}
+
+class _CustomRefreshIndicatorState extends State<CustomRefreshIndicator> with SingleTickerProviderStateMixin {
+  final IndicatorController _controller = IndicatorController();
+  late AnimationController _animationController;
+  late Animation<double> _rotationAnimation;
+  bool _isPulling = false;
+  double _dragOffset = 0.0;
+  final double _dragThreshold = 100.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    
+    _rotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 2 * math.pi,
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    _animationController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && _controller.isLoading) {
+        _animationController.repeat();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleRefresh() async {
+    _controller.startLoading();
+    _animationController.repeat();
+    
+    try {
+      await widget.onRefresh();
+    } finally {
+      _controller.stopLoading();
+      _animationController.stop();
+      
+      // Smoothly return to initial state
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() {
+            _controller.value = 0.0;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (ScrollNotification notification) {
+        if (notification is ScrollStartNotification) {
+          if (notification.metrics.pixels <= 0) {
+            setState(() {
+              _isPulling = true;
+            });
+          }
+        } else if (notification is ScrollUpdateNotification) {
+          if (_isPulling && notification.metrics.pixels <= 0) {
+            setState(() {
+              _dragOffset = math.min(_dragThreshold, -notification.metrics.pixels);
+              _controller.value = _dragOffset / _dragThreshold;
+            });
+          }
+        } else if (notification is ScrollEndNotification) {
+          if (_isPulling) {
+            setState(() {
+              _isPulling = false;
+            });
+            if (_dragOffset >= _dragThreshold) {
+              _handleRefresh();
+            } else {
+              _controller.value = 0.0;
+            }
+            _dragOffset = 0.0;
+          }
+        }
+        return false;
+      },
+      child: widget.builder(context, widget.child, _controller),
+    );
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -412,12 +552,78 @@ class _HomePage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: RefreshIndicator(
-                      color: AppColors.primary,
+                    child: CustomRefreshIndicator(
                       onRefresh: () async {
                         context
                             .read<StudentBloc>()
                             .add(const LoadStudentDataEvent());
+                      },
+                      builder: (
+                        BuildContext context,
+                        Widget child,
+                        IndicatorController controller,
+                      ) {
+                        return Stack(
+                          children: <Widget>[
+                            child,
+                            Positioned(
+                              top: 0.0,
+                              left: 0.0,
+                              right: 0.0,
+                              child: AnimatedBuilder(
+                                animation: controller,
+                                builder: (BuildContext context, Widget? _) {
+                                  return SizedBox(
+                                    height: math.max(controller.value * 100, controller.isLoading ? 60 : 0),
+                                    child: Center(
+                                      child: AnimatedOpacity(
+                                        duration: const Duration(milliseconds: 300),
+                                        opacity: controller.value > 0.0 ? 1.0 : 0.0,
+                                        child: Container(
+                                          height: 45 + (controller.value * 5),
+                                          width: 45 + (controller.value * 5),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.1),
+                                                spreadRadius: 1,
+                                                blurRadius: 5,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Center(
+                                            child: controller.isLoading
+                                                ? SizedBox(
+                                                    width: 24,
+                                                    height: 24,
+                                                    child: CircularProgressIndicator(
+                                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                                        AppColors.primary,
+                                                      ),
+                                                      strokeWidth: 3,
+                                                    ),
+                                                  )
+                                                : Transform.rotate(
+                                                    angle: controller.value * 2 * math.pi,
+                                                    child: Icon(
+                                                      Icons.refresh_rounded,
+                                                      color: AppColors.primary,
+                                                      size: 24,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
                       },
                       child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
