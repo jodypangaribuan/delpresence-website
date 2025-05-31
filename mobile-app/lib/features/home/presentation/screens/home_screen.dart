@@ -442,6 +442,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // Navigation will be handled by BlocListener
   }
 
+  // Helper method to build menu items with just the icon and text
+  Widget _buildMenuItem(
+    BuildContext context, {
+    required String title,
+    required String iconPath,
+    required double iconSize,
+    required VoidCallback onTap,
+  }) {
+    return _PressableMenuItem(
+      title: title,
+      iconPath: iconPath,
+      iconSize: iconSize,
+      onTap: onTap,
+    );
+  }
+
   // Show QR scanner bottom sheet
   void _showQRScannerBottomSheet(BuildContext context) {
     showModalBottomSheet(
