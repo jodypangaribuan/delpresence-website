@@ -14,9 +14,10 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  late DateTime _currentMonth;
-  late DateTime _selectedDate;
-  late String _selectedDay;
+  // Initialize with default values to prevent LateInitializationError
+  late DateTime _currentMonth = DateTime.now();
+  late DateTime _selectedDate = DateTime.now();
+  late String _selectedDay = _dayAbbr[DateTime.now().weekday - 1];
   
   // Add these properties for API integration
   late ScheduleService _scheduleService;
@@ -26,11 +27,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   bool _isLoading = true;
   String? _errorMessage;
 
-  // Format for month and year (April 2025)
-  late DateFormat _monthYearFormat;
-
-  // Format for day names (Sen, Sel, etc)
-  late DateFormat _dayNameFormat;
+  // Initialize with dummy formatter that will be replaced
+  late DateFormat _monthYearFormat = DateFormat('MMMM yyyy');
+  late DateFormat _dayNameFormat = DateFormat('E');
 
   // Day names in Indonesian
   final List<String> _dayAbbr = [

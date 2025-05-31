@@ -32,7 +32,10 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
   int? _selectedAcademicYearId;
   bool _isLoading = true;
   String? _errorMessage;
-  String _todayName = '';
+  // Initialize with current weekday to prevent initialization issues
+  String _todayName = DateTime.now().weekday >= 1 && DateTime.now().weekday <= 7 
+      ? ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'][DateTime.now().weekday - 1] 
+      : '';
 
   @override
   void initState() {

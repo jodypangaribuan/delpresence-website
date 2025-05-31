@@ -177,32 +177,37 @@ class _HomeHeaderState extends State<HomeHeader> {
                         ],
                       ),
                       child: ClipOval(
-                        child: Image.network(
-                          state is StudentLoaded
-                              ? 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=${Uri.encodeComponent(state.student.basicInfo.nama)}'
-                              : 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=User',
-                          fit: BoxFit.cover,
-                          width: avatarSize,
-                          height: avatarSize,
-                          errorBuilder: (context, error, stackTrace) {
-                            // If image fails to load, show initials
-                            final initials = state is StudentLoaded
-                                ? _getInitials(state.student.basicInfo.nama)
-                                : 'S';
-                            return CircleAvatar(
+                        child: state is StudentLoaded
+                          ? SvgPicture.network(
+                              'https://api.dicebear.com/7.x/fun-emoji/svg?seed=${Uri.encodeComponent(state.student.basicInfo.nama)}',
+                              fit: BoxFit.cover,
+                              width: avatarSize,
+                              height: avatarSize,
+                              placeholderBuilder: (BuildContext context) => CircleAvatar(
+                                radius: avatarSize / 2,
+                                backgroundColor: Colors.grey[300],
+                                child: Text(
+                                  _getInitials(state.student.basicInfo.nama),
+                                  style: TextStyle(
+                                    fontSize: avatarSize * 0.4,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : CircleAvatar(
                               radius: avatarSize / 2,
                               backgroundColor: Colors.grey[300],
                               child: Text(
-                                initials,
+                                'S',
                                 style: TextStyle(
                                   fontSize: avatarSize * 0.4,
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.primary,
                                 ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
                       ),
                     ),
 
