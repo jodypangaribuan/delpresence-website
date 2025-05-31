@@ -38,6 +38,8 @@ dependencies:
   flutter_face_api: ^6.4.875
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.10
+  webview_flutter: ^4.13.0
+  url_launcher: ^6.2.4
 
 dev_dependencies:
   flutter_test:

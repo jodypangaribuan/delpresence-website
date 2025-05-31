@@ -9,6 +9,7 @@ import '../../../../core/widgets/form/custom_password_field.dart';
 import '../bloc/auth_bloc.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../../../core/utils/toast_utils.dart';
+import '../../../../features/auth/presentation/screens/forgot_password_screen.dart';
 
 class LoginFormSection extends StatefulWidget {
   const LoginFormSection({super.key});
@@ -71,8 +72,12 @@ class _LoginFormSectionState extends State<LoginFormSection> {
   }
 
   void _showForgotPasswordMessage() {
-    ToastUtils.showWarningToast(
-        context, 'Fitur lupa kata sandi tidak tersedia saat ini.');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ForgotPasswordScreen(),
+      ),
+    );
   }
 
   @override
