@@ -1006,9 +1006,11 @@ func (h *CourseScheduleHandler) GetStudentSchedules(c *gin.Context) {
 	studentRepo := repositories.NewStudentRepository()
 	student, err := studentRepo.FindByUserID(userIDInt)
 	if err != nil || student == nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Student not found",
+		// Return empty schedules list instead of error when student not found
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"data":    []interface{}{},
+			"message": "No student record found for the current user",
 		})
 		return
 	}

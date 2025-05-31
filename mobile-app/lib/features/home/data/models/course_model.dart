@@ -37,12 +37,21 @@ class CourseModel {
       }
     }
 
+    // Extract lecturer name, handling null and empty values
+    String lecturerName = '';
+    final rawLecturerName = json['lecturer_name'];
+    if (rawLecturerName != null && 
+        rawLecturerName.toString().isNotEmpty && 
+        rawLecturerName.toString().toLowerCase() != 'null') {
+      lecturerName = rawLecturerName.toString();
+    }
+
     return CourseModel(
       id: parseValue<String>(json['id'] ?? json['course_id'], ''),
       title: parseValue<String>(json['title'] ?? json['course_name'], ''),
       code: parseValue<String>(json['code'] ?? json['course_code'], ''),
       description: parseValue<String>(json['description'], ''),
-      lecturer: parseValue<String>(json['lecturer'] ?? json['lecturer_name'], ''),
+      lecturer: lecturerName,
       semester: parseValue<String>(json['semester'], ''),
       credits: parseValue<int>(json['credits'] ?? json['sks'], 0),
       schedule: parseValue<String>(json['schedule'], ''),

@@ -43,7 +43,7 @@ class CourseService {
       final endpoint = '/api/student/courses';
       debugPrint('🔍 Attempting to fetch courses from: ${_networkService.baseUrl}$endpoint');
       debugPrint('🔍 Query params: $queryParams');
-      debugPrint('🔍 Using Authorization header: Bearer ${token.substring(0, 10)}...');
+      debugPrint('🔍 Using Authorization header: Bearer ${token.substring(0, min(10, token.length))}...');
 
       // Make the API call
       final response = await _networkService.get<Map<String, dynamic>>(
@@ -65,6 +65,13 @@ class CourseService {
           // Parse the courses list
           final List<dynamic> coursesJson = data['data'];
           debugPrint('🔍 Successfully parsed ${coursesJson.length} courses');
+          
+          // Debug: Print raw lecturer data from first course if available
+          if (coursesJson.isNotEmpty) {
+            final firstCourse = coursesJson.first;
+            debugPrint('🔍 First course lecturer_name: ${firstCourse['lecturer_name']}');
+          }
+          
           return coursesJson
               .map((json) => CourseModel.fromJson(json))
               .toList();
@@ -97,5 +104,10 @@ class CourseService {
       debugPrint('🔍 General exception while fetching student courses: $e');
       throw Exception('Terjadi kesalahan saat mengambil daftar mata kuliah: $e');
     }
+  }
+  
+  // Helper function to get minimum of two integers
+  int min(int a, int b) {
+    return a < b ? a : b;
   }
 } 
