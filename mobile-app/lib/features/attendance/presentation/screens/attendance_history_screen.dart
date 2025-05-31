@@ -47,18 +47,13 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.black87),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_outlined, color: Colors.black87),
-            onPressed: () {
-              // Reload data - would be connected to API in production
-              setState(() {
-                _loadAttendanceData();
-              });
-            },
+            onPressed: _fetchAttendanceHistory,
           ),
         ],
         bottom: PreferredSize(
