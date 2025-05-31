@@ -17,7 +17,6 @@ import 'core/utils/http_override.dart';
 import 'core/utils/api_logger.dart';
 import 'core/network/network_info.dart';
 import 'core/config/api_config.dart';
-import 'core/services/network_service.dart';
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
@@ -27,8 +26,6 @@ import 'features/home/data/datasources/student_local_datasource.dart';
 import 'features/home/data/repositories/student_repository_impl.dart';
 import 'features/home/domain/repositories/student_repository.dart';
 import 'features/splash/presentation/screens/splash_screen.dart';
-import 'features/face/data/services/face_service.dart';
-import 'features/face/presentation/providers/face_registration_provider.dart';
 
 // Add function to preload critical assets
 Future<void> _preloadAssets() async {
@@ -83,11 +80,7 @@ void main() async {
   };
 
   // Initialize API configuration
-  ApiConfig.instance.initialize(
-    baseUrl: ApiConfig.DEFAULT_BASE_URL,
-    enableApiLogging: true,
-    allowSelfSignedCerts: true,
-  );
+  ApiConfig.instance.initialize();
   debugPrint('API Base URL: ${ApiConfig.instance.baseUrl}');
 
   // Initialize locale data for Indonesian at app startup - with proper error handling
@@ -164,23 +157,11 @@ void main() async {
     networkInfo: networkInfo,
   );
 
-  // Inisialisasi services
-  final networkService = NetworkService(
-    baseUrl: ApiConfig.instance.baseUrl,
-    timeout: const Duration(seconds: 30),
-  );
-  
-  final faceService = FaceService(
-    networkService: networkService,
-  );
-
   runApp(MyApp(
     prefs: prefs,
     httpClient: httpClient,
     authRepository: authRepository,
     studentRepository: studentRepository,
-    networkService: networkService,
-    faceService: faceService,
   ));
 }
 
@@ -189,8 +170,6 @@ class MyApp extends StatelessWidget {
   final http.Client httpClient;
   final AuthRepository authRepository;
   final StudentRepository studentRepository;
-  final NetworkService networkService;
-  final FaceService faceService;
 
   const MyApp({
     super.key,
@@ -198,8 +177,6 @@ class MyApp extends StatelessWidget {
     required this.httpClient,
     required this.authRepository,
     required this.studentRepository,
-    required this.networkService,
-    required this.faceService,
   });
 
   @override
@@ -217,16 +194,6 @@ class MyApp extends StatelessWidget {
         // Provide the auth bloc
         BlocProvider<AuthBloc>(
           create: (context) => AuthBloc(authRepository),
-        ),
-        // Service providers
-        Provider<NetworkService>.value(value: networkService),
-        Provider<FaceService>.value(value: faceService),
-        
-        // Feature providers
-        ChangeNotifierProvider(
-          create: (_) => FaceRegistrationProvider(
-            faceService: faceService,
-          ),
         ),
       ],
       child: MaterialApp(
