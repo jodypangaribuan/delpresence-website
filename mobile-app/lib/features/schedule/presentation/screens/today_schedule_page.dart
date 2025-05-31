@@ -229,13 +229,7 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date icon only, without the text
-          Icon(
-            Icons.calendar_today_rounded,
-            size: 18,
-            color: AppColors.primary,
-          ),
-          const SizedBox(height: 8),
+          // No icon, just the date aligned to the left
           Text(
             formattedDate,
             style: const TextStyle(
@@ -517,32 +511,7 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
               ],
             ),
             
-            // Add "Absen" button for all classes
-            const SizedBox(height: 10),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Navigate to attendance screen
-                },
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                child: const Text('Absen Sekarang'),
-              ),
-            ),
+            // No absen button
           ],
         ),
       ),

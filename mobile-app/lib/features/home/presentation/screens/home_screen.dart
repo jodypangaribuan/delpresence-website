@@ -601,71 +601,52 @@ class _HomePage extends StatelessWidget {
                                 animation: controller,
                                 builder: (BuildContext context, Widget? _) {
                                   return Container(
-                                    height: math.max(controller.value * 120, controller.isLoading ? 70 : 0),
+                                    height: math.max(controller.value * 100, controller.isLoading ? 60 : 0),
                                     alignment: Alignment.center,
                                     child: AnimatedOpacity(
                                       duration: const Duration(milliseconds: 300),
                                       opacity: controller.value > 0.0 ? 1.0 : 0.0,
-                                      child: Container(
-                                        height: 50 + (controller.value * 10),
-                                        width: 50 + (controller.value * 10),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.1),
-                                              spreadRadius: 1,
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
+                                      child: SizedBox(
+                                        height: 40,
+                                        width: 40,
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            // Rotating progress indicator that matches theme
+                                            CircularProgressIndicator(
+                                              value: controller.isLoading ? null : controller.value,
+                                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                              backgroundColor: Colors.white,
+                                              strokeWidth: 2.0,
+                                            ),
+                                            // Icon in center
+                                            Container(
+                                              height: 30,
+                                              width: 30,
+                                              decoration: BoxDecoration(
+                                                color: controller.value > 0.8 ? AppColors.primary : Colors.white,
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withOpacity(0.05),
+                                                    blurRadius: 2,
+                                                    spreadRadius: 0.5,
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Center(
+                                                child: AnimatedSwitcher(
+                                                  duration: const Duration(milliseconds: 300),
+                                                  child: Icon(
+                                                    controller.value > 0.8 ? Icons.arrow_upward : Icons.arrow_downward,
+                                                    color: controller.value > 0.8 ? Colors.white : AppColors.primary,
+                                                    size: 16,
+                                                    key: ValueKey(controller.value > 0.8),
+                                                  ),
+                                                ),
+                                              ),
                                             ),
                                           ],
-                                          border: Border.all(
-                                            color: AppColors.primary.withOpacity(0.1),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: controller.isLoading 
-                                              // Loading spinner when refreshing
-                                              ? SizedBox(
-                                                  width: 24,
-                                                  height: 24,
-                                                  child: CircularProgressIndicator(
-                                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                                      AppColors.primary,
-                                                    ),
-                                                    strokeWidth: 2.5,
-                                                  ),
-                                                )
-                                              // Rotating arrow when pulling
-                                              : Stack(
-                                                  alignment: Alignment.center,
-                                                  children: [
-                                                    // Background progress indicator
-                                                    SizedBox(
-                                                      width: 36,
-                                                      height: 36,
-                                                      child: CircularProgressIndicator(
-                                                        value: controller.value,
-                                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                                          AppColors.primary.withOpacity(0.2),
-                                                        ),
-                                                        backgroundColor: Colors.grey.withOpacity(0.1),
-                                                        strokeWidth: 2,
-                                                      ),
-                                                    ),
-                                                    // Icon that rotates with pull
-                                                    Transform.rotate(
-                                                      angle: controller.value * 2 * math.pi,
-                                                      child: Icon(
-                                                        Icons.refresh_rounded,
-                                                        color: AppColors.primary,
-                                                        size: 20,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
                                         ),
                                       ),
                                     ),
@@ -673,34 +654,6 @@ class _HomePage extends StatelessWidget {
                                 },
                               ),
                             ),
-                            // Add a visual cue at the top when refresh is available
-                            if (controller.value > 0.7 && !controller.isLoading)
-                              Positioned(
-                                top: 60,
-                                left: 0,
-                                right: 0,
-                                child: Center(
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 200),
-                                    opacity: controller.value > 0.9 ? 1.0 : 0.0,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        'Lepas untuk menyegarkan',
-                                        style: TextStyle(
-                                          color: AppColors.primary,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
                           ],
                         );
                       },

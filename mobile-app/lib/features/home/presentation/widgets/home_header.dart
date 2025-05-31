@@ -361,34 +361,6 @@ class _HomeHeaderState extends State<HomeHeader> {
                               ),
                             ),
                           ),
-
-                          // Refresh button
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(100),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(100),
-                                onTap: () {
-                                  context.read<StudentBloc>().add(const LoadStudentDataEvent());
-                                  ToastUtils.showSuccessToast(context, 'Memperbarui data...');
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white.withOpacity(0.2),
-                                  ),
-                                  child: const Icon(
-                                    Icons.refresh_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
