@@ -29,6 +29,20 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     _groupedRecords = AttendanceHistoryModel.groupByDate(_attendanceRecords);
   }
 
+  void _fetchAttendanceHistory() {
+    // Show loading indicator
+    ToastUtils.showInfoToast(context, 'Mengambil data absensi terbaru...');
+    
+    // This would be replaced with an actual API call in production
+    // For now, just reload the sample data with a slight delay to simulate network request
+    Future.delayed(const Duration(milliseconds: 800), () {
+      setState(() {
+        _loadAttendanceData();
+      });
+      ToastUtils.showSuccessToast(context, 'Data absensi berhasil diperbarui');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
