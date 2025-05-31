@@ -116,70 +116,55 @@ class _CustomRefreshIndicatorState extends State<CustomRefreshIndicator> with Si
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onVerticalDragUpdate: (details) {
-        // Only respond to downward drag when at the top
-        if (_isPulling) {
-          setState(() {
-            _dragOffset = math.max(0, _dragOffset + details.delta.dy / 2.5);
-            _controller.value = math.min(_dragOffset / _dragThreshold, 1.0);
-          });
-        }
-      },
-      onVerticalDragStart: (details) {
-        // Check if scroll position is at the top
-        if (details.localPosition.dy >= 0 && 
-            details.globalPosition.dy <= MediaQuery.of(context).size.height / 3) {
-          setState(() {
-            _isPulling = true;
-            _dragOffset = 0.0;
-          });
-        }
-      },
-      onVerticalDragEnd: (details) {
-        if (_isPulling) {
-          if (_controller.value >= 0.8) {
-            _handleRefresh();
-          } else {
-            // Reset if not pulled enough
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        // Handle scroll notifications for pull to refresh detection
+        if (notification is ScrollStartNotification) {
+          if (notification.metrics.pixels <= 0) {
             setState(() {
-              _controller.value = 0.0;
+              _isPulling = true;
               _dragOffset = 0.0;
             });
           }
-          _isPulling = false;
-        }
-      },
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (ScrollNotification notification) {
-          if (notification is ScrollStartNotification) {
-            if (notification.metrics.pixels <= 0) {
-              setState(() {
-                _isPulling = true;
-              });
-            }
-          } else if (notification is ScrollUpdateNotification) {
-            if (_isPulling && notification.metrics.pixels <= 0) {
-              setState(() {
-                _dragOffset = math.min(_dragThreshold, -notification.metrics.pixels);
-                _controller.value = _dragOffset / _dragThreshold;
-              });
-            }
-          } else if (notification is ScrollEndNotification) {
-            if (_isPulling) {
-              setState(() {
-                _isPulling = false;
-              });
-              if (_dragOffset >= _dragThreshold * 0.8) {
-                _handleRefresh();
-              } else {
-                _controller.value = 0.0;
-              }
-              _dragOffset = 0.0;
-            }
+        } else if (notification is ScrollUpdateNotification) {
+          if (_isPulling && notification.metrics.pixels <= 0) {
+            // Calculate how far the user has pulled
+            setState(() {
+              _dragOffset = math.min(_dragThreshold, -notification.metrics.pixels * 0.5);
+              _controller.value = _dragOffset / _dragThreshold;
+            });
           }
-          return false;
-        },
+        } else if (notification is ScrollEndNotification || notification is UserScrollNotification) {
+          if (_isPulling) {
+            if (_controller.value >= 0.6) {
+              _handleRefresh();
+            } else {
+              setState(() {
+                _controller.value = 0.0;
+                _dragOffset = 0.0;
+              });
+            }
+            setState(() {
+              _isPulling = false;
+            });
+          }
+        } else if (notification is OverscrollNotification && notification.overscroll < 0) {
+          // Additional handling for overscroll
+          if (!_controller.isLoading) {
+            setState(() {
+              _dragOffset = math.min(_dragThreshold, _dragOffset - notification.overscroll * 0.3);
+              _controller.value = _dragOffset / _dragThreshold;
+            });
+          }
+        }
+        return false;
+      },
+      child: RefreshIndicator(
+        // Add a native RefreshIndicator as a fallback
+        color: Colors.transparent,
+        backgroundColor: Colors.transparent,
+        strokeWidth: 0.0,
+        onRefresh: _handleRefresh,
         child: widget.builder(context, widget.child, _controller),
       ),
     );

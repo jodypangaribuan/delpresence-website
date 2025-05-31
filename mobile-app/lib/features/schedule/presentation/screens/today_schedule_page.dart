@@ -229,23 +229,27 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // No icon, just the date aligned to the left
-          Text(
-            formattedDate,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
+          // Date aligned to the left with appropriate style
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              formattedDate,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
             ),
           ),
           const SizedBox(height: 4),
+          // Academic year with semester type (Ganjil/Genap)
           Text(
-            // Get active academic year name
+            // Get active academic year name and add semester type
             _academicYears.isNotEmpty 
-                ? _academicYears.firstWhere(
+                ? "${_academicYears.firstWhere(
                     (year) => year['is_active'] == true,
                     orElse: () => _academicYears.first,
-                  )['name'].toString()
+                  )['name'].toString()} - ${_getSemesterType(DateTime.now())}"
                 : 'Tahun Akademik Aktif',
             style: TextStyle(
               fontSize: 12,
@@ -273,6 +277,17 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
       case 11: return 'November';
       case 12: return 'Desember';
       default: return '';
+    }
+  }
+  
+  // Helper method to get semester type (Ganjil/Genap)
+  String _getSemesterType(DateTime now) {
+    if (now.month >= 8 && now.month <= 12) {
+      return 'Ganjil';
+    } else if (now.month >= 1 && now.month <= 7) {
+      return 'Genap';
+    } else {
+      throw Exception('Invalid month for semester type calculation');
     }
   }
   
