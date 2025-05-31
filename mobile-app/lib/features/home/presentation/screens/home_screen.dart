@@ -638,7 +638,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: CircularProgressIndicator(
             strokeWidth: 2,
           ),
-        ),
+                                          ),
       );
     }
     
@@ -654,13 +654,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 fontSize: 12,
                 color: Colors.red[600],
                 fontStyle: FontStyle.italic,
-              ),
-            ),
+                                          ),
+                                        ),
             TextButton(
               onPressed: _fetchTodaySchedules,
               child: const Text('Coba Lagi', style: TextStyle(fontSize: 12)),
-            ),
-          ],
+              ),
+            ],
       ),
     );
   }

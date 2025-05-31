@@ -1,8 +1,20 @@
-name: delpresence
-description: "A new Flutter project."
+name: delpresensi
+description: DelPresence Mobile App
 
-publish_to: "none"
+# The following line prevents the package from being accidentally published to
+# pub.dev using `pub publish`. This is preferred for private packages.
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
+# The following defines the version and build number for your application.
+# A version number is three numbers separated by dots, like 1.2.43
+# followed by an optional build number separated by a +.
+# Both the version and the builder number may be overridden in flutter
+# build by specifying --build-name and --build-number, respectively.
+# In Android, build-name is used as versionName while build-number used as versionCode.
+# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+# In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
+# Read more about iOS versioning at
+# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 version: 1.0.0+1
 
 environment:
@@ -11,65 +23,68 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  cupertino_icons: ^1.0.8
-  iconsax: ^0.0.8
-  provider: ^6.1.2
-  shared_preferences: ^2.5.2
-  flutter_secure_storage: ^9.2.4
-  permission_handler: ^12.0.0+1
-  sqflite: ^2.4.1
-  path: ^1.9.0
-  flutter_bloc: ^9.1.0
-  bloc: ^9.0.0
-  equatable: ^2.0.7
-  http: ^1.3.0
-  flutter_svg: ^2.0.17
-  intl: ^0.19.0
+  cupertino_icons: ^1.0.5
+  flutter_bloc: ^8.1.2
+  equatable: ^2.0.5
   dartz: ^0.10.1
-  internet_connection_checker: ^3.0.1
-  floating_bottom_navigation_bar: ^1.5.2
-  stylish_bottom_bar: ^1.1.1
-  animated_bottom_navigation_bar: ^1.4.0
-  delightful_toast: ^1.1.0
-  toastification: ^3.0.2
-  camera: ^0.11.1
-  google_mlkit_face_detection: ^0.13.1
-  flutter_face_api: ^6.4.875
-  qr_flutter: ^4.1.0
-  mobile_scanner: ^6.0.10
-  webview_flutter: ^4.13.0
-  url_launcher: ^6.2.4
+  get_it: ^7.6.0
+  internet_connection_checker: ^1.0.0+1
+  http: ^1.1.0
+  shared_preferences: ^2.2.0
+  intl: ^0.18.1
+  provider: ^6.0.5
+  image_picker: ^1.0.2
+  path_provider: ^2.1.1
+  path: ^1.8.3
+  camera: ^0.10.5+3
+  permission_handler: ^10.4.3
+  image: ^4.1.3
+  flutter_image_compress: ^2.0.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  mockito: ^5.4.2
+  build_runner: ^2.4.6
+  flutter_lints: ^2.0.2
 
-  flutter_lints: ^5.0.0
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
 
+# The following section is specific to Flutter.
 flutter:
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
   uses-material-design: true
 
+  # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
-    - assets/images/background/
-    - assets/images/background/background-header.png
     - assets/icons/
 
-  fonts:
-    - family: Mulish
-      fonts:
-        - asset: assets/fonts/Mulish-Light.ttf
-        - asset: assets/fonts/Mulish-SemiBold.ttf
-    - family: Poppins
-      fonts:
-        - asset: assets/fonts/Poppins-Light.ttf
-          weight: 300
-        - asset: assets/fonts/Poppins-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Poppins-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Poppins-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Poppins-Bold.ttf
-          weight: 700
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/assets-and-images/#resolution-aware.
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/assets-and-images/#from-packages
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/custom-fonts/#from-packages
