@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../../core/config/api_config.dart';
+import '../../../../core/constants/colors.dart';
+import '../../../../core/services/network_service.dart';
 import '../../data/models/course_model.dart';
+import '../../data/services/course_service.dart';
 import '../../../../core/utils/toast_utils.dart';
 
 class CourseListScreen extends StatefulWidget {
@@ -10,8 +14,51 @@ class CourseListScreen extends StatefulWidget {
 }
 
 class _CourseListScreenState extends State<CourseListScreen> {
-  // Using sample data from model
-  List<CourseModel> courses = CourseModel.getSampleCourses();
+  List<CourseModel> _courses = [];
+  List<Map<String, dynamic>> _academicYears = [];
+  int? _selectedAcademicYearId;
+  bool _isLoading = true;
+  String? _errorMessage;
+  late CourseService _courseService;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Initialize the network service and course service
+    final networkService = NetworkService(
+      baseUrl: ApiConfig.instance.baseUrl,
+      timeout: ApiConfig.instance.timeout,
+    );
+    _courseService = CourseService(networkService: networkService);
+    
+    // Fetch courses from API
+    _fetchCourses();
+  }
+
+  // Fetch courses from the API
+  Future<void> _fetchCourses() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      final courses = await _courseService.getStudentCourses(
+        academicYearId: _selectedAcademicYearId,
+      );
+      
+      setState(() {
+        _courses = courses;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +81,12 @@ class _CourseListScreenState extends State<CourseListScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black87),
+            onPressed: _fetchCourses,
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Divider(
@@ -43,15 +96,90 @@ class _CourseListScreenState extends State<CourseListScreen> {
           ),
         ),
       ),
-      body: ListView.builder(
-        itemCount: courses.length,
-        padding: const EdgeInsets.all(16),
-        physics: const BouncingScrollPhysics(),
-        itemBuilder: (context, index) {
-          final course = courses[index];
-          return _buildCourseCard(course);
-        },
-      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+    
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Colors.red,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.red,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchCourses,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    if (_courses.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.menu_book_outlined,
+              size: 48,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Tidak ada mata kuliah yang tersedia',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchCourses,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Muat Ulang'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: _courses.length,
+      padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
+      itemBuilder: (context, index) {
+        final course = _courses[index];
+        return _buildCourseCard(course);
+      },
     );
   }
 
@@ -82,20 +210,37 @@ class _CourseListScreenState extends State<CourseListScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Course title
+              // Course title and code
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 12, 0),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        course.title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            course.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          if (course.code.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                course.code,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     Icon(
@@ -108,52 +253,78 @@ class _CourseListScreenState extends State<CourseListScreen> {
               ),
 
               // Course description
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Text(
-                  course.description,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    height: 1.4,
+              if (course.description.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Text(
+                    course.description,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
 
               // Divider
               Divider(height: 1, thickness: 1, color: Colors.grey[100]),
 
               // Lecturer and credits
-              if (course.lecturer.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.person_outline,
-                        size: 16,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        course.lecturer,
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.person_outline,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        course.lecturer.isNotEmpty ? course.lecturer : 'Dosen belum ditentukan',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: Colors.grey[700],
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const Spacer(),
+                    ),
+                    Icon(
+                      Icons.book_outlined,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${course.credits} SKS',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Academic year if available
+              if (course.academicYearName.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: Row(
+                    children: [
                       Icon(
-                        Icons.book_outlined,
+                        Icons.calendar_today_outlined,
                         size: 16,
                         color: Colors.grey[600],
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '${course.credits} SKS',
+                        course.academicYearName,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,

@@ -259,6 +259,10 @@ func main() {
 			// Student routes go here
 			studentRoutes.GET("/schedules", courseScheduleHandler.GetStudentSchedules)
 			studentRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
+
+			// Add new endpoint for student courses
+			studentCourseHandler := handlers.NewStudentCourseHandler()
+			studentRoutes.GET("/courses", studentCourseHandler.GetStudentCourses)
 		}
 	}
 
