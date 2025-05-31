@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/services/network_service.dart';
+import '../../../../core/config/api_config.dart';
 import '../../data/models/schedule_model.dart';
 import '../../data/services/schedule_service.dart';
 
@@ -52,9 +53,8 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
     
     // Initialize network service
     final networkService = NetworkService(
-      baseUrl: const String.fromEnvironment('API_BASE_URL', 
-        defaultValue: 'http://localhost:8080'),
-      timeout: const Duration(seconds: 15),
+      baseUrl: ApiConfig.instance.baseUrl,
+      timeout: ApiConfig.instance.timeout,
     );
     _scheduleService = ScheduleService(networkService: networkService);
     

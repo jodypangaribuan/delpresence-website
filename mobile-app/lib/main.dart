@@ -16,6 +16,7 @@ import 'core/theme/theme.dart';
 import 'core/utils/http_override.dart';
 import 'core/utils/api_logger.dart';
 import 'core/network/network_info.dart';
+import 'core/config/api_config.dart';
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
@@ -77,6 +78,10 @@ void main() async {
       ),
     );
   };
+
+  // Initialize API configuration
+  ApiConfig.instance.initialize();
+  debugPrint('API Base URL: ${ApiConfig.instance.baseUrl}');
 
   // Initialize locale data for Indonesian at app startup - with proper error handling
   try {
