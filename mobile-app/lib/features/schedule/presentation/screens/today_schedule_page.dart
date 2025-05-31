@@ -229,23 +229,11 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today_rounded,
-                size: 16,
-                color: AppColors.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Jadwal Hari Ini',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
+          // Date icon only, without the text
+          Icon(
+            Icons.calendar_today_rounded,
+            size: 18,
+            color: AppColors.primary,
           ),
           const SizedBox(height: 8),
           Text(
@@ -394,10 +382,8 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
           ),
         ],
         border: Border.all(
-          color: schedule.status == 'Sedang Berlangsung'
-              ? AppColors.primary.withOpacity(0.3)
-              : Colors.grey.withOpacity(0.1),
-          width: schedule.status == 'Sedang Berlangsung' ? 1.5 : 1,
+          color: Colors.grey.withOpacity(0.1),
+          width: 1,
         ),
       ),
       child: Padding(
@@ -405,38 +391,16 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Course title and status
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    schedule.courseName,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: schedule.getStatusColor().withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    schedule.status,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
-                      color: schedule.getStatusColor(),
-                    ),
-                  ),
-                ),
-              ],
+            // Course title only, without status
+            Text(
+              schedule.courseName,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 8),
             
             // Course code
             Text(
@@ -553,34 +517,32 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
               ],
             ),
             
-            // Add "Absen" button for ongoing classes
-            if (schedule.status == 'Sedang Berlangsung') ...[
-              const SizedBox(height: 10),
-              const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate to attendance screen
-                  },
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
+            // Add "Absen" button for all classes
+            const SizedBox(height: 10),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  // Navigate to attendance screen
+                },
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text('Absen Sekarang'),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+                child: const Text('Absen Sekarang'),
               ),
-            ],
+            ),
           ],
         ),
       ),

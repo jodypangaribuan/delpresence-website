@@ -66,34 +66,17 @@ class CustomRefreshIndicator extends StatefulWidget {
 class _CustomRefreshIndicatorState extends State<CustomRefreshIndicator> with SingleTickerProviderStateMixin {
   final IndicatorController _controller = IndicatorController();
   late AnimationController _animationController;
-  late Animation<double> _rotationAnimation;
   bool _isPulling = false;
   double _dragOffset = 0.0;
-  final double _dragThreshold = 100.0;
+  final double _dragThreshold = 80.0;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
     );
-    
-    _rotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 2 * math.pi,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
-    );
-    
-    _animationController.addStatusListener((status) {
-      if (status == AnimationStatus.completed && _controller.isLoading) {
-        _animationController.repeat();
-      }
-    });
   }
 
   @override
@@ -103,59 +86,102 @@ class _CustomRefreshIndicatorState extends State<CustomRefreshIndicator> with Si
   }
 
   Future<void> _handleRefresh() async {
+    // Start loading animation
     _controller.startLoading();
     _animationController.repeat();
     
     try {
+      // Execute the provided refresh callback
       await widget.onRefresh();
+    } catch (e) {
+      debugPrint('Error during refresh: $e');
     } finally {
-      _controller.stopLoading();
-      _animationController.stop();
+      // Introduce a small delay to ensure user sees the refresh animation
+      await Future.delayed(const Duration(milliseconds: 500));
       
-      // Smoothly return to initial state
-      Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _controller.stopLoading();
+        _animationController.stop();
+        
+        // Smoothly return to initial state
+        await Future.delayed(const Duration(milliseconds: 300));
         if (mounted) {
           setState(() {
             _controller.value = 0.0;
           });
         }
-      });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (ScrollNotification notification) {
-        if (notification is ScrollStartNotification) {
-          if (notification.metrics.pixels <= 0) {
-            setState(() {
-              _isPulling = true;
-            });
-          }
-        } else if (notification is ScrollUpdateNotification) {
-          if (_isPulling && notification.metrics.pixels <= 0) {
-            setState(() {
-              _dragOffset = math.min(_dragThreshold, -notification.metrics.pixels);
-              _controller.value = _dragOffset / _dragThreshold;
-            });
-          }
-        } else if (notification is ScrollEndNotification) {
-          if (_isPulling) {
-            setState(() {
-              _isPulling = false;
-            });
-            if (_dragOffset >= _dragThreshold) {
-              _handleRefresh();
-            } else {
-              _controller.value = 0.0;
-            }
-            _dragOffset = 0.0;
-          }
+    return GestureDetector(
+      onVerticalDragUpdate: (details) {
+        // Only respond to downward drag when at the top
+        if (_isPulling) {
+          setState(() {
+            _dragOffset = math.max(0, _dragOffset + details.delta.dy / 2.5);
+            _controller.value = math.min(_dragOffset / _dragThreshold, 1.0);
+          });
         }
-        return false;
       },
-      child: widget.builder(context, widget.child, _controller),
+      onVerticalDragStart: (details) {
+        // Check if scroll position is at the top
+        if (details.localPosition.dy >= 0 && 
+            details.globalPosition.dy <= MediaQuery.of(context).size.height / 3) {
+          setState(() {
+            _isPulling = true;
+            _dragOffset = 0.0;
+          });
+        }
+      },
+      onVerticalDragEnd: (details) {
+        if (_isPulling) {
+          if (_controller.value >= 0.8) {
+            _handleRefresh();
+          } else {
+            // Reset if not pulled enough
+            setState(() {
+              _controller.value = 0.0;
+              _dragOffset = 0.0;
+            });
+          }
+          _isPulling = false;
+        }
+      },
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (ScrollNotification notification) {
+          if (notification is ScrollStartNotification) {
+            if (notification.metrics.pixels <= 0) {
+              setState(() {
+                _isPulling = true;
+              });
+            }
+          } else if (notification is ScrollUpdateNotification) {
+            if (_isPulling && notification.metrics.pixels <= 0) {
+              setState(() {
+                _dragOffset = math.min(_dragThreshold, -notification.metrics.pixels);
+                _controller.value = _dragOffset / _dragThreshold;
+              });
+            }
+          } else if (notification is ScrollEndNotification) {
+            if (_isPulling) {
+              setState(() {
+                _isPulling = false;
+              });
+              if (_dragOffset >= _dragThreshold * 0.8) {
+                _handleRefresh();
+              } else {
+                _controller.value = 0.0;
+              }
+              _dragOffset = 0.0;
+            }
+          }
+          return false;
+        },
+        child: widget.builder(context, widget.child, _controller),
+      ),
     );
   }
 }
@@ -566,6 +592,7 @@ class _HomePage extends StatelessWidget {
                         return Stack(
                           children: <Widget>[
                             child,
+                            // Refresh indicator
                             Positioned(
                               top: 0.0,
                               left: 0.0,
@@ -573,48 +600,72 @@ class _HomePage extends StatelessWidget {
                               child: AnimatedBuilder(
                                 animation: controller,
                                 builder: (BuildContext context, Widget? _) {
-                                  return SizedBox(
-                                    height: math.max(controller.value * 100, controller.isLoading ? 60 : 0),
-                                    child: Center(
-                                      child: AnimatedOpacity(
-                                        duration: const Duration(milliseconds: 300),
-                                        opacity: controller.value > 0.0 ? 1.0 : 0.0,
-                                        child: Container(
-                                          height: 45 + (controller.value * 5),
-                                          width: 45 + (controller.value * 5),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(0.1),
-                                                spreadRadius: 1,
-                                                blurRadius: 5,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ],
+                                  return Container(
+                                    height: math.max(controller.value * 120, controller.isLoading ? 70 : 0),
+                                    alignment: Alignment.center,
+                                    child: AnimatedOpacity(
+                                      duration: const Duration(milliseconds: 300),
+                                      opacity: controller.value > 0.0 ? 1.0 : 0.0,
+                                      child: Container(
+                                        height: 50 + (controller.value * 10),
+                                        width: 50 + (controller.value * 10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.1),
+                                              spreadRadius: 1,
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                          border: Border.all(
+                                            color: AppColors.primary.withOpacity(0.1),
+                                            width: 1,
                                           ),
-                                          child: Center(
-                                            child: controller.isLoading
-                                                ? SizedBox(
-                                                    width: 24,
-                                                    height: 24,
-                                                    child: CircularProgressIndicator(
-                                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                                        AppColors.primary,
-                                                      ),
-                                                      strokeWidth: 3,
+                                        ),
+                                        child: Center(
+                                          child: controller.isLoading 
+                                              // Loading spinner when refreshing
+                                              ? SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child: CircularProgressIndicator(
+                                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                                      AppColors.primary,
                                                     ),
-                                                  )
-                                                : Transform.rotate(
-                                                    angle: controller.value * 2 * math.pi,
-                                                    child: Icon(
-                                                      Icons.refresh_rounded,
-                                                      color: AppColors.primary,
-                                                      size: 24,
-                                                    ),
+                                                    strokeWidth: 2.5,
                                                   ),
-                                          ),
+                                                )
+                                              // Rotating arrow when pulling
+                                              : Stack(
+                                                  alignment: Alignment.center,
+                                                  children: [
+                                                    // Background progress indicator
+                                                    SizedBox(
+                                                      width: 36,
+                                                      height: 36,
+                                                      child: CircularProgressIndicator(
+                                                        value: controller.value,
+                                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                                          AppColors.primary.withOpacity(0.2),
+                                                        ),
+                                                        backgroundColor: Colors.grey.withOpacity(0.1),
+                                                        strokeWidth: 2,
+                                                      ),
+                                                    ),
+                                                    // Icon that rotates with pull
+                                                    Transform.rotate(
+                                                      angle: controller.value * 2 * math.pi,
+                                                      child: Icon(
+                                                        Icons.refresh_rounded,
+                                                        color: AppColors.primary,
+                                                        size: 20,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                         ),
                                       ),
                                     ),
@@ -622,6 +673,34 @@ class _HomePage extends StatelessWidget {
                                 },
                               ),
                             ),
+                            // Add a visual cue at the top when refresh is available
+                            if (controller.value > 0.7 && !controller.isLoading)
+                              Positioned(
+                                top: 60,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 200),
+                                    opacity: controller.value > 0.9 ? 1.0 : 0.0,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        'Lepas untuk menyegarkan',
+                                        style: TextStyle(
+                                          color: AppColors.primary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         );
                       },

@@ -19,7 +19,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   late DateTime _currentMonth = DateTime.now();
   late DateTime _selectedDate = DateTime.now();
   late String _selectedDay = _dayAbbr[DateTime.now().weekday - 1];
-  
+
   // Add these properties for API integration
   late ScheduleService _scheduleService;
   List<ScheduleModel> _schedules = [];
@@ -94,9 +94,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }).catchError((e) {
       debugPrint('Error initializing locale data: $e');
       setState(() {
-        _currentMonth = DateTime.now();
-        _selectedDate = DateTime.now();
-        _selectedDay = _dayAbbr[_selectedDate.weekday - 1];
+    _currentMonth = DateTime.now();
+    _selectedDate = DateTime.now();
+    _selectedDay = _dayAbbr[_selectedDate.weekday - 1];
       });
     });
     
@@ -570,7 +570,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     value: year['id'],
                     child: Text(
                       '${year['name']} ${year['is_active'] == true ? "(Aktif)" : ""}',
-                    ),
+            ),
                   );
                 }).toList(),
               ),
@@ -579,7 +579,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ),
       );
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: daySchedules.length,
@@ -613,13 +613,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Column(
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Course title and status
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
+        children: [
                 Expanded(
                   child: Text(
                     schedule.courseName,
@@ -630,9 +630,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     ),
                   ),
                 ),
-                Container(
+          Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
+            decoration: BoxDecoration(
                     color: schedule.getStatusColor().withOpacity(0.08),
                     borderRadius: BorderRadius.circular(4),
                   ),
@@ -642,7 +642,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       fontSize: 9,
                       fontWeight: FontWeight.w500,
                       color: schedule.getStatusColor(),
-                    ),
+              ),
                   ),
                 ),
               ],
@@ -695,7 +695,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            
+
             // Building
             Row(
               children: [
@@ -708,17 +708,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 Expanded(
                   child: Text(
                     schedule.buildingName,
-                    style: TextStyle(
+                  style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 4),
-            
+
             // Lecturer
             Row(
               children: [
@@ -731,7 +731,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 Expanded(
                   child: Text(
                     schedule.lecturerName,
-                    style: TextStyle(
+                  style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                     ),
@@ -739,7 +739,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   ),
                 ),
               ],
-            ),
+                ),
             const SizedBox(height: 4),
             
             // Student Group
@@ -754,7 +754,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 Expanded(
                   child: Text(
                     schedule.studentGroupName,
-                    style: TextStyle(
+                  style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                     ),
@@ -789,9 +789,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     ),
                   ),
                   child: const Text('Absen Sekarang'),
-                ),
-              ),
-            ],
+            ),
+          ),
+        ],
           ],
         ),
       ),
