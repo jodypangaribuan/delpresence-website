@@ -14,7 +14,7 @@ class ScheduleService {
   /// Get auth token from shared preferences
   Future<String?> _getAuthToken() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
+    final token = prefs.getString('auth_token');
     debugPrint('🔑 Retrieved token: ${token != null ? 'Token exists' : 'No token found'}');
     return token;
   }
