@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../data/models/attendance_history_model.dart';
@@ -17,57 +16,11 @@ class AttendanceHistoryScreen extends StatefulWidget {
 class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   late List<AttendanceHistoryModel> _attendanceRecords;
   late Map<String, List<AttendanceHistoryModel>> _groupedRecords;
-  String _todayFormattedDate = '';  // Initialize with empty string
 
   @override
   void initState() {
     super.initState();
-    _initializeDateFormatting();
     _loadAttendanceData();
-  }
-
-  void _initializeDateFormatting() {
-    // Initialize locale data for Indonesian
-    initializeDateFormatting('id_ID', null).then((_) {
-      // Format today's date in Indonesian
-      final now = DateTime.now();
-      setState(() {
-        try {
-          final dateFormat = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
-          _todayFormattedDate = dateFormat.format(now);
-        } catch (e) {
-          // Fallback if locale data is not initialized
-          _todayFormattedDate = "${_getDayName(now.weekday)}, ${now.day} ${_getMonthName(now.month)} ${now.year}";
-        }
-      });
-    });
-  }
-
-  // Helper method to get Indonesian day name
-  String _getDayName(int weekday) {
-    final List<String> dayNames = [
-      'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'
-    ];
-    return dayNames[weekday - 1];
-  }
-
-  // Helper method to get Indonesian month name
-  String _getMonthName(int month) {
-    switch (month) {
-      case 1: return 'Januari';
-      case 2: return 'Februari';
-      case 3: return 'Maret';
-      case 4: return 'April';
-      case 5: return 'Mei';
-      case 6: return 'Juni';
-      case 7: return 'Juli';
-      case 8: return 'Agustus';
-      case 9: return 'September';
-      case 10: return 'Oktober';
-      case 11: return 'November';
-      case 12: return 'Desember';
-      default: return '';
-    }
   }
 
   void _loadAttendanceData() {
@@ -126,58 +79,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          _buildTodayHeader(),
-          Expanded(
-            child: _buildAttendanceList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTodayHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            offset: const Offset(0, 2),
-            blurRadius: 5,
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _todayFormattedDate,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Riwayat Absensi Hari Ini',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      body: _buildAttendanceList(),
     );
   }
 
