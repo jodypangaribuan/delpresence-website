@@ -16,12 +16,58 @@ class HomeHeader extends StatefulWidget {
 
 class _HomeHeaderState extends State<HomeHeader> {
   bool _hasShownCachedDataToast = false;
+  bool _headerImageLoadError = false;
 
   String _getInitials(String fullName) {
     final nameParts = fullName.split(' ');
     if (nameParts.isEmpty) return '';
     if (nameParts.length == 1) return nameParts[0][0];
     return nameParts[0][0] + nameParts[1][0];
+  }
+
+  // Create box decoration with or without background image
+  BoxDecoration _createHeaderDecoration() {
+    // Base decoration without image
+    final decoration = BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          AppColors.primaryDark,
+          AppColors.primary,
+        ],
+        stops: const [0.0, 1.0],
+      ),
+      borderRadius: BorderRadius.zero,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.2),
+          blurRadius: 10,
+          spreadRadius: 0,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    );
+    
+    // Add image only if no error has occurred
+    if (!_headerImageLoadError) {
+      return decoration.copyWith(
+        image: DecorationImage(
+          image: const AssetImage(
+              'assets/images/background/background-header.png'),
+          fit: BoxFit.cover,
+          opacity: 0.85,
+          onError: (exception, stackTrace) {
+            debugPrint('Error loading header background: $exception');
+            setState(() {
+              _headerImageLoadError = true;
+            });
+          },
+        ),
+      );
+    }
+    
+    return decoration;
   }
 
   @override
@@ -73,33 +119,7 @@ class _HomeHeaderState extends State<HomeHeader> {
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.primaryDark,
-                        AppColors.primary,
-                      ],
-                      stops: const [0.0, 1.0],
-                    ),
-                    borderRadius: BorderRadius.zero,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 10,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                    image: const DecorationImage(
-                      image: AssetImage(
-                          'assets/images/background/background-header.png'),
-                      fit: BoxFit.cover,
-                      opacity:
-                          0.85, // Slightly reduced opacity for better text contrast
-                    ),
-                  ),
+                  decoration: _createHeaderDecoration(),
                   child: Stack(
                     children: [
                       // Bottom decoration - subtle light effect

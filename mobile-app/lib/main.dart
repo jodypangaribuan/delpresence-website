@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:toastification/toastification.dart';
 import 'dart:io';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/theme/theme.dart';
 import 'core/utils/http_override.dart';
@@ -22,8 +24,63 @@ import 'features/home/data/repositories/student_repository_impl.dart';
 import 'features/home/domain/repositories/student_repository.dart';
 import 'features/splash/presentation/screens/splash_screen.dart';
 
+// Add function to preload critical assets
+Future<void> _preloadAssets() async {
+  try {
+    // Preload background image to check if it can load properly
+    final imageProvider = AssetImage('assets/images/background/background-header.png');
+    await precacheImage(imageProvider, null);
+    debugPrint('Successfully preloaded header background image');
+  } catch (e) {
+    debugPrint('Error preloading assets: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Add global error handling for image loading
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    if (details.exception.toString().contains('image')) {
+      debugPrint('Image loading error: ${details.exception}');
+      return Container(
+        height: 30,
+        width: 30,
+        color: Colors.grey[300],
+        child: const Icon(Icons.error, size: 16, color: Colors.red),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Center(
+        child: Text(
+          'An error occurred: ${details.exception}',
+          style: const TextStyle(color: Colors.red),
+        ),
+      ),
+    );
+  };
+
+  // Initialize locale data for Indonesian at app startup - with proper error handling
+  try {
+    await initializeDateFormatting('id_ID', null);
+    // Verify the locale is properly loaded by testing it
+    DateFormat('EEEE, d MMMM yyyy', 'id_ID');
+    debugPrint('Indonesian locale initialized successfully');
+  } catch (e) {
+    debugPrint('Error initializing Indonesian locale: $e');
+    // Force locale initialization with a direct call to ensure availability
+    Intl.defaultLocale = 'id_ID';
+    try {
+      await initializeDateFormatting('id_ID', null);
+      debugPrint('Retry: Indonesian locale initialized successfully');
+    } catch (e) {
+      debugPrint('Retry failed: $e');
+    }
+  }
+
+  // Preload critical assets
+  await _preloadAssets();
 
   // Set HTTP overrides untuk menerima sertifikat self-signed
   HttpOverrides.global = DevHttpOverrides();

@@ -27,10 +27,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   String? _errorMessage;
 
   // Format for month and year (April 2025)
-  final DateFormat _monthYearFormat = DateFormat('MMMM yyyy', 'id_ID');
+  late DateFormat _monthYearFormat;
 
   // Format for day names (Sen, Sel, etc)
-  final DateFormat _dayNameFormat = DateFormat('E', 'id_ID');
+  late DateFormat _dayNameFormat;
 
   // Day names in Indonesian
   final List<String> _dayAbbr = [
@@ -73,11 +73,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize locale data for Indonesian
-    initializeDateFormatting('id_ID', null);
-    _currentMonth = DateTime.now();
-    _selectedDate = DateTime.now();
-    _selectedDay = _dayAbbr[_selectedDate.weekday - 1];
+    
+    // Initialize locale data for Indonesian with proper handling
+    initializeDateFormatting('id_ID', null).then((_) {
+      // Set initial state values after locale data is initialized
+      setState(() {
+        _currentMonth = DateTime.now();
+        _selectedDate = DateTime.now();
+        _selectedDay = _dayAbbr[_selectedDate.weekday - 1];
+        
+        // Try to initialize DateFormat after locale data is loaded
+        try {
+          _monthYearFormat = DateFormat('MMMM yyyy', 'id_ID');
+          _dayNameFormat = DateFormat('E', 'id_ID');
+        } catch (e) {
+          debugPrint('Error initializing DateFormat: $e');
+          // Will use the fallback in formatMonthYear
+        }
+      });
+    }).catchError((e) {
+      debugPrint('Error initializing locale data: $e');
+      setState(() {
+        _currentMonth = DateTime.now();
+        _selectedDate = DateTime.now();
+        _selectedDay = _dayAbbr[_selectedDate.weekday - 1];
+      });
+    });
     
     // Initialize the network service and schedule service
     final networkService = NetworkService(
@@ -120,7 +141,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Gagal memuat tahun akademik: $e';
+        _errorMessage = e.toString();
       });
     }
   }
@@ -144,13 +165,29 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Gagal memuat jadwal: $e';
+        _errorMessage = e.toString();
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Set a custom error widget handler for image loading errors
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      if (details.exception.toString().contains('image')) {
+        debugPrint('Image loading error: ${details.exception}');
+        return Container(
+          height: 30,
+          width: 30,
+          color: Colors.grey[300],
+          child: const Icon(Icons.error, size: 16, color: Colors.red),
+        );
+      }
+      return const Center(
+        child: Text('An error occurred.', style: TextStyle(color: Colors.red)),
+      );
+    };
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -215,7 +252,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             },
           ),
           Text(
-            '${_monthNames[_currentMonth.month]} ${_currentMonth.year}',
+            formatMonthYear(_currentMonth),
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -773,5 +810,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         }).toList(),
       ),
     );
+  }
+
+  // Add a helper method to safely format the month and year
+  String formatMonthYear(DateTime date) {
+    try {
+      return _monthYearFormat.format(date);
+    } catch (e) {
+      // Fallback to using the month names map
+      return '${_monthNames[date.month]} ${date.year}';
+    }
   }
 }

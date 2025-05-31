@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/services/network_service.dart';
 import '../../data/models/schedule_model.dart';
@@ -37,9 +38,14 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
   void initState() {
     super.initState();
     
-    // Get today's day name
-    final today = DateTime.now();
-    _todayName = _dayNames[today.weekday - 1];
+    // Initialize locale data for Indonesian
+    initializeDateFormatting('id_ID', null).then((_) {
+      // Get today's day name after locale is initialized
+      final today = DateTime.now();
+      setState(() {
+        _todayName = _dayNames[today.weekday - 1];
+      });
+    });
     
     // Initialize network service
     final networkService = NetworkService(
@@ -82,7 +88,7 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Gagal memuat tahun akademik: $e';
+        _errorMessage = e.toString();
       });
     }
   }
@@ -108,13 +114,29 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Gagal memuat jadwal: $e';
+        _errorMessage = e.toString();
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Set a custom error widget handler for image loading errors
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      if (details.exception.toString().contains('image')) {
+        debugPrint('Image loading error: ${details.exception}');
+        return Container(
+          height: 30,
+          width: 30,
+          color: Colors.grey[300],
+          child: const Icon(Icons.error, size: 16, color: Colors.red),
+        );
+      }
+      return const Center(
+        child: Text('An error occurred.', style: TextStyle(color: Colors.red)),
+      );
+    };
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -164,13 +186,21 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
   Widget _buildTodayHeader() {
     // Get today's date in Indonesian format
     final now = DateTime.now();
-    final dateFormat = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
-    final formattedDate = dateFormat.format(now);
+    
+    // Check if locale data is initialized before creating DateFormat
+    String formattedDate;
+    try {
+      final dateFormat = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
+      formattedDate = dateFormat.format(now);
+    } catch (e) {
+      // Fallback if locale data is not initialized
+      formattedDate = "${_dayNames[now.weekday - 1]}, ${now.day} ${_getMonthName(now.month)} ${now.year}";
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+      color: Colors.white,
         border: Border(
           bottom: BorderSide(color: Colors.grey[200]!, width: 1),
         ),
@@ -185,18 +215,37 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
-          ),
+            ),
           const SizedBox(height: 4),
           Text(
-            formattedDate,
-            style: TextStyle(
-              fontSize: 14,
+              formattedDate,
+              style: TextStyle(
+                fontSize: 14,
               color: Colors.grey[600],
             ),
           ),
         ],
       ),
     );
+  }
+  
+  // Helper method to get Indonesian month name
+  String _getMonthName(int month) {
+    switch (month) {
+      case 1: return 'Januari';
+      case 2: return 'Februari';
+      case 3: return 'Maret';
+      case 4: return 'April';
+      case 5: return 'Mei';
+      case 6: return 'Juni';
+      case 7: return 'Juli';
+      case 8: return 'Agustus';
+      case 9: return 'September';
+      case 10: return 'Oktober';
+      case 11: return 'November';
+      case 12: return 'Desember';
+      default: return '';
+    }
   }
   
   Widget _buildAcademicYearSelector() {

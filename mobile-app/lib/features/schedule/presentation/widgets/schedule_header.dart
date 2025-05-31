@@ -1,13 +1,65 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/colors.dart';
 
-class ScheduleHeader extends StatelessWidget {
+class ScheduleHeader extends StatefulWidget {
   final String title;
 
   const ScheduleHeader({
     super.key,
     required this.title,
   });
+
+  @override
+  State<ScheduleHeader> createState() => _ScheduleHeaderState();
+}
+
+class _ScheduleHeaderState extends State<ScheduleHeader> {
+  bool _headerImageLoadError = false;
+  
+  // Create box decoration with or without background image
+  BoxDecoration _createHeaderDecoration() {
+    // Base decoration without image
+    final decoration = BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          AppColors.primaryDark,
+          AppColors.primary,
+        ],
+        stops: const [0.0, 1.0],
+      ),
+      borderRadius: BorderRadius.zero,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.2),
+          blurRadius: 10,
+          spreadRadius: 0,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    );
+    
+    // Add image only if no error has occurred
+    if (!_headerImageLoadError) {
+      return decoration.copyWith(
+        image: DecorationImage(
+          image: const AssetImage(
+              'assets/images/background/background-header.png'),
+          fit: BoxFit.cover,
+          opacity: 0.85,
+          onError: (exception, stackTrace) {
+            debugPrint('Error loading header background: $exception');
+            setState(() {
+              _headerImageLoadError = true;
+            });
+          },
+        ),
+      );
+    }
+    
+    return decoration;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,32 +79,7 @@ class ScheduleHeader extends StatelessWidget {
             right: 0,
             bottom: 0,
             child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.primaryDark,
-                    AppColors.primary,
-                  ],
-                  stops: const [0.0, 1.0],
-                ),
-                borderRadius: BorderRadius.zero,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 10,
-                    spreadRadius: 0,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-                image: const DecorationImage(
-                  image: AssetImage(
-                      'assets/images/background/background-header.png'),
-                  fit: BoxFit.cover,
-                  opacity: 0.85,
-                ),
-              ),
+              decoration: _createHeaderDecoration(),
               child: Stack(
                 children: [
                   // Bottom decoration - subtle light effect
@@ -111,7 +138,7 @@ class ScheduleHeader extends StatelessWidget {
                   // Title
                   Expanded(
                     child: Text(
-                      title,
+                      widget.title,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
