@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class FaceService {
   final NetworkService _networkService;
+  // The face recognition service has a separate URL
+  final String _faceApiUrl = 'https://7c00-103-167-217-200.ngrok-free.app/api';
 
   FaceService({required NetworkService networkService})
       : _networkService = networkService;
@@ -19,6 +21,72 @@ class FaceService {
     final token = prefs.getString('auth_token');
     debugPrint('🔑 Retrieved token: ${token != null ? 'Token exists' : 'No token found'}');
     return token;
+  }
+
+  /// Make a direct HTTP request to the face service API
+  Future<Map<String, dynamic>> _makeDirectRequest({
+    required String path,
+    required String method,
+    Map<String, String>? headers,
+    dynamic body,
+  }) async {
+    try {
+      final uri = Uri.parse('$_faceApiUrl$path');
+      debugPrint('🔌 Making direct request to: $uri');
+      
+      http.Response response;
+      
+      switch (method) {
+        case 'GET':
+          response = await http.get(
+            uri,
+            headers: headers,
+          ).timeout(const Duration(seconds: 30));
+          break;
+        case 'POST':
+          response = await http.post(
+            uri,
+            headers: headers,
+            body: body,
+          ).timeout(const Duration(seconds: 30));
+          break;
+        case 'DELETE':
+          final request = http.Request('DELETE', uri);
+          if (headers != null) request.headers.addAll(headers);
+          if (body != null) request.body = body;
+          final streamedResponse = await http.Client().send(request)
+              .timeout(const Duration(seconds: 30));
+          response = await http.Response.fromStream(streamedResponse);
+          break;
+        default:
+          throw Exception('Unsupported HTTP method: $method');
+      }
+      
+      debugPrint('🔌 Response status code: ${response.statusCode}');
+      
+      // Parse response
+      Map<String, dynamic> responseData = {};
+      if (response.body.isNotEmpty) {
+        try {
+          responseData = json.decode(response.body);
+        } catch (e) {
+          debugPrint('🔌 Error decoding response: $e');
+          throw Exception('Failed to parse response: $e');
+        }
+      }
+      
+      // Check for successful response
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return responseData;
+      } else {
+        final errorMessage = responseData['message'] ?? 'API request failed with status: ${response.statusCode}';
+        debugPrint('🔌 API error: $errorMessage');
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      debugPrint('🔌 Exception during API request: $e');
+      rethrow;
+    }
   }
 
   /// Register face for a student
@@ -42,25 +110,17 @@ class FaceService {
         'image': base64Image,
       });
 
-      // Make the API call
-      final response = await _networkService.post<Map<String, dynamic>>(
-        '/api/student/face-registration',
+      // Make a direct API call to the face service
+      final result = await _makeDirectRequest(
+        path: '/student/face-registration',
+        method: 'POST',
         headers: headers,
         body: body,
       );
 
-      debugPrint('🔍 Face registration API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
+      debugPrint('🔍 Face registration API result: $result');
       
-      if (response.success && response.data != null) {
-        return response.data!;
-      } else {
-        // If there was an error with the API call
-        debugPrint('Error registering face: ${response.errorMessage}');
-        return {
-          'success': false,
-          'message': response.errorMessage ?? 'Gagal mendaftarkan wajah.',
-        };
-      }
+      return result;
     } catch (e) {
       debugPrint('🔍 Exception during face registration: $e');
       return {
@@ -91,25 +151,17 @@ class FaceService {
         'image': base64Image,
       });
 
-      // Make the API call
-      final response = await _networkService.post<Map<String, dynamic>>(
-        '/api/attendance/face-verification',
+      // Make a direct API call to the face service
+      final result = await _makeDirectRequest(
+        path: '/attendance/face-verification',
+        method: 'POST',
         headers: headers,
         body: body,
       );
 
-      debugPrint('🔍 Face verification API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
+      debugPrint('🔍 Face verification API result: $result');
       
-      if (response.data != null) {
-        return response.data!;
-      } else {
-        // If there was an error with the API call
-        debugPrint('Error verifying face: ${response.errorMessage}');
-        return {
-          'success': false,
-          'message': response.errorMessage ?? 'Gagal verifikasi wajah.',
-        };
-      }
+      return result;
     } catch (e) {
       debugPrint('🔍 Exception during face verification: $e');
       return {
@@ -133,24 +185,16 @@ class FaceService {
         'Authorization': 'Bearer $token',
       };
 
-      // Make the API call
-      final response = await _networkService.get<Map<String, dynamic>>(
-        '/api/student/$studentId/registered-faces',
+      // Make a direct API call to the face service
+      final result = await _makeDirectRequest(
+        path: '/student/$studentId/registered-faces',
+        method: 'GET',
         headers: headers,
       );
 
-      debugPrint('🔍 Get faces API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
+      debugPrint('🔍 Get faces API result: $result');
       
-      if (response.success && response.data != null) {
-        return response.data!;
-      } else {
-        // If there was an error with the API call
-        debugPrint('Error getting registered faces: ${response.errorMessage}');
-        return {
-          'success': false,
-          'message': response.errorMessage ?? 'Gagal mengambil data wajah.',
-        };
-      }
+      return result;
     } catch (e) {
       debugPrint('🔍 Exception getting registered faces: $e');
       return {
@@ -181,27 +225,17 @@ class FaceService {
         'embedding_id': embeddingId,
       });
 
-      // Make the API call using direct http call because NetworkService might not support DELETE with body
-      final uri = Uri.parse('${_networkService.baseUrl}/api/student/face');
-      final request = http.Request('DELETE', uri);
-      request.headers.addAll(headers);
-      request.body = body;
+      // Make a direct API call to the face service
+      final result = await _makeDirectRequest(
+        path: '/student/face',
+        method: 'DELETE',
+        headers: headers,
+        body: body,
+      );
+
+      debugPrint('🔍 Delete face API result: $result');
       
-      final httpResponse = await http.Client().send(request);
-      final responseBody = await httpResponse.stream.bytesToString();
-      
-      debugPrint('🔍 Delete face API response status: ${httpResponse.statusCode}');
-      
-      if (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300) {
-        return jsonDecode(responseBody);
-      } else {
-        // If there was an error with the API call
-        debugPrint('Error deleting face: $responseBody');
-        return {
-          'success': false,
-          'message': 'Gagal menghapus data wajah.',
-        };
-      }
+      return result;
     } catch (e) {
       debugPrint('🔍 Exception deleting face: $e');
       return {
