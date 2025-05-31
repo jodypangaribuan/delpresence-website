@@ -260,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     // Add the indicator animation initialization
     _indicatorAnimation = Tween<double>(
       begin: 0.4,
@@ -646,11 +646,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         alignment: Alignment.center,
-        child: Column(
-          children: [
-            Text(
+                                child: Column(
+                                  children: [
+                                        Text(
               'Gagal memuat jadwal',
-              style: TextStyle(
+                                          style: TextStyle(
                 fontSize: 12,
                 color: Colors.red[600],
                 fontStyle: FontStyle.italic,
@@ -661,10 +661,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: const Text('Coba Lagi', style: TextStyle(fontSize: 12)),
             ),
           ],
-        ),
-      );
-    }
-    
+      ),
+    );
+  }
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       alignment: Alignment.center,

@@ -223,6 +223,13 @@ func Initialize() {
 	}
 	log.Println("Attendance tables migrated successfully")
 
+	// Migrate the StudentFace model for face recognition
+	err = DB.AutoMigrate(&models.StudentFace{})
+	if err != nil {
+		log.Fatalf("Error auto-migrating StudentFace model: %v\n", err)
+	}
+	log.Println("StudentFace table migrated successfully")
+
 	log.Println("Database schema migrated successfully")
 }
 
