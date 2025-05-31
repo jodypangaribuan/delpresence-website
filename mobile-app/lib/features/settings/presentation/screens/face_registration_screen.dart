@@ -1,9 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:toastification/toastification.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../features/face/data/services/face_service.dart';
+import '../../../../core/services/network_service.dart';
+import '../../../../core/config/api_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FaceRegistrationScreen extends StatefulWidget {
   const FaceRegistrationScreen({super.key});
@@ -17,14 +23,59 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
   bool _isCameraInitialized = false;
   bool _isFaceDetected = false;
   bool _isRegistering = false;
+  bool _isProcessing = false;
   Timer? _registrationTimer;
   int _countdownSeconds = 5;
   Timer? _faceDetectionTimer;
+  FaceService? _faceService;
+  int? _studentId;
+  XFile? _capturedImage;
 
   @override
   void initState() {
     super.initState();
+    _initializeDependencies();
     _requestCameraPermission();
+  }
+
+  Future<void> _initializeDependencies() async {
+    // Setup network service with API config
+    final networkService = NetworkService(
+      baseUrl: ApiConfig.instance.apiUrl,
+      defaultHeaders: ApiConfig.instance.defaultHeaders,
+      timeout: ApiConfig.instance.timeout,
+    );
+
+    // Initialize face service
+    _faceService = FaceService(networkService: networkService);
+
+    // Get student ID from shared preferences
+    await _getStudentId();
+  }
+
+  Future<void> _getStudentId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final studentIdStr = prefs.getString('student_id');
+      if (studentIdStr != null) {
+        setState(() {
+          _studentId = int.parse(studentIdStr);
+        });
+        debugPrint('Student ID loaded: $_studentId');
+      } else {
+        debugPrint('No student_id found in SharedPreferences');
+        // For demo, set a default student ID
+        setState(() {
+          _studentId = 12345; // Demo ID
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading student ID: $e');
+      // Set demo ID as fallback
+      setState(() {
+        _studentId = 12345; // Demo ID
+      });
+    }
   }
 
   Future<void> _requestCameraPermission() async {
@@ -123,7 +174,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
         _isCameraInitialized = true;
       });
 
-      // Start demo face detection
+      // Start real face detection (simulated in demo)
       _startDemoFaceDetection();
     } catch (e) {
       print('Error initializing camera: $e');
@@ -166,7 +217,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
           _countdownSeconds--;
         });
       } else {
-        _completeRegistration();
+        _captureAndRegisterFace();
       }
     });
   }
@@ -180,29 +231,94 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
     }
   }
 
-  void _completeRegistration() {
+  Future<void> _captureAndRegisterFace() async {
     _registrationTimer?.cancel();
-
-    // Navigate back to settings screen with a slight delay to ensure UI updates
-    Future.delayed(const Duration(milliseconds: 500), () {
+    
+    try {
+      setState(() {
+        _isProcessing = true;
+      });
+      
+      // Take picture
+      if (_cameraController == null || !_cameraController!.value.isInitialized) {
+        throw Exception('Camera controller not initialized');
+      }
+      
+      // Capture the image
+      final image = await _cameraController!.takePicture();
+      setState(() {
+        _capturedImage = image;
+      });
+      
+      if (_studentId == null) {
+        throw Exception('Student ID not available');
+      }
+      
+      // Convert image to base64
+      final imageBytes = await File(image.path).readAsBytes();
+      final base64Image = base64Encode(imageBytes);
+      
+      // Send to backend
+      if (_faceService == null) {
+        throw Exception('Face service not initialized');
+      }
+      
+      final result = await _faceService!.registerFace(_studentId!, base64Image);
+      
+      if (result['success'] == true) {
+        // Registration successful
+        if (mounted) {
+          Navigator.pop(context);
+          toastification.show(
+            context: context,
+            type: ToastificationType.success,
+            style: ToastificationStyle.fillColored,
+            autoCloseDuration: const Duration(seconds: 3),
+            title: const Text('Berhasil'),
+            description: const Text('Wajah berhasil didaftarkan'),
+            showProgressBar: true,
+            primaryColor: AppColors.success,
+            closeOnClick: true,
+            dragToClose: true,
+          );
+        }
+      } else {
+        // Registration failed
+        throw Exception(result['message'] ?? 'Gagal mendaftarkan wajah');
+      }
+    } catch (e) {
+      debugPrint('Error during face registration: $e');
       if (mounted) {
-        Navigator.pop(context);
-
-        // Show success notification
         toastification.show(
           context: context,
-          type: ToastificationType.success,
+          type: ToastificationType.error,
           style: ToastificationStyle.fillColored,
           autoCloseDuration: const Duration(seconds: 3),
-          title: const Text('Berhasil'),
-          description: const Text('Wajah berhasil didaftarkan'),
+          title: const Text('Gagal'),
+          description: Text('Pendaftaran wajah gagal: $e'),
           showProgressBar: true,
-          primaryColor: AppColors.success,
+          primaryColor: AppColors.error,
           closeOnClick: true,
           dragToClose: true,
         );
       }
-    });
+    } finally {
+      // Clean up
+      if (_capturedImage != null) {
+        try {
+          await File(_capturedImage!.path).delete();
+        } catch (e) {
+          debugPrint('Error deleting temporary image: $e');
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _isRegistering = false;
+        });
+      }
+    }
   }
 
   @override
@@ -280,8 +396,35 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
                     ),
                   ),
 
+                // Processing overlay
+                if (_isProcessing)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black.withOpacity(0.7),
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(height: 20),
+                            Text(
+                              'Mendaftarkan wajah...',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
                 // Countdown text overlay
-                if (_isFaceDetected && _isRegistering)
+                if (_isFaceDetected && _isRegistering && !_isProcessing)
                   Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
