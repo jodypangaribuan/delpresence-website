@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -206,7 +207,22 @@ func (h *StudentCourseHandler) GetStudentCourses(c *gin.Context) {
 				if err == nil && lecturer.FullName != "" {
 					courseWithDetails.LecturerID = uint(lecturer.ID)
 					courseWithDetails.LecturerName = lecturer.FullName
+				} else {
+					// Try other methods to get lecturer name
+					// Try by UserID first
+					lecturer, err = lecturerRepo.GetByUserID(int(assignments[0].UserID))
+					if err == nil && lecturer.FullName != "" {
+						courseWithDetails.LecturerID = uint(lecturer.ID)
+						courseWithDetails.LecturerName = lecturer.FullName
+					}
 				}
+
+				// Add debug information
+				fmt.Printf("Course %s - Lecturer assignment found: UserID=%d, Name=%s\n",
+					course.Name, assignments[0].UserID, courseWithDetails.LecturerName)
+			} else {
+				// Add debug information
+				fmt.Printf("Course %s - No lecturer assignment found\n", course.Name)
 			}
 
 			coursesList = append(coursesList, courseWithDetails)

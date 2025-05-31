@@ -72,9 +72,11 @@ class CourseService {
             debugPrint('🔍 First course data: ${jsonEncode(coursesJson.first)}');
             
             // Check specifically for lecturer data in all courses
-            for (int i = 0; i < min(coursesJson.length, 3); i++) {
+            for (int i = 0; i < min(coursesJson.length, 5); i++) {
               final course = coursesJson[i];
-              debugPrint('🔍 Course ${i+1} - ${course['course_name']} - Lecturer data: ${course['lecturer_name']}');
+              debugPrint('🔍 Course ${i+1} - ${course['course_name']} - ' +
+                         'Lecturer data: ${course['lecturer_name']} - ' +
+                         'LecturerID: ${course['lecturer_id']}');
             }
           }
           

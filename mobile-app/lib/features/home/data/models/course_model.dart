@@ -40,6 +40,10 @@ class CourseModel {
     // Extract lecturer name, with better handling for various formats
     String lecturerName = '';
     
+    // Print raw data for debugging
+    print('Raw JSON data for course: ${json['course_name']}');
+    print('Lecturer data: ${json['lecturer_name']}');
+    
     // Try multiple fields where lecturer name might be present
     final possibleLecturerFields = ['lecturer_name', 'lecturer', 'dosen'];
     
@@ -50,13 +54,15 @@ class CourseModel {
           json[field].toString().toLowerCase() != 'null' &&
           json[field].toString().toLowerCase() != 'belum ditentukan') {
         lecturerName = json[field].toString();
+        print('Found lecturer name in field $field: $lecturerName');
         break;
       }
     }
     
-    // Debug output
-    print('Raw lecturer data: ${json['lecturer_name']}');
-    print('Parsed lecturer name: $lecturerName');
+    // If no valid lecturer name found, use default
+    if (lecturerName.isEmpty) {
+      lecturerName = 'Belum ditentukan';
+    }
 
     return CourseModel(
       id: parseValue<String>(json['id'] ?? json['course_id'], ''),

@@ -322,7 +322,8 @@ class _CourseListScreenState extends State<CourseListScreen> {
     
     if (course.lecturer.isEmpty || 
         course.lecturer == 'null' || 
-        course.lecturer == 'Belum ditentukan') {
+        course.lecturer.toLowerCase() == 'belum ditentukan' ||
+        course.lecturer.toLowerCase() == 'dosen') {
       return 'Belum ditentukan';
     }
     return course.lecturer;
