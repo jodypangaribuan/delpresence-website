@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/network_service.dart';
 import '../models/schedule_model.dart';
 
@@ -10,24 +11,45 @@ class ScheduleService {
   ScheduleService({required NetworkService networkService})
       : _networkService = networkService;
 
+  /// Get auth token from shared preferences
+  Future<String?> _getAuthToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    debugPrint('🔑 Retrieved token: ${token != null ? 'Token exists' : 'No token found'}');
+    return token;
+  }
+
   /// Get all schedules for the current student
   Future<List<ScheduleModel>> getStudentSchedules({int? academicYearId}) async {
     try {
+      // Get auth token
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('Tidak ada token autentikasi. Silahkan login kembali.');
+      }
+
       // Build query parameters if academic year ID is provided
       Map<String, dynamic>? queryParams;
       if (academicYearId != null && academicYearId > 0) {
         queryParams = {'academic_year_id': academicYearId.toString()};
       }
 
+      // Prepare auth headers
+      final headers = {
+        'Authorization': 'Bearer $token',
+      };
+
       // Log the API request for debugging
       final endpoint = '/api/student/schedules';
       debugPrint('🔍 Attempting to fetch schedules from: ${_networkService.baseUrl}$endpoint');
       debugPrint('🔍 Query params: $queryParams');
+      debugPrint('🔍 Using Authorization header: Bearer ${token.substring(0, 10)}...');
 
       // Make the API call
       final response = await _networkService.get<Map<String, dynamic>>(
         endpoint,
         queryParams: queryParams,
+        headers: headers,
       );
 
       debugPrint('🔍 Schedule API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
@@ -54,6 +76,9 @@ class ScheduleService {
       } else {
         // If there was an error with the API call
         debugPrint('Error fetching student schedules: ${response.errorMessage}');
+        if (response.statusCode == 401) {
+          throw Exception('Sesi anda telah berakhir. Silahkan login kembali.');
+        }
         if (response.statusCode == 0) {
           debugPrint('🔍 Connection issue - Status code 0 typically means the request didn\'t reach the server');
         }
@@ -76,12 +101,25 @@ class ScheduleService {
   /// Get all academic years
   Future<List<Map<String, dynamic>>> getAcademicYears() async {
     try {
+      // Get auth token
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('Tidak ada token autentikasi. Silahkan login kembali.');
+      }
+
+      // Prepare auth headers
+      final headers = {
+        'Authorization': 'Bearer $token',
+      };
+
       // Log the API request for debugging
       final endpoint = '/api/student/academic-years';
       debugPrint('🔍 Attempting to fetch academic years from: ${_networkService.baseUrl}$endpoint');
+      debugPrint('🔍 Using Authorization header: Bearer ${token.substring(0, 10)}...');
 
       final response = await _networkService.get<Map<String, dynamic>>(
         endpoint,
+        headers: headers,
       );
 
       debugPrint('🔍 Academic years API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
@@ -102,6 +140,9 @@ class ScheduleService {
         }
       } else {
         debugPrint('Error fetching academic years: ${response.errorMessage}');
+        if (response.statusCode == 401) {
+          throw Exception('Sesi anda telah berakhir. Silahkan login kembali.');
+        }
         if (response.statusCode == 0) {
           debugPrint('🔍 Connection issue - Status code 0 typically means the request didn\'t reach the server');
         }
