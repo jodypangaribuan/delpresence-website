@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import '../utils/api_logger.dart';
+import 'package:flutter/foundation.dart';
 
 /// API Response model
 class ApiResponse<T> {
@@ -55,7 +56,16 @@ class NetworkService {
     required this.baseUrl,
     this.defaultHeaders = const {'Content-Type': 'application/json'},
     this.timeout = const Duration(seconds: 30),
-  });
+  }) {
+    debugPrint('🔌 NetworkService initialized with baseUrl: $baseUrl');
+    // Validate the URL format
+    try {
+      final uri = Uri.parse(baseUrl);
+      debugPrint('🔌 Base URL scheme: ${uri.scheme}, host: ${uri.host}, port: ${uri.port}');
+    } catch (e) {
+      debugPrint('⚠️ WARNING: Invalid baseUrl format: $e');
+    }
+  }
 
   /// Builds the complete URL from endpoint
   String _buildUrl(String endpoint) {
@@ -140,12 +150,24 @@ class NetworkService {
 
     String errorMessage = 'Network error occurred';
     if (error is SocketException) {
+      debugPrint('🔌 Socket Exception: ${error.message}');
+      debugPrint('🔌 Address: ${error.address?.address}, Port: ${error.port}');
+      debugPrint('🔌 OS Error: ${error.osError}');
+      
       errorMessage =
           'Could not connect to the server. Please check your internet connection.';
     } else if (error is TimeoutException) {
+      debugPrint('🔌 Timeout Exception: $error');
+      debugPrint('🔌 Timeout duration: $timeout');
+      
       errorMessage = 'The connection timed out. Please try again.';
     } else if (error is FormatException) {
+      debugPrint('🔌 Format Exception: $error');
+      
       errorMessage = 'Invalid response format.';
+    } else {
+      debugPrint('🔌 Unexpected error type: ${error.runtimeType}');
+      debugPrint('🔌 Error details: $error');
     }
 
     return ApiResponse<T>.error(

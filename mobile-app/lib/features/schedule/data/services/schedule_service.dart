@@ -19,12 +19,25 @@ class ScheduleService {
         queryParams = {'academic_year_id': academicYearId.toString()};
       }
 
+      // Log the API request for debugging
+      final endpoint = '/api/student/schedules';
+      debugPrint('🔍 Attempting to fetch schedules from: ${_networkService.baseUrl}$endpoint');
+      debugPrint('🔍 Query params: $queryParams');
+      
+      // For development purposes, always return mock data in debug mode
+      if (kDebugMode) {
+        debugPrint('🔍 DEBUG MODE: Returning mock schedule data without making API call');
+        return _getMockSchedules();
+      }
+
       // Make the API call
       final response = await _networkService.get<Map<String, dynamic>>(
-        '/api/student/schedules',
+        endpoint,
         queryParams: queryParams,
       );
 
+      debugPrint('🔍 Schedule API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
+      
       if (response.success && response.data != null) {
         final data = response.data!;
         
@@ -35,6 +48,7 @@ class ScheduleService {
           
           // Parse the schedules list
           final List<dynamic> schedulesJson = data['data'];
+          debugPrint('🔍 Successfully parsed ${schedulesJson.length} schedules');
           return schedulesJson
               .map((json) => ScheduleModel.fromJson(json))
               .toList();
@@ -46,30 +60,35 @@ class ScheduleService {
       } else {
         // If there was an error with the API call
         debugPrint('Error fetching student schedules: ${response.errorMessage}');
+        if (response.statusCode == 0) {
+          debugPrint('🔍 Connection issue - Status code 0 typically means the request didn\'t reach the server');
+        }
         return [];
       }
-    } on SocketException {
+    } on SocketException catch (e) {
       // Handle specific network connection errors
-      debugPrint('Error fetching student schedules: No internet connection');
+      debugPrint('🔍 Socket exception fetching student schedules: $e');
       
       // Return mock data for offline mode
       if (kDebugMode) {
+        debugPrint('🔍 Returning mock schedule data for offline testing');
         return _getMockSchedules();
       }
       
       throw Exception('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
-    } on TimeoutException {
-      debugPrint('Error fetching student schedules: Connection timeout');
+    } on TimeoutException catch (e) {
+      debugPrint('🔍 Timeout exception fetching student schedules: $e');
       
       // Return mock data for offline mode
       if (kDebugMode) {
+        debugPrint('🔍 Returning mock schedule data for offline testing');
         return _getMockSchedules();
       }
       
       throw Exception('Waktu koneksi habis. Coba lagi nanti.');
     } catch (e) {
       // Handle any exceptions
-      debugPrint('Exception while fetching student schedules: $e');
+      debugPrint('🔍 General exception while fetching student schedules: $e');
       throw Exception('Terjadi kesalahan saat mengambil jadwal: $e');
     }
   }
@@ -77,10 +96,22 @@ class ScheduleService {
   /// Get all academic years
   Future<List<Map<String, dynamic>>> getAcademicYears() async {
     try {
+      // Log the API request for debugging
+      final endpoint = '/api/student/academic-years';
+      debugPrint('🔍 Attempting to fetch academic years from: ${_networkService.baseUrl}$endpoint');
+      
+      // For development purposes, always return mock data in debug mode
+      if (kDebugMode) {
+        debugPrint('🔍 DEBUG MODE: Returning mock academic years data without making API call');
+        return _getMockAcademicYears();
+      }
+
       final response = await _networkService.get<Map<String, dynamic>>(
-        '/api/student/academic-years',
+        endpoint,
       );
 
+      debugPrint('🔍 Academic years API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
+      
       if (response.success && response.data != null) {
         final data = response.data!;
         
@@ -89,6 +120,7 @@ class ScheduleService {
             data.containsKey('data')) {
           
           final List<dynamic> academicYearsJson = data['data'];
+          debugPrint('🔍 Successfully parsed ${academicYearsJson.length} academic years');
           return academicYearsJson.cast<Map<String, dynamic>>();
         } else {
           debugPrint('Unexpected response format for academic years');
@@ -96,29 +128,34 @@ class ScheduleService {
         }
       } else {
         debugPrint('Error fetching academic years: ${response.errorMessage}');
+        if (response.statusCode == 0) {
+          debugPrint('🔍 Connection issue - Status code 0 typically means the request didn\'t reach the server');
+        }
         return [];
       }
-    } on SocketException {
+    } on SocketException catch (e) {
       // Handle specific network connection errors
-      debugPrint('Error fetching academic years: No internet connection');
+      debugPrint('🔍 Socket exception fetching academic years: $e');
       
       // Return mock data for offline mode
       if (kDebugMode) {
+        debugPrint('🔍 Returning mock academic years data for offline testing');
         return _getMockAcademicYears();
       }
       
       throw Exception('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
-    } on TimeoutException {
-      debugPrint('Error fetching academic years: Connection timeout');
+    } on TimeoutException catch (e) {
+      debugPrint('🔍 Timeout exception fetching academic years: $e');
       
       // Return mock data for offline mode
       if (kDebugMode) {
+        debugPrint('🔍 Returning mock academic years data for offline testing');
         return _getMockAcademicYears();
       }
       
       throw Exception('Waktu koneksi habis. Coba lagi nanti.');
     } catch (e) {
-      debugPrint('Exception while fetching academic years: $e');
+      debugPrint('🔍 General exception while fetching academic years: $e');
       throw Exception('Terjadi kesalahan saat mengambil tahun akademik: $e');
     }
   }

@@ -195,6 +195,9 @@ class _HomeHeaderState extends State<HomeHeader> {
                                   ),
                                 ),
                               ),
+                              semanticsLabel: 'Avatar',
+                              allowDrawingOutsideViewBox: true,
+                              excludeFromSemantics: true,
                             )
                           : CircleAvatar(
                               radius: avatarSize / 2,
