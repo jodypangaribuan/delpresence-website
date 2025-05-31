@@ -194,6 +194,7 @@ func (h *StudentCourseHandler) GetStudentCourses(c *gin.Context) {
 				StudentGroupName: group.Name,
 				AcademicYearID:   course.AcademicYearID,
 				AcademicYearName: academicYearName,
+				LecturerName:     "Belum ditentukan", // Default value when no lecturer is assigned
 			}
 
 			// Get lecturer assignment for this course
@@ -202,7 +203,7 @@ func (h *StudentCourseHandler) GetStudentCourses(c *gin.Context) {
 				// Get lecturer information
 				lecturerRepo := repositories.NewLecturerRepository()
 				lecturer, err := lecturerRepo.GetByID(uint(assignments[0].UserID))
-				if err == nil {
+				if err == nil && lecturer.FullName != "" {
 					courseWithDetails.LecturerID = uint(lecturer.ID)
 					courseWithDetails.LecturerName = lecturer.FullName
 				}

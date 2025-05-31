@@ -37,14 +37,26 @@ class CourseModel {
       }
     }
 
-    // Extract lecturer name, handling null and empty values
+    // Extract lecturer name, with better handling for various formats
     String lecturerName = '';
-    final rawLecturerName = json['lecturer_name'];
-    if (rawLecturerName != null && 
-        rawLecturerName.toString().isNotEmpty && 
-        rawLecturerName.toString().toLowerCase() != 'null') {
-      lecturerName = rawLecturerName.toString();
+    
+    // Try multiple fields where lecturer name might be present
+    final possibleLecturerFields = ['lecturer_name', 'lecturer', 'dosen'];
+    
+    for (final field in possibleLecturerFields) {
+      if (json.containsKey(field) && 
+          json[field] != null && 
+          json[field].toString().isNotEmpty && 
+          json[field].toString().toLowerCase() != 'null' &&
+          json[field].toString().toLowerCase() != 'belum ditentukan') {
+        lecturerName = json[field].toString();
+        break;
+      }
     }
+    
+    // Debug output
+    print('Raw lecturer data: ${json['lecturer_name']}');
+    print('Parsed lecturer name: $lecturerName');
 
     return CourseModel(
       id: parseValue<String>(json['id'] ?? json['course_id'], ''),

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/network_service.dart';
@@ -66,10 +67,15 @@ class CourseService {
           final List<dynamic> coursesJson = data['data'];
           debugPrint('🔍 Successfully parsed ${coursesJson.length} courses');
           
-          // Debug: Print raw lecturer data from first course if available
+          // Debug: Print detailed information about courses
           if (coursesJson.isNotEmpty) {
-            final firstCourse = coursesJson.first;
-            debugPrint('🔍 First course lecturer_name: ${firstCourse['lecturer_name']}');
+            debugPrint('🔍 First course data: ${jsonEncode(coursesJson.first)}');
+            
+            // Check specifically for lecturer data in all courses
+            for (int i = 0; i < min(coursesJson.length, 3); i++) {
+              final course = coursesJson[i];
+              debugPrint('🔍 Course ${i+1} - ${course['course_name']} - Lecturer data: ${course['lecturer_name']}');
+            }
           }
           
           return coursesJson
