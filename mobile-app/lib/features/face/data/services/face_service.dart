@@ -8,11 +8,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class FaceService {
   final NetworkService _networkService;
-  // The face recognition service has a separate URL
-  final String _faceApiUrl = 'https://7c00-103-167-217-200.ngrok-free.app/api';
+  // Use ApiConfig instead of hardcoded URL
+  late final String _faceApiUrl;
 
   FaceService({required NetworkService networkService})
-      : _networkService = networkService;
+      : _networkService = networkService {
+    // Get the base URL from ApiConfig
+    _faceApiUrl = ApiConfig.instance.baseUrl;
+    debugPrint('🔌 Face service initialized with URL: $_faceApiUrl');
+  }
 
   /// Get auth token from shared preferences
   Future<String?> _getAuthToken() async {
@@ -31,7 +35,8 @@ class FaceService {
     dynamic body,
   }) async {
     try {
-      final uri = Uri.parse('$_faceApiUrl$path');
+      // Match exact URL structure in face_recognition_handler.go
+      final uri = Uri.parse('$_faceApiUrl/api$path');
       debugPrint('🔌 Making direct request to: $uri');
       
       http.Response response;
@@ -71,6 +76,15 @@ class FaceService {
           responseData = json.decode(response.body);
         } catch (e) {
           debugPrint('🔌 Error decoding response: $e');
+          debugPrint('🔌 Response body: ${response.body}');
+          
+          if (response.statusCode == 404) {
+            return {
+              'success': false,
+              'message': 'API endpoint not found. Please check the server configuration.'
+            };
+          }
+          
           throw Exception('Failed to parse response: $e');
         }
       }
@@ -110,7 +124,7 @@ class FaceService {
         'image': base64Image,
       });
 
-      // Make a direct API call to the face service
+      // Make a direct API call to the face service - match Go backend
       final result = await _makeDirectRequest(
         path: '/student/face-registration',
         method: 'POST',
@@ -151,7 +165,7 @@ class FaceService {
         'image': base64Image,
       });
 
-      // Make a direct API call to the face service
+      // Make a direct API call to the face service - match Go backend
       final result = await _makeDirectRequest(
         path: '/attendance/face-verification',
         method: 'POST',
@@ -185,7 +199,7 @@ class FaceService {
         'Authorization': 'Bearer $token',
       };
 
-      // Make a direct API call to the face service
+      // Make a direct API call to the face service - match Go backend
       final result = await _makeDirectRequest(
         path: '/student/$studentId/registered-faces',
         method: 'GET',
@@ -225,7 +239,7 @@ class FaceService {
         'embedding_id': embeddingId,
       });
 
-      // Make a direct API call to the face service
+      // Make a direct API call to the face service - match Go backend
       final result = await _makeDirectRequest(
         path: '/student/face',
         method: 'DELETE',
