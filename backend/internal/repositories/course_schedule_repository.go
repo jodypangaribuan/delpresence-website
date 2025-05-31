@@ -438,6 +438,21 @@ func (r *CourseScheduleRepository) UpdateSchedulesForRoom(roomID uint, capacity 
 	return nil
 }
 
+// GetByStudentGroupAndAcademicYear returns course schedules by student group ID and academic year ID
+func (r *CourseScheduleRepository) GetByStudentGroupAndAcademicYear(studentGroupID uint, academicYearID uint) ([]models.CourseSchedule, error) {
+	var schedules []models.CourseSchedule
+	err := r.db.
+		Preload("Course").
+		Preload("Room").
+		Preload("Room.Building").
+		Preload("Lecturer").
+		Preload("StudentGroup").
+		Preload("AcademicYear").
+		Where("student_group_id = ? AND academic_year_id = ?", studentGroupID, academicYearID).
+		Find(&schedules).Error
+	return schedules, err
+}
+
 // DB returns the database instance
 func (r *CourseScheduleRepository) DB() *gorm.DB {
 	return r.db

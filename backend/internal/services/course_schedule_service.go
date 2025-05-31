@@ -349,6 +349,11 @@ func (s *CourseScheduleService) GetSchedulesByCourseAndAcademicYear(courseID, ac
 	return s.repo.GetByCourseAndAcademicYear(courseID, academicYearID)
 }
 
+// GetSchedulesByStudentGroupAndAcademicYear retrieves schedules by student group and academic year
+func (s *CourseScheduleService) GetSchedulesByStudentGroupAndAcademicYear(studentGroupID uint, academicYearID uint) ([]models.CourseSchedule, error) {
+	return s.repo.GetByStudentGroupAndAcademicYear(studentGroupID, academicYearID)
+}
+
 // FormatScheduleForResponse formats a schedule for response to clients
 func (s *CourseScheduleService) FormatScheduleForResponse(schedule models.CourseSchedule) map[string]interface{} {
 	// Build a response that matches the expected frontend format

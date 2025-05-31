@@ -257,6 +257,8 @@ func main() {
 		studentRoutes.Use(middleware.RoleMiddleware("Mahasiswa"))
 		{
 			// Student routes go here
+			studentRoutes.GET("/schedules", courseScheduleHandler.GetStudentSchedules)
+			studentRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
 		}
 	}
 

@@ -962,3 +962,118 @@ func (h *CourseScheduleHandler) validateLecturerAssignment(courseID, academicYea
 	assignedLecturerID := uint(assignments[0].UserID)
 	return assignedLecturerID, nil
 }
+
+// GetStudentSchedules returns the schedules for the logged in student
+func (h *CourseScheduleHandler) GetStudentSchedules(c *gin.Context) {
+	// Get the user ID from the JWT token context
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "error",
+			"message": "User not found in token",
+		})
+		return
+	}
+
+	// Convert to the appropriate type
+	var userIDInt int
+	switch v := userID.(type) {
+	case float64:
+		userIDInt = int(v)
+	case int:
+		userIDInt = v
+	case uint:
+		userIDInt = int(v)
+	case string:
+		id, err := strconv.Atoi(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "error",
+				"message": "Invalid user ID format",
+			})
+			return
+		}
+		userIDInt = id
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Invalid user ID type",
+		})
+		return
+	}
+
+	// Get the student by userID from authentication
+	studentRepo := repositories.NewStudentRepository()
+	student, err := studentRepo.FindByUserID(userIDInt)
+	if err != nil || student == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": "Student not found",
+		})
+		return
+	}
+
+	// Get student groups for this student
+	studentGroupRepo := repositories.NewStudentGroupRepository()
+	studentGroups, err := studentGroupRepo.GetGroupsByStudentID(student.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  "error",
+			"message": "Failed to get student groups",
+		})
+		return
+	}
+
+	// If the student isn't in any groups, return empty schedules
+	if len(studentGroups) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"data":    []interface{}{},
+			"message": "Student is not assigned to any groups",
+		})
+		return
+	}
+
+	// Get schedules for all student groups
+	var allSchedules []models.CourseSchedule
+
+	// Check if we should filter by academic year
+	academicYearIDStr := c.Query("academic_year_id")
+	var academicYearID uint
+	if academicYearIDStr != "" {
+		id, convErr := strconv.ParseUint(academicYearIDStr, 10, 32)
+		if convErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":  "error",
+				"message": "Invalid academic year ID",
+			})
+			return
+		}
+		academicYearID = uint(id)
+	}
+
+	for _, group := range studentGroups {
+		var schedules []models.CourseSchedule
+		var err error
+
+		if academicYearIDStr != "" {
+			// Get schedules for this group in the specified academic year
+			schedules, err = h.service.GetSchedulesByStudentGroupAndAcademicYear(group.ID, academicYearID)
+		} else {
+			// Get all schedules for this group
+			schedules, err = h.service.GetSchedulesByStudentGroup(group.ID)
+		}
+
+		if err != nil {
+			continue
+		}
+
+		allSchedules = append(allSchedules, schedules...)
+	}
+
+	formattedSchedules := h.service.FormatSchedulesForResponse(allSchedules)
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   formattedSchedules,
+	})
+}

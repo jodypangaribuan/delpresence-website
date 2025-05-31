@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/services/network_service.dart';
 import '../../data/models/schedule_model.dart';
+import '../../data/services/schedule_service.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -15,6 +17,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   late DateTime _currentMonth;
   late DateTime _selectedDate;
   late String _selectedDay;
+  
+  // Add these properties for API integration
+  late ScheduleService _scheduleService;
+  List<ScheduleModel> _schedules = [];
+  List<Map<String, dynamic>> _academicYears = [];
+  int? _selectedAcademicYearId;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   // Format for month and year (April 2025)
   final DateFormat _monthYearFormat = DateFormat('MMMM yyyy', 'id_ID');
@@ -68,6 +78,75 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     _currentMonth = DateTime.now();
     _selectedDate = DateTime.now();
     _selectedDay = _dayAbbr[_selectedDate.weekday - 1];
+    
+    // Initialize the network service and schedule service
+    final networkService = NetworkService(
+      baseUrl: const String.fromEnvironment('API_BASE_URL', 
+        defaultValue: 'http://localhost:8080'),
+      timeout: const Duration(seconds: 15),
+    );
+    _scheduleService = ScheduleService(networkService: networkService);
+    
+    // Fetch data from the API
+    _fetchAcademicYears();
+  }
+  
+  // Fetch academic years from the API
+  Future<void> _fetchAcademicYears() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      final academicYears = await _scheduleService.getAcademicYears();
+      
+      setState(() {
+        _academicYears = academicYears;
+        
+        // Set selected academic year to the first active one or the most recent
+        if (academicYears.isNotEmpty) {
+          // First try to find an active academic year
+          final activeYear = academicYears.firstWhere(
+            (year) => year['is_active'] == true,
+            orElse: () => academicYears.first,
+          );
+          _selectedAcademicYearId = activeYear['id'];
+        }
+      });
+      
+      // After getting academic years, fetch schedules
+      await _fetchSchedules();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal memuat tahun akademik: $e';
+      });
+    }
+  }
+  
+  // Fetch schedules from the API
+  Future<void> _fetchSchedules() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      final schedules = await _scheduleService.getStudentSchedules(
+        academicYearId: _selectedAcademicYearId,
+      );
+      
+      setState(() {
+        _schedules = schedules;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal memuat jadwal: $e';
+      });
+    }
   }
 
   @override
@@ -91,6 +170,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black87),
+            onPressed: _fetchSchedules,
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Divider(
@@ -102,6 +187,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       body: Column(
         children: [
+          _buildAcademicYearSelector(),
           _buildMonthSelector(),
           _buildCalendar(),
           _buildSelectedDateHeader(),
@@ -368,182 +454,285 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Widget _buildScheduleList() {
-    // Get schedules for the selected date's day
-    final indonesianDayName = _dayNames[_selectedDate.weekday - 1];
-    final schedules = ScheduleModel.getSchedulesByDay(indonesianDayName);
-
-    if (schedules.isEmpty) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+    
+    if (_errorMessage != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.event_busy,
-              size: 80,
-              color: Colors.grey[200],
+            const Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Colors.red,
             ),
             const SizedBox(height: 16),
             Text(
-              'Tidak ada jadwal di hari ini',
-              style: TextStyle(
-                color: Colors.grey[600],
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w500,
+                color: Colors.red,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Nikmati waktu luang Anda!',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[400],
-              ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchSchedules,
+              child: const Text('Coba Lagi'),
             ),
           ],
         ),
       );
     }
-
+    
+    final dayName = _dayNames[_selectedDate.weekday - 1];
+    final daySchedules = ScheduleModel.getSchedulesByDay(_schedules, dayName);
+    
+    if (daySchedules.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.event_busy,
+              size: 48,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Tidak ada jadwal untuk hari ini',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+            ),
+            if (_academicYears.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'Pilih Tahun Akademik:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              DropdownButton<int>(
+                value: _selectedAcademicYearId,
+                hint: const Text('Pilih Tahun Akademik'),
+                onChanged: (int? newValue) {
+                  setState(() {
+                    _selectedAcademicYearId = newValue;
+                  });
+                  _fetchSchedules();
+                },
+                items: _academicYears.map<DropdownMenuItem<int>>((year) {
+                  return DropdownMenuItem<int>(
+                    value: year['id'],
+                    child: Text(
+                      '${year['name']} ${year['is_active'] == true ? "(Aktif)" : ""}',
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+    
     return ListView.builder(
-      itemCount: schedules.length,
       padding: const EdgeInsets.all(16),
-      physics: const BouncingScrollPhysics(),
+      itemCount: daySchedules.length,
       itemBuilder: (context, index) {
-        final schedule = schedules[index];
+        final schedule = daySchedules[index];
         return _buildScheduleCard(schedule);
       },
     );
   }
 
   Widget _buildScheduleCard(ScheduleModel schedule) {
-    // Determine the border color based on course
-    Color borderColor = _getCourseColor(schedule.courseTitle);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        side: BorderSide(color: Colors.grey[200]!, width: 1),
       ),
-      child: Column(
-        children: [
-          // Time and box icon at the top
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[200]!, width: 1),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.book_outlined,
-                  color: borderColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  '${schedule.startTime} - ${schedule.endTime} WIB',
-                  style: TextStyle(
-                    color: borderColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Colors.grey[400],
-                ),
-              ],
-            ),
-          ),
-
-          // Course title and description
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  schedule.courseTitle,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
+                // Time column
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${schedule.startTime} - ${schedule.endTime}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.blue[700],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          schedule.roomName,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.business_outlined,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          schedule.buildingName,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  _getCourseDescription(schedule.courseTitle),
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: Colors.grey[600],
-                    height: 1.4,
+                
+                const SizedBox(width: 16),
+                
+                // Course info column
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        schedule.courseName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        schedule.courseCode,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              schedule.lecturerName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.group_outlined,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              schedule.studentGroupName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-          ),
-
-          // Divider
-          Divider(height: 1, thickness: 1, color: Colors.grey[100]),
-
-          // Room and lecturer info
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  Icons.location_on_outlined,
-                  size: 16,
-                  color: Colors.grey[600],
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  schedule.roomName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: schedule.getStatusColor().withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    schedule.status,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: schedule.getStatusColor(),
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Icon(
-                  Icons.book_outlined,
-                  size: 16,
-                  color: Colors.grey[600],
-                ),
-                const SizedBox(width: 6),
                 Text(
-                  "${schedule.credits} SKS",
+                  'Tahun Akademik: ${schedule.academicYearName}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -554,41 +743,35 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   bool _dateHasSchedules(DateTime date) {
-    // Get Indonesian day name directly from weekday
-    final indonesianDayName = _dayNames[date.weekday - 1];
-
-    // Check if there are schedules for this day
-    final schedules = ScheduleModel.getSchedulesByDay(indonesianDayName);
-    return schedules.isNotEmpty;
+    final dayName = _dayNames[date.weekday - 1];
+    return _schedules.any((schedule) => 
+      schedule.day.toLowerCase() == dayName.toLowerCase());
   }
 
-  Color _getCourseColor(String courseName) {
-    // Use consistent black color for all courses
-    return Colors.black87;
-  }
-
-  String _getCourseDescription(String courseName) {
-    // Sample descriptions for each course
-    final Map<String, String> courseDescriptions = {
-      'Pemrograman Mobile':
-          'Mata kuliah ini mengajarkan tentang pengembangan aplikasi mobile untuk platform Android dan iOS menggunakan Flutter.',
-      'Basis Data Lanjut':
-          'Kuliah ini membahas konsep lanjutan dari database, termasuk normalisasi, query optimization, dan distributed databases.',
-      'Bahasa Inggris III':
-          'Mata kuliah ini bertujuan untuk mempersiapkan mahasiswa dalam mengikuti tes TOEFL ITP yang menjadi persyaratan kelulusan di universitas.',
-      'Pengujian Kualitas Perangkat Lunak':
-          'Mata kuliah ini memperkenalkan peran/pentingnya pengujian perangkat lunak, teknik pengujian, dan perencanaan pengujian.',
-      'Desain Pengalaman Pengguna':
-          'Pengalaman Pengguna bukan tentang membuat sesuatu yang cantik, tetapi tentang menciptakan pengalaman yang menyeluruh bagi pengguna akhir.',
-      'Aljabar Linear':
-          'Aljabar Linier dan Matriks berisi bahasan bagaimana menerapkan konsep matriks dan berbagai metode penyelesaian.',
-      'Keamanan Perangkat Lunak':
-          'Secara garis besar, terdapat 3 topik yang akan diberikan, yakni (1) prinsip keamanan komputer, (2) teknik keamanan, dan (3) implementasi keamanan perangkat lunak.',
-      'Sistem Komputasi Awan':
-          'Kuliah ini menawarkan pembelajaran tingkat lanjut mengenai implementasi sebuah jaringan sistem komputasi awan dan penerapannya dalam dunia industri.',
-    };
-
-    return courseDescriptions[courseName] ??
-        'Deskripsi mata kuliah tidak tersedia.';
+  Widget _buildAcademicYearSelector() {
+    if (_academicYears.isEmpty) return const SizedBox.shrink();
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: DropdownButton<int>(
+        isExpanded: true,
+        value: _selectedAcademicYearId,
+        hint: const Text('Pilih Tahun Akademik'),
+        onChanged: (int? newValue) {
+          setState(() {
+            _selectedAcademicYearId = newValue;
+          });
+          _fetchSchedules();
+        },
+        items: _academicYears.map<DropdownMenuItem<int>>((year) {
+          return DropdownMenuItem<int>(
+            value: year['id'],
+            child: Text(
+              '${year['name']} ${year['is_active'] == true ? "(Aktif)" : ""}',
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 }
