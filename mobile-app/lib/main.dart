@@ -7,8 +7,10 @@ import 'package:http/http.dart' as http;
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:toastification/toastification.dart';
 import 'dart:io';
+import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter/rendering.dart';
 
 import 'core/theme/theme.dart';
 import 'core/utils/http_override.dart';
@@ -29,7 +31,22 @@ Future<void> _preloadAssets() async {
   try {
     // Preload background image to check if it can load properly
     final imageProvider = AssetImage('assets/images/background/background-header.png');
-    await precacheImage(imageProvider, null);
+    // Use a BuildContext-free approach for preloading
+    final imageStream = imageProvider.resolve(ImageConfiguration.empty);
+    final completer = Completer<void>();
+    final listener = ImageStreamListener(
+      (ImageInfo info, bool syncCall) {
+        completer.complete();
+      },
+      onError: (dynamic exception, StackTrace? stackTrace) {
+        debugPrint('Error preloading header background image: $exception');
+        completer.completeError(exception);
+      },
+    );
+    
+    imageStream.addListener(listener);
+    await completer.future;
+    imageStream.removeListener(listener);
     debugPrint('Successfully preloaded header background image');
   } catch (e) {
     debugPrint('Error preloading assets: $e');
