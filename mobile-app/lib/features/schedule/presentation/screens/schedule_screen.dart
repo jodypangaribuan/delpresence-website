@@ -223,12 +223,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       body: Column(
         children: [
-          _buildAcademicYearSelector(),
           _buildMonthSelector(),
           _buildCalendar(),
           _buildSelectedDateHeader(),
           Expanded(
-            child: _buildScheduleList(),
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: Colors.white,
+              onRefresh: () async {
+                await _fetchSchedules();
+              },
+              child: _buildScheduleList(),
+            ),
           ),
         ],
       ),
@@ -529,60 +535,38 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final daySchedules = ScheduleModel.getSchedulesByDay(_schedules, dayName);
     
     if (daySchedules.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.event_busy,
-              size: 48,
-              color: Colors.grey,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Tidak ada jadwal untuk hari ini',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-            if (_academicYears.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              const Text(
-                'Pilih Tahun Akademik:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height / 3),
+          const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.event_busy,
+                  size: 48,
+                  color: Colors.grey,
                 ),
-              ),
-              const SizedBox(height: 8),
-              DropdownButton<int>(
-                value: _selectedAcademicYearId,
-                hint: const Text('Pilih Tahun Akademik'),
-                onChanged: (int? newValue) {
-                  setState(() {
-                    _selectedAcademicYearId = newValue;
-                  });
-                  _fetchSchedules();
-                },
-                items: _academicYears.map<DropdownMenuItem<int>>((year) {
-                  return DropdownMenuItem<int>(
-                    value: year['id'],
-                    child: Text(
-                      '${year['name']} ${year['is_active'] == true ? "(Aktif)" : ""}',
+                SizedBox(height: 16),
+                Text(
+                  'Tidak ada jadwal untuk hari ini',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
             ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: daySchedules.length,
+      physics: const AlwaysScrollableScrollPhysics(),
       itemBuilder: (context, index) {
         final schedule = daySchedules[index];
         return _buildScheduleCard(schedule);
@@ -807,33 +791,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final dayName = _dayNames[date.weekday - 1];
     return _schedules.any((schedule) => 
       schedule.day.toLowerCase() == dayName.toLowerCase());
-  }
-
-  Widget _buildAcademicYearSelector() {
-    if (_academicYears.isEmpty) return const SizedBox.shrink();
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: DropdownButton<int>(
-        isExpanded: true,
-        value: _selectedAcademicYearId,
-        hint: const Text('Pilih Tahun Akademik'),
-        onChanged: (int? newValue) {
-          setState(() {
-            _selectedAcademicYearId = newValue;
-          });
-          _fetchSchedules();
-        },
-        items: _academicYears.map<DropdownMenuItem<int>>((year) {
-          return DropdownMenuItem<int>(
-            value: year['id'],
-            child: Text(
-              '${year['name']} ${year['is_active'] == true ? "(Aktif)" : ""}',
-            ),
-          );
-        }).toList(),
-      ),
-    );
   }
 
   // Add a helper method to safely format the month and year

@@ -192,7 +192,14 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
         children: [
           _buildTodayHeader(),
           Expanded(
-            child: _buildScheduleList(),
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: Colors.white,
+              onRefresh: () async {
+                await _fetchAcademicYears();
+              },
+              child: _buildScheduleList(),
+            ),
           ),
         ],
       ),
@@ -320,47 +327,56 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
     }
 
     if (_todaySchedules.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.event_busy,
-              size: 48,
-              color: Colors.grey,
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height / 3),
+          const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.event_busy,
+                  size: 48,
+                  color: Colors.grey,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Tidak ada jadwal untuk hari ini',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Tidak ada jadwal untuk hari ini',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
-    // Sort by start time
-    _todaySchedules.sort((a, b) {
-      final aTimeParts = a.startTime.split(':');
-      final bTimeParts = b.startTime.split(':');
-      
-      final aHour = int.tryParse(aTimeParts[0]) ?? 0;
-      final aMinute = int.tryParse(aTimeParts[1]) ?? 0;
-      final bHour = int.tryParse(bTimeParts[0]) ?? 0;
-      final bMinute = int.tryParse(bTimeParts[1]) ?? 0;
-      
-      final aMinutes = aHour * 60 + aMinute;
-      final bMinutes = bHour * 60 + bMinute;
-      
-      return aMinutes.compareTo(bMinutes);
-    });
+    // Sort by start time if there are schedules
+    if (_todaySchedules.isNotEmpty) {
+      _todaySchedules.sort((a, b) {
+        final aTimeParts = a.startTime.split(':');
+        final bTimeParts = b.startTime.split(':');
+        
+        final aHour = int.tryParse(aTimeParts[0]) ?? 0;
+        final aMinute = int.tryParse(aTimeParts[1]) ?? 0;
+        final bHour = int.tryParse(bTimeParts[0]) ?? 0;
+        final bMinute = int.tryParse(bTimeParts[1]) ?? 0;
+        
+        final aMinutes = aHour * 60 + aMinute;
+        final bMinutes = bHour * 60 + bMinute;
+        
+        return aMinutes.compareTo(bMinutes);
+      });
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _todaySchedules.length,
+      physics: const AlwaysScrollableScrollPhysics(),
       itemBuilder: (context, index) {
         final schedule = _todaySchedules[index];
         return _buildScheduleCard(schedule);

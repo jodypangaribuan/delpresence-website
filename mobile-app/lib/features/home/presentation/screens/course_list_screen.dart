@@ -102,15 +102,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: AppColors.primary,
-        ),
-      );
-    }
-    
-    if (_errorMessage != null) {
+    if (_errorMessage != null && _courses.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -143,46 +135,50 @@ class _CourseListScreenState extends State<CourseListScreen> {
       );
     }
     
-    if (_courses.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return RefreshIndicator(
+      color: AppColors.primary,
+      backgroundColor: Colors.white,
+      onRefresh: () async {
+        await _fetchCourses();
+      },
+      child: _courses.isEmpty ? 
+        // Empty state
+        ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            const Icon(
-              Icons.menu_book_outlined,
-              size: 48,
-              color: Colors.grey,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Tidak ada mata kuliah yang tersedia',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
+            SizedBox(height: MediaQuery.of(context).size.height / 3),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.menu_book_outlined,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Tidak ada mata kuliah yang tersedia',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _fetchCourses,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Muat Ulang'),
             ),
           ],
+        ) :
+        // List of courses
+        ListView.builder(
+          itemCount: _courses.length,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            final course = _courses[index];
+            return _buildCourseCard(course);
+          },
         ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: _courses.length,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      physics: const BouncingScrollPhysics(),
-      itemBuilder: (context, index) {
-        final course = _courses[index];
-        return _buildCourseCard(course);
-      },
     );
   }
 
