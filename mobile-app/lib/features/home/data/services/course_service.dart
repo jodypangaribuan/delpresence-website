@@ -71,8 +71,7 @@ class CourseService {
         } else {
           // If the response format is unexpected
           debugPrint('Unexpected response format: ${data.toString()}');
-          // Return sample data temporarily for development
-          return CourseModel.getSampleCourses();
+          throw Exception('Format respons API tidak valid.');
         }
       } else {
         // If there was an error with the API call
@@ -82,9 +81,9 @@ class CourseService {
         }
         if (response.statusCode == 0) {
           debugPrint('🔍 Connection issue - Status code 0 typically means the request didn\'t reach the server');
+          throw Exception('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
         }
-        // Return sample data temporarily for development
-        return CourseModel.getSampleCourses();
+        throw Exception(response.errorMessage ?? 'Gagal mengambil data mata kuliah.');
       }
     } on SocketException catch (e) {
       // Handle specific network connection errors
