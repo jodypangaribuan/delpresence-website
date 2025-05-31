@@ -242,14 +242,17 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
             ),
           ),
           const SizedBox(height: 4),
-          // Academic year with semester type (Ganjil/Genap)
+          // Academic year with semester type (Ganjil/Genap) from the backend
           Text(
-            // Get active academic year name and add semester type
+            // Get active academic year name and semester from backend data
             _academicYears.isNotEmpty 
                 ? "${_academicYears.firstWhere(
                     (year) => year['is_active'] == true,
                     orElse: () => _academicYears.first,
-                  )['name'].toString()} - ${_getSemesterType(DateTime.now())}"
+                  )['name'].toString()} - ${_academicYears.firstWhere(
+                    (year) => year['is_active'] == true,
+                    orElse: () => _academicYears.first,
+                  )['semester'].toString()}"
                 : 'Tahun Akademik Aktif',
             style: TextStyle(
               fontSize: 12,
@@ -277,17 +280,6 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
       case 11: return 'November';
       case 12: return 'Desember';
       default: return '';
-    }
-  }
-  
-  // Helper method to get semester type (Ganjil/Genap)
-  String _getSemesterType(DateTime now) {
-    if (now.month >= 8 && now.month <= 12) {
-      return 'Ganjil';
-    } else if (now.month >= 1 && now.month <= 7) {
-      return 'Genap';
-    } else {
-      throw Exception('Invalid month for semester type calculation');
     }
   }
   

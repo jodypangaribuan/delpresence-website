@@ -563,84 +563,13 @@ class _HomePage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: CustomRefreshIndicator(
+                    child: RefreshIndicator(
+                      color: AppColors.primary,
+                      backgroundColor: Colors.white,
                       onRefresh: () async {
                         context
                             .read<StudentBloc>()
                             .add(const LoadStudentDataEvent());
-                      },
-                      builder: (
-                        BuildContext context,
-                        Widget child,
-                        IndicatorController controller,
-                      ) {
-                        return Stack(
-                          children: <Widget>[
-                            child,
-                            // Refresh indicator
-                            Positioned(
-                              top: 0.0,
-                              left: 0.0,
-                              right: 0.0,
-                              child: AnimatedBuilder(
-                                animation: controller,
-                                builder: (BuildContext context, Widget? _) {
-                                  return Container(
-                                    height: math.max(controller.value * 100, controller.isLoading ? 60 : 0),
-                                    alignment: Alignment.center,
-                                    child: AnimatedOpacity(
-                                      duration: const Duration(milliseconds: 300),
-                                      opacity: controller.value > 0.0 ? 1.0 : 0.0,
-                                      child: SizedBox(
-                                        height: 40,
-                                        width: 40,
-                                        child: Stack(
-                                          alignment: Alignment.center,
-                                          children: [
-                                            // Rotating progress indicator that matches theme
-                                            CircularProgressIndicator(
-                                              value: controller.isLoading ? null : controller.value,
-                                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                                              backgroundColor: Colors.white,
-                                              strokeWidth: 2.0,
-                                            ),
-                                            // Icon in center
-                                            Container(
-                                              height: 30,
-                                              width: 30,
-                                              decoration: BoxDecoration(
-                                                color: controller.value > 0.8 ? AppColors.primary : Colors.white,
-                                                shape: BoxShape.circle,
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black.withOpacity(0.05),
-                                                    blurRadius: 2,
-                                                    spreadRadius: 0.5,
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Center(
-                                                child: AnimatedSwitcher(
-                                                  duration: const Duration(milliseconds: 300),
-                                                  child: Icon(
-                                                    controller.value > 0.8 ? Icons.arrow_upward : Icons.arrow_downward,
-                                                    color: controller.value > 0.8 ? Colors.white : AppColors.primary,
-                                                    size: 16,
-                                                    key: ValueKey(controller.value > 0.8),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        );
                       },
                       child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
