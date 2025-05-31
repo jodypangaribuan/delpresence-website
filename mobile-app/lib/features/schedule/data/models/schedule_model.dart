@@ -70,8 +70,8 @@ class ScheduleModel {
     final currentTimeMinutes = now.hour * 60 + now.minute;
     
     final day = json['day']?.toString().toLowerCase() ?? '';
-    final startTime = json['start_time'] ?? '';
-    final endTime = json['end_time'] ?? '';
+    final startTime = json['start_time']?.toString() ?? '';
+    final endTime = json['end_time']?.toString() ?? '';
     
     if (startTime.isNotEmpty && endTime.isNotEmpty) {
       final startTimeParts = startTime.split(':');
@@ -97,25 +97,40 @@ class ScheduleModel {
       }
     }
     
+    // Helper function to safely convert values that might be int or String
+    T parseValue<T>(dynamic value, T defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is T) return value;
+      
+      // Handle specific type conversions
+      if (T == int && value is String) {
+        return int.tryParse(value) as T? ?? defaultValue;
+      } else if (T == String && value is int) {
+        return value.toString() as T;
+      } else {
+        return defaultValue;
+      }
+    }
+    
     return ScheduleModel(
-      id: json['id'] ?? 0,
-      courseId: json['course_id'] ?? 0,
-      courseCode: json['course_code'] ?? '',
-      courseName: json['course_name'] ?? '',
-      day: json['day'] ?? '',
-      startTime: json['start_time'] ?? '',
-      endTime: json['end_time'] ?? '',
-      roomName: json['room_name'] ?? '',
-      buildingName: json['building_name'] ?? '',
-      lecturerId: json['lecturer_id'] ?? 0,
-      lecturerName: json['lecturer_name'] ?? '',
-      studentGroupId: json['student_group_id'] ?? 0,
-      studentGroupName: json['student_group_name'] ?? '',
-      academicYearId: json['academic_year_id'] ?? 0,
-      academicYearName: json['academic_year_name'] ?? '',
-      capacity: json['capacity'] ?? 0,
-      enrolled: json['enrolled'] ?? 0,
-      semester: json['semester'],
+      id: parseValue<int>(json['id'], 0),
+      courseId: parseValue<int>(json['course_id'], 0),
+      courseCode: parseValue<String>(json['course_code'], ''),
+      courseName: parseValue<String>(json['course_name'], ''),
+      day: parseValue<String>(json['day'], ''),
+      startTime: parseValue<String>(json['start_time'], ''),
+      endTime: parseValue<String>(json['end_time'], ''),
+      roomName: parseValue<String>(json['room_name'], ''),
+      buildingName: parseValue<String>(json['building_name'], ''),
+      lecturerId: parseValue<int>(json['lecturer_id'], 0),
+      lecturerName: parseValue<String>(json['lecturer_name'], ''),
+      studentGroupId: parseValue<int>(json['student_group_id'], 0),
+      studentGroupName: parseValue<String>(json['student_group_name'], ''),
+      academicYearId: parseValue<int>(json['academic_year_id'], 0),
+      academicYearName: parseValue<String>(json['academic_year_name'], ''),
+      capacity: parseValue<int>(json['capacity'], 0),
+      enrolled: parseValue<int>(json['enrolled'], 0),
+      semester: json['semester']?.toString(),
       status: scheduleStatus,
     );
   }
