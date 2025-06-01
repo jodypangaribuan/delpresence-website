@@ -22,6 +22,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   String? _scheduleError;
   late ScheduleService _scheduleService;
   Map<int, bool> _activeSessionsMap = {}; // To store active session status
+  Map<int, bool> _attendanceStatusMap = {}; // Track attendance status
 
   @override
   void initState() {
@@ -86,6 +87,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     if (schedules.isEmpty || !mounted) return;
     
     Map<int, bool> tempMap = {};
+    Map<int, bool> attendanceMap = {}; // Create a temporary map for attendance status
+    
     try {
       // Get shared preferences to reset attendance flags when needed
       final prefs = await SharedPreferences.getInstance();
@@ -107,21 +110,36 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
               tempMap[schedule.id] = false; // Default to false on error
             })
           );
+          
+          // Add attendance status check
+          futures.add(
+            _scheduleService.checkAttendanceStatus(schedule.id).then((hasAttended) {
+              attendanceMap[schedule.id] = hasAttended;
+              debugPrint('🔍 Schedule ${schedule.id} attendance status: ${hasAttended ? 'Attended' : 'Not attended'}');
+            }).catchError((e) {
+              debugPrint('🔍 Error checking attendance status for schedule ${schedule.id}: $e');
+              // Fall back to local preference
+              attendanceMap[schedule.id] = prefs.getBool('attendance_completed_${schedule.id}') ?? false;
+            })
+          );
         } else {
            tempMap[schedule.id] = false; // Default for invalid ID
+           attendanceMap[schedule.id] = false; // Default for invalid ID
         }
       }
       await Future.wait(futures);
       if (mounted) {
         setState(() {
           _activeSessionsMap = tempMap;
+          _attendanceStatusMap = attendanceMap; // Store the attendance status
         });
       }
     } catch (e) {
       // Handle or log error if needed
       if (mounted) {
         setState(() { // Ensure UI reflects that checking might have failed
-            _activeSessionsMap = tempMap; // Use whatever was gathered
+          _activeSessionsMap = tempMap; // Use whatever was gathered
+          _attendanceStatusMap = attendanceMap; // Store whatever attendance data was gathered
         });
       }
     }
