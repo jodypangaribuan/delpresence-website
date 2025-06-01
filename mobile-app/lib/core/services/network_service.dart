@@ -69,9 +69,7 @@ class NetworkService {
 
   /// Builds the complete URL from endpoint
   String _buildUrl(String endpoint) {
-    final url = endpoint.startsWith('http') ? endpoint : '$baseUrl$endpoint';
-    debugPrint('🌐 Built URL: $url');
-    return url;
+    return endpoint.startsWith('http') ? endpoint : '$baseUrl$endpoint';
   }
 
   /// Combines default headers with request-specific headers

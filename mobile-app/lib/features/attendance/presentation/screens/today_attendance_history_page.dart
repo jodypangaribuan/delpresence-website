@@ -4,7 +4,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/constants/colors.dart';
 import '../../data/models/attendance_history_model.dart';
 import '../../../../core/utils/toast_utils.dart';
-import '../../data/services/attendance_service.dart';
 
 class TodayAttendanceHistoryPage extends StatefulWidget {
   const TodayAttendanceHistoryPage({super.key});
@@ -16,11 +15,8 @@ class TodayAttendanceHistoryPage extends StatefulWidget {
 
 class _TodayAttendanceHistoryPageState
     extends State<TodayAttendanceHistoryPage> {
-  late List<AttendanceHistoryModel> _todayRecords = [];
+  late List<AttendanceHistoryModel> _todayRecords;
   bool _initialized = false;
-  bool _isLoading = true;
-  String? _errorMessage;
-  final AttendanceService _attendanceService = AttendanceService();
 
   @override
   void initState() {
@@ -31,7 +27,6 @@ class _TodayAttendanceHistoryPageState
         setState(() {
           _initialized = true;
         });
-        _loadTodayAttendance();
       }
     }).catchError((error) {
       print('Error initializing locale: $error');
@@ -39,54 +34,60 @@ class _TodayAttendanceHistoryPageState
         setState(() {
           _initialized = true; // Still mark as initialized to avoid hanging
         });
-        _loadTodayAttendance();
       }
     });
+    _loadTodayAttendance();
   }
 
-  Future<void> _loadTodayAttendance() async {
-    if (!mounted) return;
-    
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  void _loadTodayAttendance() {
+    // Load sample data and filter for today only
+    final allRecords = AttendanceHistoryModel.getSampleData();
 
-    try {
-      final attendanceHistory = await _attendanceService.getTodayAttendanceHistory();
-      
-      if (mounted) {
-        setState(() {
-          _todayRecords = attendanceHistory;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Gagal memuat data absensi: $e';
-          _isLoading = false;
-        });
-      }
-    }
-  }
+    // Filter records for today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
-  Future<void> _refreshAttendance() async {
-    // Show loading indicator
-    ToastUtils.showInfoToast(context, 'Memperbarui data absensi...');
-    
-    try {
-      final attendanceHistory = await _attendanceService.getTodayAttendanceHistory();
-      
-      if (mounted) {
-        setState(() {
-          _todayRecords = attendanceHistory;
-        });
-        ToastUtils.showSuccessToast(context, 'Data absensi berhasil diperbarui');
+    // First get today's records
+    _todayRecords = allRecords.where((record) {
+      final recordDate = DateTime(
+        record.dateTime.year,
+        record.dateTime.month,
+        record.dateTime.day,
+      );
+      return recordDate.isAtSameMomentAs(today);
+    }).toList();
+
+    // If in development mode, ensure we have records with all status types for demo purposes
+    if (_todayRecords.isNotEmpty) {
+      // Make sure we have one of each status type
+      // This is for demonstration only, in production this would be removed
+      final existing = _todayRecords.map((r) => r.status).toSet();
+
+      // Create copies of existing records with different statuses as needed
+      if (!existing.contains('Terlambat')) {
+        final record = _todayRecords.first;
+        _todayRecords.add(
+          AttendanceHistoryModel(
+            id: '${record.id}_terlambat',
+            courseTitle: 'Aljabar Linier',
+            roomName: record.roomName,
+            dateTime: DateTime(today.year, today.month, today.day, 11, 47),
+            status: 'Terlambat',
+          ),
+        );
       }
-    } catch (e) {
-      if (mounted) {
-        ToastUtils.showErrorToast(context, 'Gagal memuat data absensi: $e');
+
+      if (!existing.contains('Alpa')) {
+        final record = _todayRecords.first;
+        _todayRecords.add(
+          AttendanceHistoryModel(
+            id: '${record.id}_alpa',
+            courseTitle: 'Sistem Komputasi Awan',
+            roomName: 'GD 515 - 156',
+            dateTime: DateTime(today.year, today.month, today.day, 8, 5),
+            status: 'Alpa',
+          ),
+        );
       }
     }
   }
@@ -116,13 +117,8 @@ class _TodayAttendanceHistoryPageState
             color: Colors.black87,
           ),
         ),
-        automaticallyImplyLeading: false, // Remove back button since it's in navbar
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_outlined, color: Colors.black87),
-            onPressed: _refreshAttendance,
-          ),
-        ],
+        automaticallyImplyLeading:
+            false, // Remove back button since it's in navbar
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Divider(
@@ -136,58 +132,7 @@ class _TodayAttendanceHistoryPageState
         children: [
           _buildTodayDateHeader(),
           Expanded(
-            child: _isLoading
-                ? _buildLoadingIndicator()
-                : _errorMessage != null
-                    ? _buildErrorMessage()
-                    : _buildTodayAttendanceList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingIndicator() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Memuat data absensi...'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline_rounded,
-            size: 80,
-            color: Colors.red[300],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _errorMessage ?? 'Terjadi kesalahan',
-            style: TextStyle(
-              color: Colors.red[700],
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _loadTodayAttendance,
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: AppColors.primary,
-            ),
-            child: const Text('Coba Lagi'),
+            child: _buildTodayAttendanceList(),
           ),
         ],
       ),
@@ -286,30 +231,46 @@ class _TodayAttendanceHistoryPageState
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _refreshAttendance,
-      child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 24),
-        itemCount: _todayRecords.length,
-        itemBuilder: (context, index) {
-          final record = _todayRecords[index];
-          return _buildAttendanceItem(record);
-        },
-      ),
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: _todayRecords.length,
+      itemBuilder: (context, index) {
+        final record = _todayRecords[index];
+        return _buildAttendanceItem(record);
+      },
     );
   }
 
   Widget _buildAttendanceItem(AttendanceHistoryModel record) {
-    // Get status color and icon from the model
-    final Color statusColor = record.statusColor;
-    final IconData statusIcon = record.statusIcon;
+    // Determine icon and color based on status
+    IconData statusIcon;
+    Color statusColor;
+
+    switch (record.status) {
+      case 'Hadir':
+        statusIcon = Icons.check_circle_outline_rounded;
+        statusColor = Colors.green;
+        break;
+      case 'Terlambat':
+        statusIcon = Icons.watch_later_outlined;
+        statusColor = Colors.orange;
+        break;
+      case 'Alpa':
+        statusIcon = Icons.cancel_outlined;
+        statusColor = Colors.red;
+        break;
+      default:
+        statusIcon = Icons.check_circle_outline_rounded;
+        statusColor = Colors.green;
+    }
 
     return Column(
       children: [
         InkWell(
           onTap: () {
-            // Show detail dialog
-            _showAttendanceDetailDialog(record);
+            // Handle attendance item tap
+            ToastUtils.showInfoToast(
+                context, 'Detail absensi: ${record.courseTitle}');
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -343,7 +304,7 @@ class _TodayAttendanceHistoryPageState
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${record.buildingName} - ${record.roomName}',
+                        record.roomName,
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -372,7 +333,7 @@ class _TodayAttendanceHistoryPageState
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        record.statusInIndonesian,
+                        record.status,
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
@@ -394,67 +355,6 @@ class _TodayAttendanceHistoryPageState
           endIndent: 0,
         ),
       ],
-    );
-  }
-  
-  void _showAttendanceDetailDialog(AttendanceHistoryModel record) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Detail Absensi'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _detailRow('Mata Kuliah', record.courseTitle),
-                _detailRow('Kode MK', record.courseCode),
-                _detailRow('Dosen', record.lecturerName),
-                _detailRow('Ruangan', '${record.buildingName} - ${record.roomName}'),
-                _detailRow('Waktu Absensi', record.formattedTime),
-                _detailRow('Status', record.statusInIndonesian),
-                _detailRow('Metode Verifikasi', record.verificationType.isNotEmpty 
-                    ? record.verificationType 
-                    : 'Tidak Ada'),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Tutup'),
-            ),
-          ],
-        );
-      }
-    );
-  }
-  
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Divider(height: 1),
-        ],
-      ),
     );
   }
 }

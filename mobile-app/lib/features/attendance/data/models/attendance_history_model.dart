@@ -22,24 +22,16 @@ class AttendanceHistoryModel {
 
   final String id;
   final String courseTitle;
-  final String courseCode;
   final String roomName;
-  final String buildingName;
-  final String lecturerName;
   final DateTime dateTime;
   final String status; // 'Hadir', 'Terlambat', 'Alpa'
-  final String verificationType; // 'QR_CODE', 'FACE_RECOGNITION'
 
   AttendanceHistoryModel({
     required this.id,
     required this.courseTitle,
-    required this.courseCode,
     required this.roomName,
-    required this.buildingName,
-    required this.lecturerName,
     required this.dateTime,
     required this.status,
-    required this.verificationType,
   });
 
   String get formattedTime {
@@ -50,85 +42,16 @@ class AttendanceHistoryModel {
     _initializeLocale();
     return DateFormat('EEEE, d MMM yyyy', 'id_ID').format(dateTime);
   }
-  
-  String get statusInIndonesian {
-    switch (status) {
-      case 'PRESENT':
-        return 'Hadir';
-      case 'LATE':
-        return 'Terlambat';
-      case 'ABSENT':
-        return 'Alpa';
-      case 'EXCUSED':
-        return 'Izin';
-      default:
-        return status;
-    }
-  }
-  
-  Color get statusColor {
-    switch (status) {
-      case 'PRESENT':
-        return Colors.green;
-      case 'LATE':
-        return Colors.orange;
-      case 'ABSENT':
-        return Colors.red;
-      case 'EXCUSED':
-        return Colors.blue;
-      default:
-        return Colors.grey;
-    }
-  }
-  
-  IconData get statusIcon {
-    switch (status) {
-      case 'PRESENT':
-        return Icons.check_circle_outline_rounded;
-      case 'LATE':
-        return Icons.watch_later_outlined;
-      case 'ABSENT':
-        return Icons.cancel_outlined;
-      case 'EXCUSED':
-        return Icons.event_note_outlined;
-      default:
-        return Icons.help_outline_rounded;
-    }
-  }
 
   factory AttendanceHistoryModel.fromJson(Map<String, dynamic> json) {
-    // Parse date and time from API format
-    String dateStr = json['date'] ?? '';
-    String sessionStartTimeStr = json['session_start_time'] ?? '';
-    String checkInTimeStr = json['check_in_time'] ?? '';
-    
-    // Prefer check-in time if available, otherwise use session start time
-    String timeToUse = checkInTimeStr.isNotEmpty ? checkInTimeStr : sessionStartTimeStr;
-    
-    DateTime dateTime;
-    try {
-      // If we have both date and time, combine them
-      if (dateStr.isNotEmpty && timeToUse.isNotEmpty) {
-        dateTime = DateTime.parse('$dateStr $timeToUse');
-      } else {
-        // Fallback to current time if data is missing
-        dateTime = DateTime.now();
-      }
-    } catch (e) {
-      print('Error parsing date/time: $e');
-      dateTime = DateTime.now();
-    }
-    
     return AttendanceHistoryModel(
-      id: json['id']?.toString() ?? '',
-      courseTitle: json['course_name'] ?? '',
-      courseCode: json['course_code'] ?? '',
-      roomName: json['room_name'] ?? '',
-      buildingName: json['building_name'] ?? '',
-      lecturerName: json['lecturer_name'] ?? '',
-      dateTime: dateTime,
-      status: json['status'] ?? 'PRESENT',
-      verificationType: json['verification_method'] ?? '',
+      id: json['id'] ?? '',
+      courseTitle: json['courseTitle'] ?? '',
+      roomName: json['roomName'] ?? '',
+      dateTime: json['dateTime'] != null
+          ? DateTime.parse(json['dateTime'])
+          : DateTime.now(),
+      status: json['status'] ?? 'Hadir',
     );
   }
 
@@ -146,122 +69,116 @@ class AttendanceHistoryModel {
       AttendanceHistoryModel(
         id: '1',
         courseTitle: 'Proyek Akhir II',
-        courseCode: 'IF1234',
-        roomName: 'GD 515',
-        buildingName: 'Gedung Informatika',
-        lecturerName: 'Dr. Budi Santoso',
+        roomName: 'GD 515 - 156',
         dateTime: DateTime(now.year, now.month, now.day, 8, 5),
-        status: 'PRESENT',
-        verificationType: 'QR_CODE',
+        status: 'Hadir',
       ),
       AttendanceHistoryModel(
         id: '2',
         courseTitle: 'Aljabar Linier',
-        courseCode: 'MT1001',
-        roomName: 'Auditorium',
-        buildingName: 'Gedung Matematika',
-        lecturerName: 'Dr. Ayu Putri',
+        roomName: 'GD Audit',
         dateTime: DateTime(now.year, now.month, now.day, 11, 47),
-        status: 'LATE',
-        verificationType: 'QR_CODE',
+        status: 'Terlambat',
       ),
       AttendanceHistoryModel(
         id: '3',
         courseTitle: 'Keamanan Perangkat Lunak',
-        courseCode: 'IF2456',
-        roomName: 'Lab Komputer',
-        buildingName: 'Gedung Informatika',
-        lecturerName: 'Dr. Candra Wijaya',
+        roomName: 'GD 525',
         dateTime: DateTime(now.year, now.month, now.day, 12, 17),
-        status: 'PRESENT',
-        verificationType: 'FACE_RECOGNITION',
+        status: 'Hadir',
       ),
       AttendanceHistoryModel(
         id: '4',
         courseTitle: 'Desain Pengalaman Pengguna',
-        courseCode: 'IF3780',
-        roomName: 'Studio Desain',
-        buildingName: 'Gedung Multimedia',
-        lecturerName: 'Dr. Dian Pratiwi',
+        roomName: 'GD 517',
         dateTime: DateTime(now.year, now.month, now.day, 14, 8),
-        status: 'PRESENT',
-        verificationType: 'QR_CODE',
+        status: 'Hadir',
       ),
 
       // Yesterday's attendance
       AttendanceHistoryModel(
         id: '5',
         courseTitle: 'Bahasa Inggris III',
-        courseCode: 'LG2003',
-        roomName: 'Ruang Diskusi',
-        buildingName: 'Gedung Bahasa',
-        lecturerName: 'Mrs. Elizabeth Johnson',
+        roomName: 'GD 515 - 156',
         dateTime:
             DateTime(yesterday.year, yesterday.month, yesterday.day, 8, 5),
-        status: 'PRESENT',
-        verificationType: 'QR_CODE',
+        status: 'Hadir',
       ),
       AttendanceHistoryModel(
         id: '6',
         courseTitle: 'Pengujian Keamanan Perangkat Lunak',
-        courseCode: 'IF2457',
-        roomName: 'Lab Keamanan',
-        buildingName: 'Gedung Informatika',
-        lecturerName: 'Dr. Eko Prasetyo',
+        roomName: 'GD 515 - 156',
         dateTime:
-            DateTime(yesterday.year, yesterday.month, yesterday.day, 10, 15),
-        status: 'LATE',
-        verificationType: 'QR_CODE',
+            DateTime(yesterday.year, yesterday.month, yesterday.day, 8, 5),
+        status: 'Terlambat',
       ),
       AttendanceHistoryModel(
         id: '7',
         courseTitle: 'Sistem Komputasi Awan',
-        courseCode: 'IF3890',
-        roomName: 'Lab Server',
-        buildingName: 'Gedung Informatika',
-        lecturerName: 'Dr. Faisal Rahman',
+        roomName: 'GD 515 - 156',
         dateTime:
-            DateTime(yesterday.year, yesterday.month, yesterday.day, 13, 30),
-        status: 'PRESENT',
-        verificationType: 'FACE_RECOGNITION',
+            DateTime(yesterday.year, yesterday.month, yesterday.day, 8, 5),
+        status: 'Hadir',
       ),
-      
+      AttendanceHistoryModel(
+        id: '8',
+        courseTitle: 'Sistem Komputasi Awan',
+        roomName: 'GD 515 - 156',
+        dateTime:
+            DateTime(yesterday.year, yesterday.month, yesterday.day, 8, 5),
+        status: 'Hadir',
+      ),
+
       // Two days ago
       AttendanceHistoryModel(
         id: '9',
         courseTitle: 'Bahasa Inggris III',
-        courseCode: 'LG2003',
-        roomName: 'Ruang Diskusi',
-        buildingName: 'Gedung Bahasa',
-        lecturerName: 'Mrs. Elizabeth Johnson',
+        roomName: 'GD 515 - 156',
         dateTime:
             DateTime(twoDaysAgo.year, twoDaysAgo.month, twoDaysAgo.day, 8, 5),
-        status: 'PRESENT',
-        verificationType: 'QR_CODE',
+        status: 'Hadir',
       ),
       AttendanceHistoryModel(
         id: '10',
         courseTitle: 'Pengujian Keamanan Perangkat Lunak',
-        courseCode: 'IF2457',
-        roomName: 'Lab Keamanan',
-        buildingName: 'Gedung Informatika',
-        lecturerName: 'Dr. Eko Prasetyo',
+        roomName: 'GD 515 - 156',
         dateTime:
-            DateTime(twoDaysAgo.year, twoDaysAgo.month, twoDaysAgo.day, 10, 15),
-        status: 'LATE',
-        verificationType: 'QR_CODE',
+            DateTime(twoDaysAgo.year, twoDaysAgo.month, twoDaysAgo.day, 8, 5),
+        status: 'Terlambat',
       ),
       AttendanceHistoryModel(
         id: '11',
         courseTitle: 'Sistem Komputasi Awan',
-        courseCode: 'IF3890',
-        roomName: 'Lab Server',
-        buildingName: 'Gedung Informatika',
-        lecturerName: 'Dr. Faisal Rahman',
+        roomName: 'GD 515 - 156',
         dateTime:
-            DateTime(twoDaysAgo.year, twoDaysAgo.month, twoDaysAgo.day, 13, 30),
-        status: 'ABSENT',
-        verificationType: '',
+            DateTime(twoDaysAgo.year, twoDaysAgo.month, twoDaysAgo.day, 8, 5),
+        status: 'Alpa',
+      ),
+      AttendanceHistoryModel(
+        id: '12',
+        courseTitle: 'Sistem Komputasi Awan',
+        roomName: 'GD 515 - 156',
+        dateTime:
+            DateTime(twoDaysAgo.year, twoDaysAgo.month, twoDaysAgo.day, 8, 5),
+        status: 'Hadir',
+      ),
+
+      // Three days ago
+      AttendanceHistoryModel(
+        id: '13',
+        courseTitle: 'Sistem Komputasi Awan',
+        roomName: 'GD 515 - 156',
+        dateTime: DateTime(
+            threeDaysAgo.year, threeDaysAgo.month, threeDaysAgo.day, 8, 5),
+        status: 'Hadir',
+      ),
+      AttendanceHistoryModel(
+        id: '14',
+        courseTitle: 'Sistem Komputasi Awan',
+        roomName: 'GD 515 - 156',
+        dateTime: DateTime(
+            threeDaysAgo.year, threeDaysAgo.month, threeDaysAgo.day, 8, 5),
+        status: 'Hadir',
       ),
     ];
   }

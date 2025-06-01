@@ -198,8 +198,11 @@ class QRScannerService {
         
         // Consider 2xx responses as success
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          // Don't save attendance status in SharedPreferences anymore
-          // Let the server handle the state
+          // Save attendance status in SharedPreferences to prevent duplicate submissions
+          if (scheduleId != null) {
+            await prefs.setBool('attendance_completed_$scheduleId', true);
+            debugPrint('✅ Marked attendance as completed for schedule $scheduleId');
+          }
           
           ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
           return true;
@@ -245,7 +248,6 @@ class QRScannerService {
       final token = prefs.getString('auth_token');
       
       if (token == null) {
-        debugPrint('Authentication token not found');
         return null;
       }
       
@@ -266,12 +268,10 @@ class QRScannerService {
         // Make API request
         final response = await client.get(url, headers: headers).timeout(apiConfig.timeout);
         
-        // Debug output
-        debugPrint('Active Sessions Response [${response.statusCode}]: ${response.body}');
-        
         if (response.statusCode >= 200 && response.statusCode < 300) {
           try {
             final responseData = jsonDecode(response.body);
+            debugPrint('Active sessions response: ${response.body}');
             
             if (responseData['status'] == 'success' && responseData['data'] is List) {
               final sessions = responseData['data'] as List;
@@ -279,7 +279,6 @@ class QRScannerService {
               // Find session that matches the given schedule ID
               for (var session in sessions) {
                 if (session['course_schedule_id'] == scheduleId) {
-                  debugPrint('Found matching session ID ${session['id']} for schedule $scheduleId');
                   return session['id'] as int;  // Return the session ID for this schedule
                 }
               }
@@ -292,7 +291,6 @@ class QRScannerService {
         client.close();
       }
       
-      debugPrint('No active session found for schedule $scheduleId');
       return null;  // No matching session found
     } catch (e) {
       debugPrint('Error verifying schedule session: $e');
