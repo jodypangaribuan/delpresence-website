@@ -276,6 +276,10 @@ class QRScannerService {
             if (responseData['status'] == 'success' && responseData['data'] is List) {
               final sessions = responseData['data'] as List;
               
+              // Clear previous attendance status for this schedule
+              // If there's a new active session, we should allow attendance again
+              await prefs.remove('attendance_completed_$scheduleId');
+              
               // Find session that matches the given schedule ID
               for (var session in sessions) {
                 if (session['course_schedule_id'] == scheduleId) {

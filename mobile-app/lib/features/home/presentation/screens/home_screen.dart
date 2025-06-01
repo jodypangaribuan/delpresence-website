@@ -690,6 +690,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       // Create a temporary map to store results
       Map<int, bool> tempMap = {}; // Reverted to bool
       
+      // Get shared preferences to reset attendance flags when needed
+      final prefs = await SharedPreferences.getInstance();
+      
       // Check each schedule for active sessions with parallel requests
       List<Future> futures = [];
       for (var schedule in schedules) {
@@ -698,6 +701,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
             _scheduleService.isAttendanceSessionActive(schedule.id).then((isActive) { // isActive is bool
               tempMap[schedule.id] = isActive; // Store the boolean
               debugPrint('🔍 Schedule ${schedule.id} active: $isActive');
+              
+              // If there's an active session, clear any previous completion flag
+              // This ensures if the teacher creates a new session, students can attend again
+              if (isActive) {
+                prefs.remove('attendance_completed_${schedule.id}');
+                debugPrint('🔄 Reset attendance status for schedule ${schedule.id} due to active session');
+              }
             }).catchError((e) {
               debugPrint('🔍 Error checking schedule ${schedule.id}: $e');
               // Default to false on error

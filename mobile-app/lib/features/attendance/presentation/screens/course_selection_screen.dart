@@ -87,12 +87,22 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     
     Map<int, bool> tempMap = {};
     try {
+      // Get shared preferences to reset attendance flags when needed
+      final prefs = await SharedPreferences.getInstance();
+      
       List<Future> futures = [];
       for (var schedule in schedules) {
         if (schedule.id > 0) { // Ensure valid schedule ID
           futures.add(
             _scheduleService.isAttendanceSessionActive(schedule.id).then((isActive) {
               tempMap[schedule.id] = isActive;
+              
+              // If there's an active session, clear any previous completion flag
+              // This ensures if the teacher creates a new session, students can attend again
+              if (isActive) {
+                prefs.remove('attendance_completed_${schedule.id}');
+                debugPrint('🔄 Reset attendance status for schedule ${schedule.id} due to active session');
+              }
             }).catchError((e) {
               tempMap[schedule.id] = false; // Default to false on error
             })
