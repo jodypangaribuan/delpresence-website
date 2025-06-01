@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/colors.dart';
 import '../../../schedule/data/models/schedule_model.dart';
 import '../../../schedule/data/services/schedule_service.dart';
 import '../../../../core/services/network_service.dart'; // For NetworkService

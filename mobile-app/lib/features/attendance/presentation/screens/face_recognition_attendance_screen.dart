@@ -3,7 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:toastification/toastification.dart';
-import '../../../../core/constants/colors.dart';
+import '../../../../core/theme/app_colors.dart';
 
 class FaceRecognitionAttendanceScreen extends StatefulWidget {
   final String courseName;
