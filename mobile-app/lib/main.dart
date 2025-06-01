@@ -28,6 +28,7 @@ import 'features/home/data/repositories/student_repository_impl.dart';
 import 'features/home/domain/repositories/student_repository.dart';
 import 'features/splash/presentation/screens/splash_screen.dart';
 import 'features/face/presentation/providers/face_provider.dart';
+import 'features/auth/presentation/providers/auth_provider.dart';
 
 // Add function to preload critical assets
 Future<void> _preloadAssets() async {
@@ -204,6 +205,10 @@ class MyApp extends StatelessWidget {
               baseUrl: ApiConfig.instance.baseUrl,
             ),
           ),
+        ),
+        // Provide the auth provider
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(),
         ),
       ],
       child: MaterialApp(

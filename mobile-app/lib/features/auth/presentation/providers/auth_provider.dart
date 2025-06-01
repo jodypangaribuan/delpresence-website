@@ -7,6 +7,9 @@ class AuthProvider extends ChangeNotifier {
   String? _username;
   String? _userType;
 
+  // Constructor that accepts an optional auth repository
+  AuthProvider({dynamic authRepository});
+
   int? get userId => _userId;
   String? get token => _token;
   String? get username => _username;
