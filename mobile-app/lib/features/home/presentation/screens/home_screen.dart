@@ -196,6 +196,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isLoadingSchedules = true;
   String? _scheduleError;
   late ScheduleService _scheduleService;
+  
+  // Map to track active attendance sessions for each schedule
+  Map<int, bool> _activeSessionsMap = {};
+  bool _isCheckingActiveSessions = false;
+  
+  // Timer for periodically checking active sessions
+  Timer? _activeSessionsRefreshTimer;
 
   // Halaman yang akan ditampilkan berdasarkan index bottom navbar
   late final List<Widget> _pages;
@@ -302,6 +309,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Start auto toggle timer
     _resetAutoToggleTimer();
+    
+    // Start timer to periodically check for active sessions (every 30 seconds)
+    _startActiveSessionsRefreshTimer();
   }
 
   @override
@@ -309,7 +319,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _autoToggleTimer?.cancel();
     _animationController.dispose();
     _indicatorAnimController.dispose();
+    _activeSessionsRefreshTimer?.cancel();
     super.dispose();
+  }
+
+  // Start the timer to periodically check for active sessions
+  void _startActiveSessionsRefreshTimer() {
+    // Cancel existing timer if any
+    _activeSessionsRefreshTimer?.cancel();
+    
+    // Create new timer to check every 30 seconds
+    _activeSessionsRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      // Only check if not already checking
+      if (!_isCheckingActiveSessions && _todaySchedules.isNotEmpty) {
+        debugPrint('🔄 Periodic check for active attendance sessions');
+        _checkActiveSessionsForSchedules(_todaySchedules);
+      }
+    });
   }
 
   // Handle navigation to different pages based on bottom navbar index
@@ -371,57 +397,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 children: [
                   // Main Button
                   FloatingActionButton(
-                    onPressed: () async {
+                    onPressed: () {
                       HapticFeedback.mediumImpact();
 
-                      // Check if there are any active sessions
-                      try {
-                        // First, get today's schedules
-                        final schedules = await _scheduleService.getStudentSchedules();
-                        
-                        // Then check if any schedule has an active session
-                        bool hasAnyActiveSession = false;
-                        for (final schedule in schedules) {
-                          final isActive = await _scheduleService.isAttendanceSessionActive(schedule.id);
-                          if (isActive) {
-                            hasAnyActiveSession = true;
-                            break;
-                          }
-                        }
-                        
-                        if (hasAnyActiveSession) {
-                          // If there's at least one active session, proceed to attendance screen
-                          if (_isFaceRecognition) {
-                            // Navigate to face recognition screen
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const CourseSelectionScreen(),
-                              ),
-                            );
-                          } else {
-                            // Navigate to QR code scanner
-                            _showQRScannerBottomSheet(context);
-                          }
-                        } else {
-                          // If no active sessions, show a message
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Tidak ada sesi absensi yang aktif. Tunggu dosen memulai presensi.'),
-                              duration: Duration(seconds: 3),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        // Show error message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Gagal memeriksa sesi absensi: $e'),
-                            duration: const Duration(seconds: 3),
-                            behavior: SnackBarBehavior.floating,
+                      if (_isFaceRecognition) {
+                        // Navigate to face recognition screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CourseSelectionScreen(),
                           ),
                         );
+                      } else {
+                        // Navigate to QR code scanner
+                        _showQRScannerBottomSheet(context);
                       }
                     },
                     backgroundColor: AppColors.primary,
@@ -505,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.5, // Make it taller
+        height: MediaQuery.of(context).size.height * 0.3,
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,79 +531,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ],
             ),
-            
-            const SizedBox(height: 10),
-            
-            // Instruction text
-            const Text(
-              'Arahkan kamera ke QR Code yang ditampilkan oleh dosen untuk melakukan presensi',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-            
+
             const SizedBox(height: 20),
-            
-            // Camera preview placeholder (in a real app, this would be replaced with actual camera view)
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.qr_code_scanner,
-                        size: 60,
-                        color: AppColors.primary,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Fitur QR Scanner',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Hanya tersedia saat ada sesi presensi aktif',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Cancel button
+
+            // Scan QR button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  Navigator.pop(context);
+                  // Navigate to QR code scanner (simulated for now)
+                  ToastUtils.showInfoToast(
+                      context, 'QR Scanner akan segera hadir');
+                },
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
                   backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text('Tutup'),
+                child: const Text(
+                  'Mulai Scan',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],
@@ -628,6 +573,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     setState(() {
       _isLoadingSchedules = true;
       _scheduleError = null;
+      _activeSessionsMap.clear();
     });
     
     try {
@@ -660,11 +606,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _todaySchedules = todaySchedules;
         _isLoadingSchedules = false;
       });
+      
+      // After loading schedules, check for active sessions
+      _checkActiveSessionsForSchedules(todaySchedules);
     } catch (e) {
       setState(() {
         _scheduleError = e.toString();
         _isLoadingSchedules = false;
       });
+    }
+  }
+
+  // Check for active attendance sessions for all schedules
+  Future<void> _checkActiveSessionsForSchedules(List<ScheduleModel> schedules) async {
+    if (schedules.isEmpty) return;
+    
+    setState(() {
+      _isCheckingActiveSessions = true;
+    });
+    
+    try {
+      // Create a temporary map to store results
+      Map<int, bool> tempMap = {};
+      
+      // Check each schedule for active sessions
+      for (var schedule in schedules) {
+        if (schedule.id != null) {
+          final hasActiveSession = await _scheduleService.isAttendanceSessionActive(schedule.id!);
+          tempMap[schedule.id!] = hasActiveSession;
+          debugPrint('🔍 Schedule ${schedule.id} has active session: $hasActiveSession');
+        }
+      }
+      
+      // Update state with results
+      if (mounted) {
+        setState(() {
+          _activeSessionsMap = tempMap;
+          _isCheckingActiveSessions = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('🔍 Error checking active sessions: $e');
+      if (mounted) {
+        setState(() {
+          _isCheckingActiveSessions = false;
+        });
+      }
     }
   }
 
@@ -696,6 +683,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       final bool isActive = currentTime >= startTimeMinutes && currentTime <= endTimeMinutes;
       
+      // Check if this schedule has an active attendance session
+      final bool hasActiveSession = schedule.id != null ? (_activeSessionsMap[schedule.id!] ?? false) : false;
+      
       return {
         'title': schedule.courseName,
         'time': '${schedule.startTime} - ${schedule.endTime}',
@@ -703,6 +693,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         'lecturer': schedule.lecturerName,
         'status': schedule.status,
         'isActive': isActive || schedule.status == 'Sedang Berlangsung',
+        'scheduleId': schedule.id,
+        'hasActiveSession': hasActiveSession,
       };
     }).toList();
   }
@@ -762,6 +754,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Build class card - improved design
   Widget _buildClassCard(BuildContext context, Map<String, dynamic> classData) {
+    // Get the attendance session status
+    final int? scheduleId = classData['scheduleId'];
+    final bool hasActiveSession = classData['hasActiveSession'] ?? false;
+    final bool isActive = classData['isActive'] as bool;
+    
     return GestureDetector(
       onTap: () {
         // Navigate to today's schedule screen
@@ -882,7 +879,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ],
               ),
-              if (classData['isActive'] as bool) ...[
+              if (isActive) ...[
                 const SizedBox(height: 10),
                 const Divider(
                     height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
@@ -890,12 +887,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: hasActiveSession ? () {
                       _showAbsensiBottomSheet(context);
-                    },
+                    } : null, // Button is disabled when no active session
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: hasActiveSession ? AppColors.primary : Colors.grey.shade400,
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -906,7 +903,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    child: const Text('Absen Sekarang'),
+                    child: Text(
+                      hasActiveSession ? 'Absen Sekarang' : 'Belum Ada Sesi Absensi'
+                    ),
                   ),
                 ),
               ],
@@ -1185,6 +1184,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Improved bottom sheet method
   void _showAbsensiBottomSheet(BuildContext context) {
+    // Check if there are any active sessions
+    bool hasAnyActiveSession = _activeSessionsMap.values.contains(true);
+    
+    if (!hasAnyActiveSession) {
+      // Show toast if no active sessions
+      ToastUtils.showInfoToast(context, 'Tidak ada sesi absensi yang aktif saat ini');
+      return;
+    }
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1474,6 +1482,12 @@ class _HomePage extends StatelessWidget {
     // Get the HomeScreen parent state using findAncestorStateOfType
     final homeState = context.findAncestorStateOfType<_HomeScreenState>();
     
+    // Check if there are any active sessions
+    bool hasAnyActiveSession = false;
+    if (homeState != null) {
+      hasAnyActiveSession = homeState._activeSessionsMap.values.contains(true);
+    }
+    
     // Set status bar to transparent with light icons
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -1579,8 +1593,13 @@ class _HomePage extends StatelessWidget {
                                                   'assets/images/menu-absensi.png',
                                               iconSize: iconSize,
                                               onTap: () {
-                                                homeState?._showAbsensiBottomSheet(
-                                                    context);
+                                                // Only show bottom sheet if there are active sessions
+                                                if (hasAnyActiveSession) {
+                                                  homeState?._showAbsensiBottomSheet(context);
+                                                } else {
+                                                  // Show toast if no active sessions
+                                                  ToastUtils.showInfoToast(context, 'Tidak ada sesi absensi yang aktif saat ini');
+                                                }
                                               },
                                             ),
                                           ),
