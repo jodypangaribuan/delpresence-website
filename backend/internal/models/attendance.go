@@ -54,17 +54,9 @@ type AttendanceSession struct {
 	LateThreshold    int              `json:"late_threshold" gorm:"default:10"` // in minutes
 	Notes            string           `json:"notes" gorm:"type:text"`
 	QRCodeData       string           `json:"qr_code_data,omitempty" gorm:"type:text"`
-
-	// Counts - These should be updated by the application logic
-	TotalStudents int `json:"total_students" gorm:"default:0"` // Number of students expected for this session (snapshot)
-	AttendedCount int `json:"attended_count" gorm:"default:0"`
-	LateCount     int `json:"late_count" gorm:"default:0"`
-	AbsentCount   int `json:"absent_count" gorm:"default:0"` // May need to be calculated or explicitly set
-	ExcusedCount  int `json:"excused_count" gorm:"default:0"`
-
-	CreatedAt time.Time      `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
+	CreatedAt        time.Time        `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt        time.Time        `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt        gorm.DeletedAt   `json:"deleted_at,omitempty" gorm:"index"`
 }
 
 // StudentAttendance represents a student's attendance record for a session
@@ -146,30 +138,3 @@ type AttendanceStatistics struct {
 	TotalExcused      int `json:"total_excused"`
 	AverageAttendance int `json:"average_attendance"` // Percentage
 }
-
-// ScanAttendanceRequest defines the structure for the student QR scan request
-type ScanAttendanceRequest struct {
-	SessionID string `json:"session_id" binding:"required"`
-}
-
-// StudentAttendance struct is assumed to be defined elsewhere in this file or package
-// type StudentAttendance struct { ... }
-
-// AttendanceSession model (ensure fields match your existing model, especially for status, times, and counts)
-// This is a partial representation; ensure your actual model is complete.
-// type AttendanceSession struct {
-// 	ID                uint   `json:"id" gorm:"primaryKey"`
-// 	CourseScheduleID  uint   `json:"course_schedule_id"`
-//  CourseCode        string `json:"course_code"`
-//  CourseName        string `json:"course_name"`
-// 	Status            string `json:"status"` // e.g., "ACTIVE", "CLOSED", "CANCELED"
-// 	Type              string `json:"type"`   // e.g., "QR_CODE", "FACE_RECOGNITION", "BOTH"
-// 	StartTime         time.Time `json:"start_time"` // Actual start time when session was created
-//  CreatedAt         time.Time `json:"created_at"` // More reliable for duration calculation
-// 	Duration          int    `json:"duration"` // in minutes
-// 	AllowLate         bool   `json:"allow_late"`
-// 	LateThreshold     int    `json:"late_threshold"` // in minutes
-// 	AttendedCount     int    `json:"attended_count"`
-// 	LateCount         int    `json:"late_count"`
-// 	TotalStudents     int    `json:"total_students"` // This might be from the schedule
-// }

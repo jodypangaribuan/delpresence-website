@@ -7,7 +7,6 @@ import (
 	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/models"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // AttendanceRepository handles database operations for attendance
@@ -233,43 +232,4 @@ func (r *AttendanceRepository) ListActiveSessionsBySchedules(scheduleIDs []uint)
 	}
 
 	return sessions, nil
-}
-
-// UpdateAttendanceSessionCounts increments the relevant counters on an attendance session.
-// It uses a transaction to ensure atomicity for count updates.
-func (r *AttendanceRepository) UpdateAttendanceSessionCounts(sessionID uint, isLate bool, incrementValue int) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		var session models.AttendanceSession
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&session, sessionID).Error; err != nil {
-			return err // Session not found or other error
-		}
-
-		if isLate {
-			session.LateCount += incrementValue
-		} else {
-			session.AttendedCount += incrementValue
-		}
-
-		// Optionally, you might want to re-calculate/update AbsentCount if TotalStudents is reliable here
-		// For example: session.AbsentCount = session.TotalStudents - (session.AttendedCount + session.LateCount + session.ExcusedCount)
-		// However, TotalStudents in AttendanceSession might not always be up-to-date or could be from the schedule.
-		// It's generally safer to manage AbsentCount separately or calculate it on-the-fly for display.
-
-		return tx.Save(&session).Error
-	})
-}
-
-// GetStudentByID retrieves a student by their ID (needed for student details)
-// This method should ideally be in a StudentRepository, but placing a simplified version here for now
-// if one doesn't exist.
-func (r *AttendanceRepository) GetStudentByID(studentID uint) (*models.Student, error) {
-	var student models.Student
-	// Ensure you preload necessary associations if Student model has them (e.g., User)
-	if err := r.db.Preload("User").First(&student, studentID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil // Or a specific error like ErrStudentNotFound
-		}
-		return nil, err
-	}
-	return &student, nil
 }

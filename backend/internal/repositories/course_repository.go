@@ -6,12 +6,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// CourseRepository handles database operations for courses and schedules
+// CourseRepository handles database operations for courses
 type CourseRepository struct {
 	db *gorm.DB
 }
 
-// NewCourseRepository creates a new course repository
+// NewCourseRepository creates a new instance of CourseRepository
 func NewCourseRepository() *CourseRepository {
 	return &CourseRepository{
 		db: database.GetDB(),
@@ -153,35 +153,4 @@ func (r *CourseRepository) CheckCodeExists(code string, excludeID uint) (bool, e
 	}
 
 	return count > 0, nil
-}
-
-// GetCourseScheduleByID retrieves a course schedule by its ID, preloading the Course
-func (r *CourseRepository) GetCourseScheduleByID(scheduleID uint) (*models.CourseSchedule, error) {
-	var schedule models.CourseSchedule
-	err := r.db.Preload("Course").First(&schedule, scheduleID).Error
-	return &schedule, err
-}
-
-// IsStudentEnrolled checks if a student is enrolled in a specific course
-// This might involve a join table like `student_courses` or a field in `students` or `courses` table.
-// For this example, let's assume a `student_course_enrollments` table.
-func (r *CourseRepository) IsStudentEnrolled(studentID uint, courseID uint) (bool, error) {
-	var count int64
-	// Adjust Table("student_course_enrollments") and column names as per your actual schema
-	err := r.db.Table("student_course_enrollments").
-		Where("student_id = ? AND course_id = ?", studentID, courseID).
-		Count(&count).Error
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
-// GetCourseByID retrieves a course by ID (if needed separately)
-func (r *CourseRepository) GetCourseByID(courseID uint) (*models.Course, error) {
-	var course models.Course
-	if err := r.db.First(&course, courseID).Error; err != nil {
-		return nil, err
-	}
-	return &course, nil
 }
