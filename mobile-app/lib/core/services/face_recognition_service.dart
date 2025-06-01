@@ -6,9 +6,25 @@ import '../config/api_config.dart';
 
 class FaceRecognitionService {
   // Use the face recognition service URL with port 5000
-  // This gets the host part of the URL and adds port 5000
   String get _baseUrl {
-    final uri = Uri.parse(ApiConfig.instance.baseUrl);
+    // Get the base URL from the config
+    final String originalUrl = ApiConfig.instance.baseUrl;
+    final Uri uri = Uri.parse(originalUrl);
+    
+    // For ngrok URLs, we need to modify the URL to use port 5000 instead of 8080
+    if (uri.host.contains('ngrok')) {
+      // Remove any existing port in the URL
+      final baseHost = '${uri.scheme}://${uri.host}';
+      
+      // Replace port 8080 with 5000 if present, or add port 5000 if no port is specified
+      if (originalUrl.contains(':8080')) {
+        return originalUrl.replaceFirst(':8080', ':5000');
+      } else {
+        return '$baseHost:5000';
+      }
+    }
+    
+    // For local development or production, use the host with port 5000
     return '${uri.scheme}://${uri.host}:5000';
   }
   
@@ -17,7 +33,10 @@ class FaceRecognitionService {
   // Singleton pattern
   static final FaceRecognitionService _instance = FaceRecognitionService._internal();
   factory FaceRecognitionService() => _instance;
-  FaceRecognitionService._internal();
+  FaceRecognitionService._internal() {
+    // Log the face recognition service URL for debugging
+    debugPrint('🔌 Face Recognition Service URL: $_baseUrl');
+  }
   
   /// Register a face for a student
   /// 
@@ -25,10 +44,12 @@ class FaceRecognitionService {
   /// [imageBytes] - The raw bytes of the image containing the face
   Future<Map<String, dynamic>> registerFace(int studentId, Uint8List imageBytes) async {
     try {
+      final requestUrl = '$_baseUrl/api/faces/register';
+      debugPrint('🔌 Making face registration request to: $requestUrl');
       final base64Image = base64Encode(imageBytes);
       
       final response = await http.post(
-        Uri.parse('$_baseUrl/api/faces/register'),
+        Uri.parse(requestUrl),
         headers: _headers,
         body: jsonEncode({
           'student_id': studentId,
@@ -44,6 +65,7 @@ class FaceRecognitionService {
           'message': responseData['message'] ?? 'Face registered successfully',
         };
       } else {
+        debugPrint('🔌 Face registration failed: ${response.statusCode} - ${response.body}');
         return {
           'success': false,
           'message': responseData['error'] ?? 'Failed to register face',
@@ -63,10 +85,12 @@ class FaceRecognitionService {
   /// [imageBytes] - The raw bytes of the image containing the face to verify
   Future<Map<String, dynamic>> verifyFace(Uint8List imageBytes) async {
     try {
+      final requestUrl = '$_baseUrl/api/faces/verify';
+      debugPrint('🔌 Making face verification request to: $requestUrl');
       final base64Image = base64Encode(imageBytes);
       
       final response = await http.post(
-        Uri.parse('$_baseUrl/api/faces/verify'),
+        Uri.parse(requestUrl),
         headers: _headers,
         body: jsonEncode({
           'image': base64Image,
@@ -92,12 +116,14 @@ class FaceRecognitionService {
             };
           }
         } else {
+          debugPrint('🔌 Face verification failed: ${response.body}');
           return {
             'success': false,
             'message': responseData['error'] ?? 'Face verification failed',
           };
         }
       } else {
+        debugPrint('🔌 Face verification failed: ${response.statusCode} - ${response.body}');
         return {
           'success': false,
           'message': responseData['error'] ?? 'Failed to verify face',
@@ -117,8 +143,11 @@ class FaceRecognitionService {
   /// [studentId] - The ID of the student
   Future<Map<String, dynamic>> getStudentFaces(int studentId) async {
     try {
+      final requestUrl = '$_baseUrl/api/faces/student/$studentId';
+      debugPrint('🔌 Getting student faces from: $requestUrl');
+      
       final response = await http.get(
-        Uri.parse('$_baseUrl/api/faces/student/$studentId'),
+        Uri.parse(requestUrl),
         headers: _headers,
       ).timeout(ApiConfig.instance.timeout);
       
@@ -130,6 +159,7 @@ class FaceRecognitionService {
           'faces': responseData['faces'] ?? [],
         };
       } else {
+        debugPrint('🔌 Get student faces failed: ${response.statusCode} - ${response.body}');
         return {
           'success': false,
           'message': responseData['error'] ?? 'Failed to get student faces',
@@ -149,8 +179,11 @@ class FaceRecognitionService {
   /// [faceId] - The ID of the face to delete
   Future<Map<String, dynamic>> deleteFace(int faceId) async {
     try {
+      final requestUrl = '$_baseUrl/api/faces/$faceId';
+      debugPrint('🔌 Deleting face from: $requestUrl');
+      
       final response = await http.delete(
-        Uri.parse('$_baseUrl/api/faces/$faceId'),
+        Uri.parse(requestUrl),
         headers: _headers,
       ).timeout(ApiConfig.instance.timeout);
       
@@ -162,6 +195,7 @@ class FaceRecognitionService {
           'message': responseData['message'] ?? 'Face deleted successfully',
         };
       } else {
+        debugPrint('🔌 Delete face failed: ${response.statusCode} - ${response.body}');
         return {
           'success': false,
           'message': responseData['error'] ?? 'Failed to delete face',
