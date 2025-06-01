@@ -115,10 +115,10 @@ class FaceRecognitionUtil {
       for (var x = 0; x < inputSize; x++) {
         final pixel = resized.getPixel(x, y);
         
-        // Extract RGB values
-        final r = img.getRed(pixel);
-        final g = img.getGreen(pixel);
-        final b = img.getBlue(pixel);
+        // Extract RGB values - using image package v4.x API
+        final r = pixel.r;
+        final g = pixel.g;
+        final b = pixel.b;
         
         // Normalize to [-1, 1]
         inputBuffer[index++] = (r / 127.5) - 1;

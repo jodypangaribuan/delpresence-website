@@ -467,7 +467,10 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
                             width: MediaQuery.of(context).size.width,
                             height: MediaQuery.of(context).size.width *
                                 _cameraController!.value.aspectRatio,
-                            child: CameraPreview(_cameraController!),
+                            child: Transform.scale(
+                              scaleX: -1.0, // Mirror the camera horizontally
+                              child: CameraPreview(_cameraController!),
+                            ),
                           ),
                         ),
                       ),
