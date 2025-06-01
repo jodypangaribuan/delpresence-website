@@ -5,28 +5,8 @@ import 'package:flutter/foundation.dart';
 import '../config/api_config.dart';
 
 class FaceRecognitionService {
-  // Use the face recognition service URL with port 5000
-  String get _baseUrl {
-    // Get the base URL from the config
-    final String originalUrl = ApiConfig.instance.baseUrl;
-    final Uri uri = Uri.parse(originalUrl);
-    
-    // For ngrok URLs, we need to modify the URL to use port 5000 instead of 8080
-    if (uri.host.contains('ngrok')) {
-      // Remove any existing port in the URL
-      final baseHost = '${uri.scheme}://${uri.host}';
-      
-      // Replace port 8080 with 5000 if present, or add port 5000 if no port is specified
-      if (originalUrl.contains(':8080')) {
-        return originalUrl.replaceFirst(':8080', ':5000');
-      } else {
-        return '$baseHost:5000';
-      }
-    }
-    
-    // For local development or production, use the host with port 5000
-    return '${uri.scheme}://${uri.host}:5000';
-  }
+  // Use the dedicated face recognition service URL
+  String get _baseUrl => ApiConfig.instance.faceRecognitionBaseUrl;
   
   final _headers = ApiConfig.instance.defaultHeaders;
   

@@ -12,6 +12,8 @@ class ApiConfig {
   // API configuration constants
   static const String DEFAULT_BASE_URL =
       'https://7c00-103-167-217-200.ngrok-free.app';
+  static const String FACE_RECOGNITION_BASE_URL =
+      'https://7c00-103-167-217-200.ngrok-free.app:5000';
   static const String API_PATH = '/api/v1';
   static const int DEFAULT_TIMEOUT = 30;
   static const String API_VERSION = 'v1';
@@ -26,6 +28,9 @@ class ApiConfig {
 
   // Base URL
   String _baseUrl = DEFAULT_BASE_URL;
+  
+  // Face Recognition Base URL
+  String _faceRecognitionBaseUrl = FACE_RECOGNITION_BASE_URL;
 
   // API timeout in seconds
   int _timeout = DEFAULT_TIMEOUT;
@@ -36,11 +41,13 @@ class ApiConfig {
   /// Initialize the API configuration
   void initialize({
     String? baseUrl,
+    String? faceRecognitionBaseUrl,
     int? timeout,
     bool? enableApiLogging,
     bool? allowSelfSignedCerts,
   }) {
     if (baseUrl != null) _baseUrl = baseUrl;
+    if (faceRecognitionBaseUrl != null) _faceRecognitionBaseUrl = faceRecognitionBaseUrl;
     if (timeout != null) _timeout = timeout;
     if (enableApiLogging != null) _enableApiLogging = enableApiLogging;
     if (allowSelfSignedCerts != null)
@@ -48,6 +55,7 @@ class ApiConfig {
 
     flutter.debugPrint('🌐 API Config initialized');
     flutter.debugPrint('🌐 Base URL: $_baseUrl');
+    flutter.debugPrint('🌐 Face Recognition Base URL: $_faceRecognitionBaseUrl');
     flutter.debugPrint('🌐 Timeout: $_timeout seconds');
     flutter.debugPrint(
         '🌐 API logging: ${_enableApiLogging ? 'Enabled' : 'Disabled'}');
@@ -56,6 +64,9 @@ class ApiConfig {
 
   /// Get the base URL
   String get baseUrl => _baseUrl;
+  
+  /// Get the face recognition base URL
+  String get faceRecognitionBaseUrl => _faceRecognitionBaseUrl;
 
   /// Get the full API URL (baseUrl + API_PATH)
   String get apiUrl => '$_baseUrl$API_PATH';
