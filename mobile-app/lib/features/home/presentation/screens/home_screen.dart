@@ -2242,7 +2242,7 @@ class _HomePageState extends State<_HomePage> {
                                         ),
                                         const Spacer(),
                                         // Add refresh button to sync with server
-                                        !_isLoadingSchedules 
+                                        !homeState?._isLoadingSchedules 
                                             ? IconButton(
                                                 icon: Icon(
                                                   Icons.refresh, 
@@ -2256,7 +2256,7 @@ class _HomePageState extends State<_HomePage> {
                                                   ToastUtils.showInfoToast(context, 'Menyinkronkan data dengan server...');
                                                   
                                                   // Force refresh from server
-                                                  _refreshHomeScreenData();
+                                                  homeState?._refreshHomeScreenData();
                                                 },
                                               )
                                             : SizedBox(
