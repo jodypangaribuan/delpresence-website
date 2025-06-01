@@ -5,6 +5,7 @@ import '../../../schedule/data/services/schedule_service.dart';
 import '../../../../core/services/network_service.dart'; // For NetworkService
 import '../../../../core/config/api_config.dart'; // For ApiConfig
 import 'face_recognition_attendance_screen.dart';
+import 'qr_scanner_screen.dart'; // Import the new QR Scanner screen
 import '../../../../core/utils/toast_utils.dart'; // Added for ToastUtils
 
 class CourseSelectionScreen extends StatefulWidget {
@@ -125,7 +126,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.30, // Adjusted height
+        height: MediaQuery.of(context).size.height * 0.42, // Adjusted height for two options
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,6 +163,26 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
             const SizedBox(height: 20),
             Column(
               children: [
+                // QR Code Option (Re-added)
+                _buildMinimalistAbsensiOption(
+                  context,
+                  icon: Icons.qr_code_scanner_rounded,
+                  title: 'Scan QR',
+                  description: 'Pindai kode QR untuk melakukan absensi',
+                  onTap: () {
+                    Navigator.pop(context); // Close bottom sheet
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => QrScannerScreen(schedule: schedule),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                // Face Recognition Option
                 _buildMinimalistAbsensiOption(
                   context,
                   icon: Icons.face_rounded,
@@ -175,13 +196,11 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                         builder: (context) =>
                             FaceRecognitionAttendanceScreen(
                           courseName: schedule.courseName,
-                          // scheduleId: schedule.id, // Keep commented if not used
                         ),
                       ),
                     );
                   },
                 ),
-                // QR Code option removed for this screen's context
               ],
             ),
           ],
