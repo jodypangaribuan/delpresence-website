@@ -200,7 +200,9 @@ class MyApp extends StatelessWidget {
         // Provide the face provider
         ChangeNotifierProvider<FaceProvider>(
           create: (_) => FaceProvider(
-            networkService: NetworkService(),
+            networkService: NetworkService(
+              baseUrl: ApiConfig.instance.baseUrl,
+            ),
           ),
         ),
       ],

@@ -11,13 +11,13 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 class FaceRecognitionAttendanceScreen extends StatefulWidget {
   final String courseName;
   final int scheduleId;
-  final int studentId;
+  final int? studentId;
 
   const FaceRecognitionAttendanceScreen({
     super.key,
     required this.courseName,
     required this.scheduleId,
-    required this.studentId,
+    this.studentId,
   });
 
   @override
@@ -33,10 +33,13 @@ class _FaceRecognitionAttendanceScreenState
   bool _isProcessing = false;
   Timer? _faceDetectionTimer;
   XFile? _capturedImage;
+  late int _studentId;
 
   @override
   void initState() {
     super.initState();
+    _studentId = widget.studentId ?? 
+      Provider.of<AuthProvider>(context, listen: false).userId ?? 0;
     _requestCameraPermission();
   }
 
@@ -198,7 +201,7 @@ class _FaceRecognitionAttendanceScreenState
   Future<void> _verifyFace(XFile imageFile) async {
     try {
       final faceProvider = Provider.of<FaceProvider>(context, listen: false);
-      final bool success = await faceProvider.verifyFace(widget.studentId, imageFile);
+      final bool success = await faceProvider.verifyFace(_studentId, imageFile);
       
       if (!mounted) return;
       

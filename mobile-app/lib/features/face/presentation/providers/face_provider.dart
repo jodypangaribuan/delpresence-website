@@ -4,6 +4,7 @@ import '../../data/models/face_model.dart';
 import '../../data/services/face_service.dart';
 import 'package:camera/camera.dart';
 import '../../../../core/services/network_service.dart';
+import '../../../../core/config/api_config.dart';
 
 enum FaceProcessingStatus {
   idle,
@@ -21,7 +22,10 @@ class FaceProvider extends ChangeNotifier {
   FaceProcessingStatus _status = FaceProcessingStatus.idle;
   
   FaceProvider({NetworkService? networkService}) 
-      : _faceService = FaceService(networkService: networkService ?? NetworkService());
+      : _faceService = FaceService(
+          networkService: networkService ?? 
+          NetworkService(baseUrl: ApiConfig.instance.baseUrl)
+        );
 
   // Getters
   List<FaceModel> get registeredFaces => _registeredFaces;

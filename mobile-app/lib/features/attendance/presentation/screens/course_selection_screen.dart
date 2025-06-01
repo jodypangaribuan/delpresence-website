@@ -121,7 +121,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   // Adapted from home_screen.dart
   void _showAbsensiBottomSheet(BuildContext context, ScheduleModel schedule) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final studentId = authProvider.student?.id ?? 0;
+    final studentId = authProvider.userId ?? 0;
     
     showModalBottomSheet(
       context: context,

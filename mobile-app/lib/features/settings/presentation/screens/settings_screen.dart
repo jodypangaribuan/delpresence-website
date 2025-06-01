@@ -162,7 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showFaceRegistrationDialog(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final studentId = authProvider.student?.id ?? 0;
+    final studentId = authProvider.userId ?? 0;
     
     showDialog(
       context: context,
