@@ -3,9 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../../core/constants/colors.dart';
-import '../../../face/presentation/screens/face_registration_list_screen.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
-import 'package:provider/provider.dart';
+import 'face_registration_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -161,9 +159,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showFaceRegistrationDialog(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final studentId = authProvider.userId ?? 0;
-    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -223,22 +218,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                if (studentId > 0) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => FaceRegistrationListScreen(
-                        studentId: studentId,
-                      ),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Data mahasiswa tidak ditemukan. Silakan login kembali.'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const FaceRegistrationScreen(),
+                  ),
+                );
               },
               child: Text(
                 'Lanjutkan',

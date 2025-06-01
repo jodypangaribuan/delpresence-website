@@ -1,5 +1,4 @@
 import '../../data/models/auth_response_model.dart';
-import '../entities/auth_data.dart';
 
 abstract class AuthRepository {
   Future<AuthResponseModel> login({
@@ -23,7 +22,4 @@ abstract class AuthRepository {
   Future<bool> getRememberMe();
 
   Future<void> clearCredentials();
-  
-  // Get stored authentication data
-  Future<AuthData?> getStoredAuthData();
 }

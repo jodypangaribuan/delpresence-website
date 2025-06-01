@@ -7,8 +7,6 @@ import '../../../../core/config/api_config.dart'; // For ApiConfig
 import 'face_recognition_attendance_screen.dart';
 import '../../../../core/utils/toast_utils.dart'; // Added for ToastUtils
 import 'package:delpresence/features/qr_scanner/qr_scanner_service.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
-import 'package:provider/provider.dart';
 
 class CourseSelectionScreen extends StatefulWidget {
   const CourseSelectionScreen({super.key});
@@ -120,9 +118,6 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
   // Adapted from home_screen.dart
   void _showAbsensiBottomSheet(BuildContext context, ScheduleModel schedule) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final studentId = authProvider.userId ?? 0;
-    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -197,16 +192,9 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                         builder: (context) =>
                             FaceRecognitionAttendanceScreen(
                           courseName: schedule.courseName,
-                          scheduleId: schedule.id,
-                          studentId: studentId,
                         ),
                       ),
-                    ).then((result) {
-                      // If attendance was successful, refresh the schedule list
-                      if (result == true) {
-                        _fetchTodaySchedules();
-                      }
-                    });
+                    );
                   },
                 ),
               ],

@@ -4,7 +4,6 @@ import '../datasources/auth_remote_datasource.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/auth_response_model.dart';
 import '../../../../core/utils/secure_storage.dart';
-import '../../domain/entities/auth_data.dart';
 import 'dart:convert';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -20,8 +19,6 @@ class AuthRepositoryImpl implements AuthRepository {
   static const String _keyToken = 'token';
   static const String _keyUserId = 'user_id';
   static const String _keyAccessDenied = 'access_denied';
-  static const String _keyUserType = 'user_type';
-  static const String _keyUserName = 'username';
 
   AuthRepositoryImpl({
     required this.remoteDataSource,
@@ -169,34 +166,5 @@ class AuthRepositoryImpl implements AuthRepository {
     await prefs.remove(_keyUsername);
     await prefs.remove(_keyPassword);
     debugPrint('Saved credentials cleared');
-  }
-
-  @override
-  Future<AuthData?> getStoredAuthData() async {
-    try {
-      final token = await getToken();
-      if (token == null || token.isEmpty) {
-        return null;
-      }
-      
-      // Get user information from SharedPreferences
-      final userId = prefs.getInt(_keyUserId);
-      final username = prefs.getString(_keyUserName);
-      final userType = prefs.getString(_keyUserType);
-      
-      if (userId == null || username == null || userType == null) {
-        return null;
-      }
-      
-      return AuthData(
-        userId: userId,
-        token: token,
-        username: username,
-        userType: userType,
-      );
-    } catch (e) {
-      debugPrint('Error getting stored auth data: $e');
-      return null;
-    }
   }
 }
