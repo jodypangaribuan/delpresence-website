@@ -202,6 +202,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   // Map to track active attendance sessions for each schedule
   // Reverted to bool to match current ScheduleService behavior
   Map<int, bool> _activeSessionsMap = {};
+  // Map to track attendance status for each schedule
+  Map<int, bool> _attendanceStatusMap = {};
   bool _isCheckingActiveSessions = false;
 
   // Halaman yang akan ditampilkan berdasarkan index bottom navbar
@@ -685,21 +687,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     });
     
     try {
-      debugPrint('🔍 Checking for active attendance sessions...');
+      debugPrint('🔍 Checking for active attendance sessions and attendance status...');
       
-      // Create a temporary map to store results
-      Map<int, bool> tempMap = {}; // Reverted to bool
+      // Create a temporary map to store active session results
+      Map<int, bool> activeSessionsMap = {}; // For active sessions
+      Map<int, bool> attendanceStatusMap = {}; // For attendance status
       
       // Get shared preferences to reset attendance flags when needed
       final prefs = await SharedPreferences.getInstance();
       
-      // Check each schedule for active sessions with parallel requests
+      // Check each schedule for active sessions and attendance status with parallel requests
       List<Future> futures = [];
       for (var schedule in schedules) {
         if (schedule.id != null && schedule.id > 0) {
+          // Active session check
           futures.add(
-            _scheduleService.isAttendanceSessionActive(schedule.id).then((isActive) { // isActive is bool
-              tempMap[schedule.id] = isActive; // Store the boolean
+            _scheduleService.isAttendanceSessionActive(schedule.id).then((isActive) {
+              activeSessionsMap[schedule.id] = isActive;
               debugPrint('🔍 Schedule ${schedule.id} active: $isActive');
               
               // If there's an active session, clear any previous completion flag
@@ -709,9 +713,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                 debugPrint('🔄 Reset attendance status for schedule ${schedule.id} due to active session');
               }
             }).catchError((e) {
-              debugPrint('🔍 Error checking schedule ${schedule.id}: $e');
-              // Default to false on error
-              tempMap[schedule.id] = false;
+              debugPrint('🔍 Error checking schedule ${schedule.id} active status: $e');
+              activeSessionsMap[schedule.id] = false;
+            })
+          );
+          
+          // Attendance status check from server
+          futures.add(
+            _scheduleService.checkAttendanceStatus(schedule.id).then((hasAttended) {
+              attendanceStatusMap[schedule.id] = hasAttended;
+              debugPrint('🔍 Schedule ${schedule.id} attendance status: ${hasAttended ? 'Attended' : 'Not attended'}');
+            }).catchError((e) {
+              debugPrint('🔍 Error checking schedule ${schedule.id} attendance status: $e');
+              // Default to local check on error
+              attendanceStatusMap[schedule.id] = prefs.getBool('attendance_completed_${schedule.id}') ?? false;
             })
           );
         }
@@ -721,12 +736,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       await Future.wait(futures);
       
       // Debug output to help troubleshoot
-      debugPrint('🔍 Active sessions map: $tempMap');
+      debugPrint('🔍 Active sessions map: $activeSessionsMap');
+      debugPrint('🔍 Attendance status map: $attendanceStatusMap');
       
       // Update state with results if the component is still mounted
       if (mounted) {
         setState(() {
-          _activeSessionsMap = tempMap;
+          _activeSessionsMap = activeSessionsMap;
+          // Store attendance status in a class variable for use in the UI
+          _attendanceStatusMap = attendanceStatusMap;
           _isCheckingActiveSessions = false;
         });
       }
@@ -777,15 +795,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       // Check if this schedule has an active attendance session
       final bool hasActiveSession = schedule.id != null ? (_activeSessionsMap[schedule.id!] ?? false) : false;
       
+      // Check if the student has already attended this schedule
+      // This now uses the server-based attendance status
+      final bool hasAttended = schedule.id != null ? (_attendanceStatusMap[schedule.id!] ?? false) : false;
+      
+      // Override status display if student has already attended
+      String displayStatus = schedule.status;
+      if (hasAttended) {
+        displayStatus = 'Sudah Diabsen';
+      }
+      
       return {
         'title': schedule.courseName,
         'time': '${schedule.startTime} - ${schedule.endTime}',
         'room': schedule.roomName,
         'lecturer': schedule.lecturerName,
-        'status': schedule.status, // Original status for display
+        'status': displayStatus, // Modified status for display
         'isActive': uiIsActive, // Used by _buildClassCard for UI elements like 'Absen Sekarang' button
         'scheduleId': schedule.id,
         'hasActiveSession': hasActiveSession,
+        'hasAttended': hasAttended, // Add attendance status to the map
         // Fields for sorting logic
         'isFactuallyCompleted': isFactuallyCompleted,
         'startTimeMinutes': startTimeMinutes,
@@ -798,21 +827,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       bool bIsUiActive = b['isActive'];
       bool aIsFactuallyCompleted = a['isFactuallyCompleted'];
       bool bIsFactuallyCompleted = b['isFactuallyCompleted'];
+      bool aHasAttended = a['hasAttended'] ?? false;
+      bool bHasAttended = b['hasAttended'] ?? false;
       int aStartTime = a['startTimeMinutes'];
       int bStartTime = b['startTimeMinutes'];
 
       // Priority:
-      // 0: UI Active AND NOT Factually Completed (Truly Active)
-      // 1: NOT UI Active AND NOT FactuallyCompleted (Upcoming)
-      // 2: Factually Completed
-      int getPriority(bool uiActive, bool factuallyCompleted) {
-        if (factuallyCompleted) return 2;
-        if (uiActive) return 0; // This implies !factuallyCompleted because of the check above
-        return 1; // Not UI Active and Not Factually Completed (Upcoming)
+      // 0: UI Active AND NOT Factually Completed AND NOT Attended (Truly Active)
+      // 1: UI Active AND NOT Factually Completed AND Attended (Attended)
+      // 2: NOT UI Active AND NOT FactuallyCompleted (Upcoming)
+      // 3: Factually Completed
+      int getPriority(bool uiActive, bool factuallyCompleted, bool hasAttended) {
+        if (factuallyCompleted) return 3;
+        if (uiActive && !hasAttended) return 0; // Active and not yet attended
+        if (uiActive && hasAttended) return 1;  // Active but already attended
+        return 2; // Not UI Active and Not Factually Completed (Upcoming)
       }
 
-      int priorityA = getPriority(aIsUiActive, aIsFactuallyCompleted);
-      int priorityB = getPriority(bIsUiActive, bIsFactuallyCompleted);
+      int priorityA = getPriority(aIsUiActive, aIsFactuallyCompleted, aHasAttended);
+      int priorityB = getPriority(bIsUiActive, bIsFactuallyCompleted, bHasAttended);
 
       if (priorityA != priorityB) {
         return priorityA.compareTo(priorityB);
@@ -889,224 +922,208 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     final int? scheduleId = classData['scheduleId'];
     final bool hasActiveSession = classData['hasActiveSession'] ?? false;
     final bool isActive = classData['isActive'] as bool;
+    final bool hasAttended = classData['hasAttended'] ?? false;
     
-    // Check if student has already attended this class
-    bool hasAttended = false;
+    // Determine button state based on active session and attendance status
+    bool canAttend = hasActiveSession && !hasAttended;
     
-    // Use FutureBuilder to check attendance status from SharedPreferences
-    return FutureBuilder<SharedPreferences>(
-      future: SharedPreferences.getInstance(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData && scheduleId != null) {
-          hasAttended = snapshot.data!.getBool('attendance_completed_$scheduleId') ?? false;
-        }
-        
-        // Determine button state based on active session and attendance status
-        bool canAttend = hasActiveSession && !hasAttended;
-        
-        // Determine status text and color
-        String statusText;
-        Color statusColor;
-        
-        if (hasAttended) {
-          statusText = 'Sudah Diabsen';
-          statusColor = AppColors.success;
-        } else if (hasActiveSession) {
-          statusText = 'Sedang Berlangsung';
-          statusColor = AppColors.primary;
-        } else if (!isActive && classData['isFactuallyCompleted'] == true) {
-          statusText = 'Selesai';
-          statusColor = Colors.grey.shade600;
-        } else {
-          statusText = classData['status'] as String;
-          statusColor = AppColors.textSecondary;
-        }
-        
-        return GestureDetector(
-          onTap: () {
-            // Navigate to today's schedule screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TodaySchedulePage(),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  offset: const Offset(0, 1),
-                  blurRadius: 3,
-                  spreadRadius: 0,
-                ),
-              ],
-              border: Border.all(
-                color: hasAttended
-                    ? AppColors.success.withOpacity(0.3)
-                    : canAttend
-                        ? AppColors.primary.withOpacity(0.3)
-                        : Colors.grey.withOpacity(0.1),
-                width: (canAttend || hasAttended) ? 1.5 : 1,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          classData['title'] as String,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: hasAttended 
-                                ? AppColors.success
-                                : AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: hasAttended
-                              ? AppColors.success.withOpacity(0.08)
-                              : canAttend
-                                  ? AppColors.primary.withOpacity(0.08)
-                                  : Colors.grey.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          statusText,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
-                            color: statusColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time_rounded,
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        classData['time'] as String,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        classData['room'] as String,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.person_outline,
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        classData['lecturer'] as String,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (isActive) ...[
-                    const SizedBox(height: 10),
-                    const Divider(
-                        height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: hasAttended
-                        ? ElevatedButton(
-                            onPressed: null, // Disable button if already attended
-                            style: ElevatedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              backgroundColor: AppColors.success.withOpacity(0.8),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.check_circle_outline, size: 16),
-                                SizedBox(width: 8),
-                                Text('Sudah Diabsen'),
-                              ],
-                            ),
-                          )
-                        : ElevatedButton(
-                            onPressed: canAttend ? () {
-                              _showAbsensiOptionsBottomSheet(context, scheduleId!);
-                            } : null,
-                            style: ElevatedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              backgroundColor: canAttend ? AppColors.primary : Colors.grey.shade400,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            child: Text(
-                              canAttend ? 'Absen Sekarang' : 'Belum Ada Sesi Absensi'
-                            ),
-                          ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+    // Determine status text and color
+    String statusText = classData['status'] as String;
+    Color statusColor;
+    
+    if (hasAttended) {
+      statusColor = AppColors.success;
+    } else if (hasActiveSession) {
+      statusColor = AppColors.primary;
+    } else if (!isActive && classData['isFactuallyCompleted'] == true) {
+      statusColor = Colors.grey.shade600;
+    } else {
+      statusColor = AppColors.textSecondary;
+    }
+    
+    return GestureDetector(
+      onTap: () {
+        // Navigate to today's schedule screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const TodaySchedulePage(),
           ),
         );
       },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              offset: const Offset(0, 1),
+              blurRadius: 3,
+              spreadRadius: 0,
+            ),
+          ],
+          border: Border.all(
+            color: hasAttended
+                ? AppColors.success.withOpacity(0.3)
+                : canAttend
+                    ? AppColors.primary.withOpacity(0.3)
+                    : Colors.grey.withOpacity(0.1),
+            width: (canAttend || hasAttended) ? 1.5 : 1,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      classData['title'] as String,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: hasAttended 
+                            ? AppColors.success
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: hasAttended
+                          ? AppColors.success.withOpacity(0.08)
+                          : canAttend
+                              ? AppColors.primary.withOpacity(0.08)
+                              : Colors.grey.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        color: statusColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  Icon(
+                    Icons.access_time_rounded,
+                    size: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    classData['time'] as String,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    classData['room'] as String,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    size: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    classData['lecturer'] as String,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              if (isActive) ...[
+                const SizedBox(height: 10),
+                const Divider(
+                    height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: hasAttended
+                    ? ElevatedButton(
+                        onPressed: null, // Disable button if already attended
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: AppColors.success.withOpacity(0.8),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 16),
+                            SizedBox(width: 8),
+                            Text('Sudah Diabsen'),
+                          ],
+                        ),
+                      )
+                    : ElevatedButton(
+                        onPressed: canAttend ? () {
+                          _showAbsensiOptionsBottomSheet(context, scheduleId!);
+                        } : null,
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: canAttend ? AppColors.primary : Colors.grey.shade400,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        child: Text(
+                          canAttend ? 'Absen Sekarang' : 'Belum Ada Sesi Absensi'
+                        ),
+                      ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 

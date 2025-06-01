@@ -210,14 +210,33 @@ class QRScannerService {
         
         // Consider 2xx responses as success
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          // Parse response to get detailed result
+          Map<String, dynamic>? responseData;
+          try {
+            responseData = jsonDecode(response.body);
+            debugPrint('✅ Response data: $responseData');
+          } catch (e) {
+            debugPrint('Error parsing response JSON: $e');
+          }
+          
+          // Check if server confirms attendance was recorded
+          final bool serverConfirmedAttendance = responseData?['status'] == 'success' || 
+                                               responseData?['success'] == true || 
+                                               responseData?['data']?['attendance_recorded'] == true;
+
           // Save attendance status in SharedPreferences to prevent duplicate submissions
-          if (scheduleId != null) {
+          // but ONLY if server confirms attendance was recorded
+          if (scheduleId != null && serverConfirmedAttendance) {
             await prefs.setBool('attendance_completed_$scheduleId', true);
             debugPrint('✅ Marked attendance as completed for schedule $scheduleId');
+            
+            // Also store the sessionId that was used for this attendance
+            await prefs.setInt('attendance_session_$scheduleId', sessionId);
+            debugPrint('✅ Recorded session ID $sessionId for schedule $scheduleId');
           }
           
           ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
-          return true;
+          return serverConfirmedAttendance; // Return true only if server confirms
         }
         
         // Handle error response

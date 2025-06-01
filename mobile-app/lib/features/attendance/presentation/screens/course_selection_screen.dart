@@ -528,186 +528,176 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                               final bool timeBasedActive = currentTime >= startTimeMinutes && currentTime <= endTimeMinutes;
                               final bool statusBasedActive = schedule.status?.toLowerCase() == 'sedang berlangsung';
                               final bool isCurrentlyActiveClass = timeBasedActive || statusBasedActive;
+                              
+                              // Check attendance status from the server
+                              final bool isAttendanceCompleted = _attendanceStatusMap[schedule.id] ?? false;
+                              
+                              // Determine if the schedule is active and can be selected
+                              final bool canSelectForAttendance = 
+                                  isCurrentlyActiveClass && 
+                                  hasActiveSession && 
+                                  !isAttendanceCompleted;
+                              
+                              // Set the status text based on various conditions
+                              String statusText;
+                              if (isAttendanceCompleted) {
+                                statusText = 'Sudah Diabsen';
+                              } else if (hasActiveSession) {
+                                statusText = 'Bisa Absen';
+                              } else if (schedule.status?.toLowerCase() == 'selesai') {
+                                statusText = 'Selesai';
+                              } else {
+                                statusText = schedule.status ?? 'Tidak Aktif';
+                              }
 
-                              return FutureBuilder<SharedPreferences>(
-                                future: SharedPreferences.getInstance(),
-                                builder: (context, snapshot) {
-                                  // Default values if prefs not yet loaded
-                                  bool isAttendanceCompleted = false;
-                                  
-                                  // Update values if prefs are loaded
-                                  if (snapshot.hasData) {
-                                    isAttendanceCompleted = snapshot.data!.getBool('attendance_completed_${schedule.id}') ?? false;
-                                  }
-                                  
-                                  // Determine if the schedule is active and can be selected
-                                  final bool canSelectForAttendance = 
-                                      isCurrentlyActiveClass && 
-                                      hasActiveSession && 
-                                      !isAttendanceCompleted;
-                                  
-                                  // Set the status text based on various conditions
-                                  String statusText;
-                                  if (isAttendanceCompleted) {
-                                    statusText = 'Sudah Absen';
-                                  } else if (hasActiveSession) {
-                                    statusText = 'Bisa Absen';
-                                  } else if (schedule.status?.toLowerCase() == 'selesai') {
-                                    statusText = 'Selesai';
-                                  } else {
-                                    statusText = schedule.status ?? 'Tidak Aktif';
-                                  }
-
-                                  return GestureDetector(
-                                    onTap: canSelectForAttendance
-                                        ? () {
-                                            // Show bottom sheet instead of direct navigation
-                                            _showAbsensiBottomSheet(context, schedule);
-                                          }
-                                        : null,
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 12),
-                                      decoration: BoxDecoration(
-                                        color: canSelectForAttendance
-                                            ? Colors.white
-                                            : Colors.white.withOpacity(0.8),
-                                        borderRadius: BorderRadius.circular(8),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.05),
-                                            offset: const Offset(0, 1),
-                                            blurRadius: 3,
-                                            spreadRadius: 0,
-                                          ),
-                                        ],
-                                        border: Border.all(
-                                          color: canSelectForAttendance
-                                              ? AppColors.primary.withOpacity(0.3)
-                                              : isAttendanceCompleted
-                                                ? AppColors.success.withOpacity(0.3)
-                                                : Colors.grey.withOpacity(0.1),
-                                          width: canSelectForAttendance || isAttendanceCompleted ? 1.5 : 1,
-                                        ),
+                              return GestureDetector(
+                                onTap: canSelectForAttendance
+                                    ? () {
+                                        // Show bottom sheet instead of direct navigation
+                                        _showAbsensiBottomSheet(context, schedule);
+                                      }
+                                    : null,
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: canSelectForAttendance
+                                        ? Colors.white
+                                        : Colors.white.withOpacity(0.8),
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        offset: const Offset(0, 1),
+                                        blurRadius: 3,
+                                        spreadRadius: 0,
                                       ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                    ],
+                                    border: Border.all(
+                                      color: canSelectForAttendance
+                                          ? AppColors.primary.withOpacity(0.3)
+                                          : isAttendanceCompleted
+                                            ? AppColors.success.withOpacity(0.3)
+                                            : Colors.grey.withOpacity(0.1),
+                                      width: canSelectForAttendance || isAttendanceCompleted ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    schedule.courseName,
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: isAttendanceCompleted
-                                                          ? AppColors.success
-                                                          : canSelectForAttendance
-                                                            ? AppColors.textPrimary
-                                                            : AppColors.textSecondary,
-                                                    ),
-                                                  ),
-                                                ),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                      horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: isAttendanceCompleted
-                                                        ? AppColors.success.withOpacity(0.08)
-                                                        : canSelectForAttendance
-                                                          ? AppColors.primary.withOpacity(0.08)
-                                                          : Colors.grey.withOpacity(0.08),
-                                                    borderRadius: BorderRadius.circular(4),
-                                                  ),
-                                                  child: Text(
-                                                    statusText,
-                                                    style: TextStyle(
-                                                      fontSize: 9,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: isAttendanceCompleted
-                                                          ? AppColors.success
-                                                          : canSelectForAttendance
-                                                            ? AppColors.primary
-                                                            : AppColors.textSecondary,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.access_time_rounded,
-                                                  size: 12,
-                                                  color: AppColors.textSecondary,
-                                                ),
-                                                const SizedBox(width: 3),
-                                                Text(
-                                                  '${schedule.startTime} - ${schedule.endTime}',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: AppColors.textSecondary,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Icon(
-                                                  Icons.location_on_outlined,
-                                                  size: 12,
-                                                  color: AppColors.textSecondary,
-                                                ),
-                                                const SizedBox(width: 3),
-                                                Text(
-                                                  schedule.roomName,
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: AppColors.textSecondary,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 3),
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.person_outline,
-                                                  size: 12,
-                                                  color: AppColors.textSecondary,
-                                                ),
-                                                const SizedBox(width: 3),
-                                                Expanded(
-                                                  child: Text(
-                                                    schedule.lecturerName,
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: AppColors.textSecondary,
-                                                    ),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            if (!(canSelectForAttendance || isAttendanceCompleted))
-                                              Padding(
-                                                padding: const EdgeInsets.only(top: 8.0),
-                                                child: Text(
-                                                  isCurrentlyActiveClass ? 'Sesi absensi belum dibuka dosen.' : 'Jadwal tidak aktif atau sudah selesai.',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontStyle: FontStyle.italic,
-                                                    color: AppColors.warning,
-                                                  ),
+                                            Expanded(
+                                              child: Text(
+                                                schedule.courseName,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isAttendanceCompleted
+                                                      ? AppColors.success
+                                                      : canSelectForAttendance
+                                                        ? AppColors.textPrimary
+                                                        : AppColors.textSecondary,
                                                 ),
                                               ),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: isAttendanceCompleted
+                                                    ? AppColors.success.withOpacity(0.08)
+                                                    : canSelectForAttendance
+                                                      ? AppColors.primary.withOpacity(0.08)
+                                                      : Colors.grey.withOpacity(0.08),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                statusText,
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: isAttendanceCompleted
+                                                      ? AppColors.success
+                                                      : canSelectForAttendance
+                                                        ? AppColors.primary
+                                                        : AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ),
                                           ],
                                         ),
-                                      ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.access_time_rounded,
+                                              size: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              '${schedule.startTime} - ${schedule.endTime}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Icon(
+                                              Icons.location_on_outlined,
+                                              size: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              schedule.roomName,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.person_outline,
+                                              size: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Expanded(
+                                              child: Text(
+                                                schedule.lecturerName,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppColors.textSecondary,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (!(canSelectForAttendance || isAttendanceCompleted))
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 8.0),
+                                            child: Text(
+                                              isCurrentlyActiveClass ? 'Sesi absensi belum dibuka dosen.' : 'Jadwal tidak aktif atau sudah selesai.',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontStyle: FontStyle.italic,
+                                                color: AppColors.warning,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
-                                  );
-                                },
+                                  ),
+                                ),
                               );
                             },
                           ),
