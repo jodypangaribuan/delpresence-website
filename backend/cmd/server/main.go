@@ -283,6 +283,9 @@ func main() {
 			// Add new endpoints for attendance history
 			studentRoutes.GET("/attendance/history", studentAttendanceHandler.GetStudentAttendanceHistory)
 			studentRoutes.GET("/attendance/history/today", studentAttendanceHandler.GetTodayAttendanceHistory)
+
+			// Add endpoint to check if attendance is already completed
+			studentRoutes.GET("/attendance/check-status/:scheduleId", studentAttendanceHandler.CheckAttendanceStatus)
 		}
 	}
 

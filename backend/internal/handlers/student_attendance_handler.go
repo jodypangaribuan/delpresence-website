@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/delpresence/backend/internal/database"
@@ -377,46 +378,96 @@ func (h *StudentAttendanceHandler) GetTodayAttendanceHistory(c *gin.Context) {
 
 	// Format the response
 	var todayAttendanceHistory []map[string]interface{}
-	for _, result := range results {
-		// Format times for easier consumption in mobile app
-		checkInTime := result["check_in_time"]
-		formattedCheckInTime := ""
-		if checkInTime != nil {
-			if t, ok := checkInTime.(time.Time); ok {
-				formattedCheckInTime = t.Format("15:04:05")
-			}
+	for _, r := range results {
+		// Format date and time
+		date := r["date"].(time.Time).Format("2006-01-02")
+		checkInTime := ""
+		if r["check_in_time"] != nil {
+			checkInTime = r["check_in_time"].(time.Time).Format("15:04:05")
 		}
 
-		sessionStartTime := result["start_time"]
-		formattedStartTime := ""
-		if t, ok := sessionStartTime.(time.Time); ok {
-			formattedStartTime = t.Format("15:04")
+		attendanceHistory := map[string]interface{}{
+			"id":                  r["id"],
+			"course_schedule_id":  r["course_schedule_id"],
+			"course_id":           r["course_id"],
+			"course_code":         r["course_code"],
+			"course_name":         r["course_name"],
+			"date":                date,
+			"start_time":          r["start_time"],
+			"end_time":            r["end_time"],
+			"room_name":           r["room_name"],
+			"building_name":       r["building_name"],
+			"lecturer_id":         r["lecturer_id"],
+			"lecturer_name":       r["lecturer_name"],
+			"status":              r["status"],
+			"check_in_time":       checkInTime,
+			"verification_method": r["verification_method"],
+			"notes":               r["notes"],
 		}
 
-		sessionEndTime := result["end_time"]
-		formattedEndTime := ""
-		if t, ok := sessionEndTime.(time.Time); ok {
-			formattedEndTime = t.Format("15:04")
-		}
-
-		todayAttendanceHistory = append(todayAttendanceHistory, map[string]interface{}{
-			"id":                  result["id"],
-			"status":              result["status"],
-			"session_start_time":  formattedStartTime,
-			"session_end_time":    formattedEndTime,
-			"check_in_time":       formattedCheckInTime,
-			"verification_method": result["verification_method"],
-			"course_id":           result["course_id"],
-			"course_code":         result["course_code"],
-			"course_name":         result["course_name"],
-			"room_name":           result["room_name"],
-			"building_name":       result["building_name"],
-			"lecturer_name":       result["lecturer_name"],
-		})
+		todayAttendanceHistory = append(todayAttendanceHistory, attendanceHistory)
 	}
 
+	// Return the attendance history
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data":   todayAttendanceHistory,
+	})
+}
+
+// CheckAttendanceStatus checks if a student has completed attendance for a specific schedule
+func (h *StudentAttendanceHandler) CheckAttendanceStatus(c *gin.Context) {
+	// Extract student ID from the authenticated user
+	userID := c.MustGet("userID").(uint)
+
+	// Extract schedule ID from URL parameters
+	scheduleIDStr := c.Param("scheduleId")
+	scheduleID, err := strconv.ParseUint(scheduleIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": "error",
+			"error":  "Invalid schedule ID",
+		})
+		return
+	}
+
+	// Find the student record associated with this user
+	var student models.Student
+	if err := h.db.Where("user_id = ?", userID).First(&student).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status": "error",
+			"error":  "Student record not found",
+		})
+		return
+	}
+
+	// Find any active attendance session for this schedule
+	var activeSession models.AttendanceSession
+	todayDate := time.Now().Format("2006-01-02")
+
+	err = h.db.Where("course_schedule_id = ? AND date = ? AND status = ?",
+		scheduleID, todayDate, models.AttendanceStatusActive).
+		First(&activeSession).Error
+
+	// If there's no active session, the student can't have completed attendance
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "success",
+			"completed": false,
+		})
+		return
+	}
+
+	// Check if student has any attendance record for this session
+	var attendanceCount int64
+	h.db.Model(&models.StudentAttendance{}).
+		Where("student_id = ? AND attendance_session_id = ?", student.ID, activeSession.ID).
+		Count(&attendanceCount)
+
+	// Return the result
+	c.JSON(http.StatusOK, gin.H{
+		"status":     "success",
+		"completed":  attendanceCount > 0,
+		"session_id": activeSession.ID,
 	})
 }

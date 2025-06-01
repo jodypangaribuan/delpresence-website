@@ -21,6 +21,19 @@ class AttendanceService {
          timeout: ApiConfig.instance.timeout,
        );
   
+  /// Get authentication headers
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    
+    if (token == null) {
+      debugPrint('No authentication token found');
+      return {};
+    }
+    
+    return {'Authorization': 'Bearer $token'};
+  }
+  
   /// Get all attendance history for the logged-in student
   Future<List<AttendanceHistoryModel>> getAttendanceHistory({
     String? academicYearId,
@@ -34,9 +47,13 @@ class AttendanceService {
       if (startDate != null) queryParams['start_date'] = startDate;
       if (endDate != null) queryParams['end_date'] = endDate;
       
+      // Get auth headers
+      final headers = await _getAuthHeaders();
+      
       // Make API request
       final response = await _networkService.get(
         '/api/student/attendance/history',
+        headers: headers,
         queryParams: queryParams,
       );
       
@@ -71,9 +88,13 @@ class AttendanceService {
   /// Get today's attendance history for the logged-in student
   Future<List<AttendanceHistoryModel>> getTodayAttendanceHistory() async {
     try {
+      // Get auth headers
+      final headers = await _getAuthHeaders();
+      
       // Make API request
       final response = await _networkService.get(
         '/api/student/attendance/history/today',
+        headers: headers,
       );
       
       // Parse response
@@ -113,9 +134,13 @@ class AttendanceService {
       final queryParams = <String, String>{};
       if (academicYearId != null) queryParams['academic_year_id'] = academicYearId;
       
+      // Get auth headers
+      final headers = await _getAuthHeaders();
+      
       // Make API request - this endpoint doesn't exist yet, just a placeholder
       final response = await _networkService.get(
         '/api/student/attendance/statistics',
+        headers: headers,
         queryParams: queryParams,
       );
       
@@ -143,6 +168,35 @@ class AttendanceService {
         'absent': 0,
         'excused': 0,
       };
+    }
+  }
+  
+  /// Check if attendance is already completed for a specific schedule
+  Future<bool> checkAttendanceStatus(int scheduleId) async {
+    try {
+      // Get auth headers
+      final headers = await _getAuthHeaders();
+      
+      // Make API request to check attendance status
+      final response = await _networkService.get(
+        '/api/student/attendance/check-status/$scheduleId',
+        headers: headers,
+      );
+      
+      // Parse response
+      if (response.success && response.data != null) {
+        final responseData = response.data;
+        if (responseData != null && responseData['status'] == 'success') {
+          // Return the completed status from the server
+          return responseData['completed'] == true;
+        }
+      }
+      
+      // Default to not completed in case of errors
+      return false;
+    } catch (e) {
+      debugPrint('Error checking attendance status: $e');
+      return false;
     }
   }
 } 
