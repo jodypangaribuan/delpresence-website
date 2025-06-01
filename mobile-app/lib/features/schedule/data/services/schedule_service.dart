@@ -195,8 +195,14 @@ class ScheduleService {
             data['status'] == 'success' && 
             data.containsKey('data')) {
           
+          // Handle null data properly
+          if (data['data'] == null) {
+            debugPrint('🔍 No active sessions data (null) from API');
+            return false;
+          }
+          
           // Parse the active sessions list
-          final List<dynamic> sessionsJson = data['data'];
+          final List<dynamic> sessionsJson = data['data'] as List<dynamic>;
           debugPrint('🔍 Found ${sessionsJson.length} active sessions');
           
           if (sessionsJson.isEmpty) {
@@ -265,7 +271,13 @@ class ScheduleService {
             data['status'] == 'success' && 
             data.containsKey('data')) {
           
-          final List<dynamic> sessionsJson = data['data'];
+          // Handle null data properly
+          if (data['data'] == null) {
+            debugPrint('🔍 No active sessions data (null) from API');
+            return [];
+          }
+          
+          final List<dynamic> sessionsJson = data['data'] as List<dynamic>;
           debugPrint('🔍 Successfully parsed ${sessionsJson.length} active sessions');
           
           // Log each session for debugging

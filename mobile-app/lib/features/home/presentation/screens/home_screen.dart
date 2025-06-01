@@ -1524,21 +1524,41 @@ class _PressableMenuItemState extends State<_PressableMenuItem>
 }
 
 // Halaman beranda baru dengan header dan konten kosong
-class _HomePage extends StatelessWidget {
+class _HomePage extends StatefulWidget {
   const _HomePage({Key? key}) : super(key: key);
+
+  @override
+  State<_HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<_HomePage> {
+  bool _initialRefreshDone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Delay the refresh to avoid build phase issues
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshData();
+    });
+  }
+
+  void _refreshData() {
+    if (!_initialRefreshDone) {
+      final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+      if (homeState != null) {
+        homeState._fetchTodaySchedules();
+        setState(() {
+          _initialRefreshDone = true;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     // Get the HomeScreen parent state using findAncestorStateOfType
     final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-    
-    // Automatically refresh data when this widget is built
-    if (homeState != null) {
-      // Use a post-frame callback to avoid potential build phase issues
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        homeState._refreshHomeScreenData();
-      });
-    }
     
     // Check if there are any active sessions
     bool hasAnyActiveSession = false;
