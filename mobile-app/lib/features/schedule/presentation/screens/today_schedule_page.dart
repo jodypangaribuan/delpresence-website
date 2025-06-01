@@ -6,6 +6,7 @@ import '../../../../core/services/network_service.dart';
 import '../../../../core/config/api_config.dart';
 import '../../data/models/schedule_model.dart';
 import '../../data/services/schedule_service.dart';
+import 'dart:async';
 
 class TodaySchedulePage extends StatefulWidget {
   const TodaySchedulePage({super.key});
@@ -37,6 +38,11 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
   String _todayName = DateTime.now().weekday >= 1 && DateTime.now().weekday <= 7 
       ? ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'][DateTime.now().weekday - 1] 
       : '';
+      
+  // Timer for checking active sessions
+  Timer? _activeSessionsTimer;
+  // Map to store active session status for each schedule
+  final Map<int, ValueNotifier<bool>> _activeSessionsMap = {};
 
   @override
   void initState() {
@@ -60,6 +66,38 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
     
     // Fetch data
     _fetchAcademicYears();
+    
+    // Start periodic timer to check for active sessions
+    _startActiveSessionsTimer();
+  }
+  
+  @override
+  void dispose() {
+    // Cancel the timer when the widget is disposed
+    _activeSessionsTimer?.cancel();
+    super.dispose();
+  }
+  
+  void _startActiveSessionsTimer() {
+    // Check every 30 seconds for active sessions
+    _activeSessionsTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      // Only check if we have schedules loaded
+      if (_todaySchedules.isNotEmpty) {
+        for (final schedule in _todaySchedules) {
+          // Get or create notifier for this schedule
+          final notifier = _getActiveSessionNotifier(schedule.id);
+          // Check if there's an active session
+          _checkForActiveSession(schedule.id, notifier);
+        }
+      }
+    });
+  }
+  
+  ValueNotifier<bool> _getActiveSessionNotifier(int scheduleId) {
+    if (!_activeSessionsMap.containsKey(scheduleId)) {
+      _activeSessionsMap[scheduleId] = ValueNotifier<bool>(false);
+    }
+    return _activeSessionsMap[scheduleId]!;
   }
   
   // Fetch academic years from the API
@@ -114,6 +152,12 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
         _todaySchedules = ScheduleModel.getSchedulesByDay(schedules, _todayName);
         _isLoading = false;
       });
+      
+      // Check for active sessions for each today's schedule
+      for (final schedule in _todaySchedules) {
+        final notifier = _getActiveSessionNotifier(schedule.id);
+        _checkForActiveSession(schedule.id, notifier);
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -362,6 +406,14 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
   }
 
   Widget _buildScheduleCard(ScheduleModel schedule) {
+    // Get the notifier for this schedule
+    final hasActiveSession = _getActiveSessionNotifier(schedule.id);
+    
+    // Check for active session when the card is built if not already checked
+    if (!_activeSessionsMap.containsKey(schedule.id)) {
+      _checkForActiveSession(schedule.id, hasActiveSession);
+    }
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -511,10 +563,91 @@ class _TodaySchedulePageState extends State<TodaySchedulePage> {
               ],
             ),
             
-            // No absen button
+            // Add attendance button only when the class is in progress AND there's an active session
+            ValueListenableBuilder<bool>(
+              valueListenable: hasActiveSession,
+              builder: (context, isActive, child) {
+                // Only show the button if there's an active session, regardless of schedule time
+                if (isActive) {
+                  return Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Navigate to attendance screen
+                            // This would be implemented to use either QR or face recognition
+                          },
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          child: const Text('Absen Sekarang'),
+                        ),
+                      ),
+                    ],
+                  );
+                } else if (schedule.status == 'Sedang Berlangsung') {
+                  // If class is in progress but no active session, show "Menunggu Dosen" button
+                  return Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: null, // Disabled button
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.white.withOpacity(0.7),
+                            backgroundColor: Colors.grey.withOpacity(0.3),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          child: const Text('Menunggu Dosen Memulai Presensi'),
+                        ),
+                      ),
+                    ],
+                  );
+                } else {
+                  return const SizedBox.shrink(); // No button if class isn't in progress
+                }
+              },
+            ),
           ],
         ),
       ),
     );
+  }
+  
+  // Helper method to check for active sessions
+  Future<void> _checkForActiveSession(int scheduleId, ValueNotifier<bool> hasActiveSession) async {
+    try {
+      final isActive = await _scheduleService.isAttendanceSessionActive(scheduleId);
+      if (hasActiveSession.value != isActive) {
+        hasActiveSession.value = isActive;
+      }
+    } catch (e) {
+      debugPrint('Error checking for active session: $e');
+    }
   }
 }

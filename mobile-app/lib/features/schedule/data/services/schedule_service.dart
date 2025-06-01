@@ -160,4 +160,58 @@ class ScheduleService {
       throw Exception('Terjadi kesalahan saat mengambil tahun akademik: $e');
     }
   }
+
+  /// Check if there is an active attendance session for a specific schedule
+  Future<bool> isAttendanceSessionActive(int scheduleId) async {
+    try {
+      // Get auth token
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('Tidak ada token autentikasi. Silahkan login kembali.');
+      }
+
+      // Prepare auth headers
+      final headers = {
+        'Authorization': 'Bearer $token',
+      };
+
+      // Log the API request for debugging
+      final endpoint = '/api/student/attendance/active-sessions';
+      debugPrint('🔍 Checking active attendance sessions for schedule: $scheduleId');
+
+      final response = await _networkService.get<Map<String, dynamic>>(
+        endpoint,
+        headers: headers,
+      );
+
+      debugPrint('🔍 Active sessions API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
+      
+      if (response.success && response.data != null) {
+        final data = response.data!;
+        
+        if (data.containsKey('status') && 
+            data['status'] == 'success' && 
+            data.containsKey('data')) {
+          
+          // Parse the active sessions list
+          final List<dynamic> sessionsJson = data['data'];
+          debugPrint('🔍 Found ${sessionsJson.length} active sessions');
+          
+          // Check if any of the active sessions match our schedule ID
+          for (final session in sessionsJson) {
+            if (session['course_schedule_id'] == scheduleId) {
+              debugPrint('🔍 Found active session for schedule $scheduleId');
+              return true;
+            }
+          }
+        }
+      }
+      
+      // No active session found for this schedule
+      return false;
+    } catch (e) {
+      debugPrint('🔍 Error checking active sessions: $e');
+      return false;
+    }
+  }
 } 

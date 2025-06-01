@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/delpresence/backend/internal/database"
@@ -113,18 +114,48 @@ func (s *AttendanceService) CreateAttendanceSession(userID uint, courseScheduleI
 
 	// Apply custom settings if provided
 	if settings != nil {
+		fmt.Printf("Received attendance settings: %+v\n", settings)
+
 		if val, ok := settings["autoClose"].(bool); ok {
 			session.AutoClose = val
 		}
+
+		// Handle duration - try different type assertions
 		if val, ok := settings["duration"].(int); ok && val > 0 {
 			session.Duration = val
+			fmt.Printf("Set duration to %d (from int)\n", val)
+		} else if val, ok := settings["duration"].(float64); ok && val > 0 {
+			session.Duration = int(val)
+			fmt.Printf("Set duration to %d (from float64 %.2f)\n", int(val), val)
+		} else if val, ok := settings["duration"].(string); ok {
+			if intVal, err := strconv.Atoi(val); err == nil && intVal > 0 {
+				session.Duration = intVal
+				fmt.Printf("Set duration to %d (from string %s)\n", intVal, val)
+			}
+		} else {
+			fmt.Printf("Unable to parse duration from settings: %v, type: %T\n", settings["duration"], settings["duration"])
 		}
+
 		if val, ok := settings["allowLate"].(bool); ok {
 			session.AllowLate = val
 		}
+
+		// Handle lateThreshold - try different type assertions
 		if val, ok := settings["lateThreshold"].(int); ok && val > 0 {
 			session.LateThreshold = val
+			fmt.Printf("Set lateThreshold to %d (from int)\n", val)
+		} else if val, ok := settings["lateThreshold"].(float64); ok && val > 0 {
+			session.LateThreshold = int(val)
+			fmt.Printf("Set lateThreshold to %d (from float64 %.2f)\n", int(val), val)
+		} else if val, ok := settings["lateThreshold"].(string); ok {
+			if intVal, err := strconv.Atoi(val); err == nil && intVal > 0 {
+				session.LateThreshold = intVal
+				fmt.Printf("Set lateThreshold to %d (from string %s)\n", intVal, val)
+			}
+		} else {
+			fmt.Printf("Unable to parse lateThreshold from settings: %v, type: %T\n", settings["lateThreshold"], settings["lateThreshold"])
 		}
+
 		if val, ok := settings["notes"].(string); ok {
 			session.Notes = val
 		}
