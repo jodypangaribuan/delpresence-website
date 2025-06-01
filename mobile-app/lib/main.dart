@@ -17,6 +17,7 @@ import 'core/utils/http_override.dart';
 import 'core/utils/api_logger.dart';
 import 'core/network/network_info.dart';
 import 'core/config/api_config.dart';
+import 'core/services/network_service.dart';
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
@@ -26,6 +27,7 @@ import 'features/home/data/datasources/student_local_datasource.dart';
 import 'features/home/data/repositories/student_repository_impl.dart';
 import 'features/home/domain/repositories/student_repository.dart';
 import 'features/splash/presentation/screens/splash_screen.dart';
+import 'features/face/presentation/providers/face_provider.dart';
 
 // Add function to preload critical assets
 Future<void> _preloadAssets() async {
@@ -194,6 +196,12 @@ class MyApp extends StatelessWidget {
         // Provide the auth bloc
         BlocProvider<AuthBloc>(
           create: (context) => AuthBloc(authRepository),
+        ),
+        // Provide the face provider
+        ChangeNotifierProvider<FaceProvider>(
+          create: (_) => FaceProvider(
+            networkService: NetworkService(),
+          ),
         ),
       ],
       child: MaterialApp(

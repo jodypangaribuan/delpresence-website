@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -257,52 +258,43 @@ func (s *AttendanceService) CancelAttendanceSession(sessionID uint, lecturerID u
 
 // MarkStudentAttendance marks a student's attendance for a session
 func (s *AttendanceService) MarkStudentAttendance(sessionID uint, studentID uint, status models.StudentAttendanceStatus, verificationMethod string, notes string, verifiedByID *uint) error {
-	// Check if the session exists and is active
-	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
+	// Get the session by ID (untuk memastikan session ada)
+	_, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
 	if err != nil {
-		return err
+		return errors.New("attendance session not found")
 	}
 
-	if session.Status != models.AttendanceStatusActive {
-		return errors.New("attendance session is not active")
-	}
+	// Set check-in time to current Indonesia time
+	checkInTime := GetIndonesiaTime()
 
-	// Check if the student already has an attendance record
-	attendance, err := s.attendanceRepo.GetStudentAttendance(sessionID, studentID)
-	isNewRecord := err != nil
+	// Find or create attendance record
+	var attendance models.StudentAttendance
+	result := s.db.Where("attendance_session_id = ? AND student_id = ?", sessionID, studentID).FirstOrInit(&attendance)
 
-	// Determine if the student is late based on session settings
-	if status == models.StudentAttendanceStatusPresent && session.AllowLate {
-		elapsed := time.Since(session.StartTime)
-		if int(elapsed.Minutes()) > session.LateThreshold {
-			// Student is late, change status to late
-			status = models.StudentAttendanceStatusLate
-		}
-	}
+	// Update the attributes
+	attendance.Status = status
+	attendance.VerificationMethod = verificationMethod
+	attendance.CheckInTime = &checkInTime // Set to Indonesia time
+	attendance.Notes = notes
 
-	now := GetIndonesiaTime()
-
-	if isNewRecord {
-		// Create a new attendance record
-		attendance = &models.StudentAttendance{
-			AttendanceSessionID: sessionID,
-			StudentID:           studentID,
-			Status:              status,
-			CheckInTime:         &now,
-			Notes:               notes,
-			VerificationMethod:  verificationMethod,
-			VerifiedByID:        verifiedByID,
-		}
-		return s.attendanceRepo.CreateStudentAttendance(attendance)
-	} else {
-		// Update existing record
-		attendance.Status = status
-		attendance.CheckInTime = &now
-		attendance.Notes = notes
-		attendance.VerificationMethod = verificationMethod
+	if verifiedByID != nil {
 		attendance.VerifiedByID = verifiedByID
-		return s.attendanceRepo.UpdateStudentAttendance(attendance)
 	}
+
+	// Save the record
+	if attendance.ID == 0 {
+		attendance.AttendanceSessionID = sessionID
+		attendance.StudentID = studentID
+		result = s.db.Create(&attendance)
+	} else {
+		result = s.db.Save(&attendance)
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
 }
 
 // GetActiveSessionsForUser gets all active attendance sessions for a user (lecturer or teaching assistant)
@@ -494,80 +486,63 @@ func (s *AttendanceService) GetSessionDetails(sessionID uint, userID uint) (*mod
 	return s.mapSessionToResponse(session)
 }
 
-// GetStudentAttendances gets student attendance records for a session
+// GetStudentAttendances gets the list of student attendances for a session
 func (s *AttendanceService) GetStudentAttendances(sessionID uint, userID uint) ([]models.StudentAttendanceResponse, error) {
 	// Verify the session exists
 	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("attendance session not found")
 	}
 
-	// Check if user is the assigned lecturer for this session
-	if session.LecturerID != userID {
-		// If not, check if they are a teaching assistant for this course
-		var isAssistant bool
-
-		// Get the course ID from the session's schedule
-		var courseID uint
-		if err := s.db.Model(&models.CourseSchedule{}).
-			Where("id = ?", session.CourseScheduleID).
-			Select("course_id").
-			First(&courseID).Error; err != nil {
-			return nil, errors.New("failed to verify course assignment")
-		}
-
-		// Check if the user is a teaching assistant for this course
-		err = s.db.Raw(`
-			SELECT EXISTS (
-				SELECT 1 FROM teaching_assistant_assignments 
-				WHERE user_id = ? AND course_id = ?
-			) as is_assistant`,
-			userID, courseID).Scan(&isAssistant).Error
-
-		if err != nil || !isAssistant {
-			return nil, errors.New("user does not have access to this session")
-		}
+	// Authorization: Check if user is the lecturer for this session or an assistant
+	if !s.hasAccessToSession(userID, session) {
+		return nil, errors.New("unauthorized access to attendance session")
 	}
 
-	// Get all student attendances for this session
+	// Get the attendance records
 	attendances, err := s.attendanceRepo.ListStudentAttendances(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Transform to response objects
-	var responses []models.StudentAttendanceResponse
+	// Prepare responses
+	responses := []models.StudentAttendanceResponse{}
 	for _, attendance := range attendances {
-		checkInTime := ""
-		if attendance.CheckInTime != nil {
-			// Convert to Indonesia time first
-			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
-			checkInTime = indonesiaTime.Format("15:04:05")
-		}
+		checkInTimeStr := FormatCheckInTimeForResponse(attendance.CheckInTime)
 
-		// Get external user ID either from notes or from student record
-		externalUserID := uint(0)
-		if strings.Contains(attendance.Notes, "EXTID:") {
-			externalUserID = parseExternalUserIDFromNotes(attendance.Notes)
-		} else if attendance.Student.UserID > 0 {
-			externalUserID = uint(attendance.Student.UserID)
-		}
+		// Get proper student name and NIM
+		studentName := ""
+		studentNIM := ""
 
-		// Add external ID to student name if available
-		studentName := attendance.Student.FullName
+		if attendance.Student.ID > 0 {
+			studentNIM = attendance.Student.NIM
+
+			// Get user information if available
+			var user models.User
+			if err := s.db.First(&user, attendance.Student.UserID).Error; err == nil {
+				studentName = attendance.Student.FullName
+			} else {
+				studentName = studentNIM // Fallback to NIM if user not found
+			}
+		}
 
 		responses = append(responses, models.StudentAttendanceResponse{
 			ID:                  attendance.ID,
 			AttendanceSessionID: attendance.AttendanceSessionID,
-			StudentID:           externalUserID, // Use external user ID if available
+			StudentID:           attendance.StudentID,
 			StudentName:         studentName,
-			StudentNIM:          attendance.Student.NIM,
+			StudentNIM:          studentNIM,
 			Status:              string(attendance.Status),
-			CheckInTime:         checkInTime,
+			CheckInTime:         checkInTimeStr,
 			Notes:               attendance.Notes,
 			VerificationMethod:  attendance.VerificationMethod,
 		})
 	}
+
+	// Sort by student name or NIM if available
+	sort.Slice(responses, func(i, j int) bool {
+		return responses[i].StudentNIM < responses[j].StudentNIM
+	})
 
 	return responses, nil
 }
@@ -850,37 +825,45 @@ func (s *AttendanceService) GetStudentAttendancesByExternalID(externalUserID uin
 		return nil, fmt.Errorf("no student found with user ID %d", externalUserID)
 	}
 
-	// Get all student attendances
+	// Get all attendance records for this student
 	var attendances []models.StudentAttendance
 	err = s.db.Preload("AttendanceSession").
-		Preload("AttendanceSession.CourseSchedule").
-		Preload("AttendanceSession.CourseSchedule.Course").
-		Preload("AttendanceSession.CourseSchedule.Room").
 		Preload("Student").
 		Where("student_id = ?", studentID).
 		Find(&attendances).Error
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch attendances: %v", err)
+		return nil, err
 	}
 
 	var responses []models.StudentAttendanceResponse
 	for _, attendance := range attendances {
-		checkInTime := ""
-		if attendance.CheckInTime != nil {
-			// Convert to Indonesia time if needed
-			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
-			checkInTime = indonesiaTime.Format("15:04")
+		checkInTimeStr := FormatCheckInTimeForResponse(attendance.CheckInTime)
+
+		// Get proper student name and NIM
+		studentName := ""
+		studentNIM := ""
+
+		if attendance.Student.ID > 0 {
+			studentNIM = attendance.Student.NIM
+
+			// Get user information if available
+			var user models.User
+			if err := s.db.First(&user, attendance.Student.UserID).Error; err == nil {
+				studentName = attendance.Student.FullName
+			} else {
+				studentName = studentNIM // Fallback to NIM if user not found
+			}
 		}
 
 		responses = append(responses, models.StudentAttendanceResponse{
 			ID:                  attendance.ID,
 			AttendanceSessionID: attendance.AttendanceSessionID,
 			StudentID:           attendance.StudentID,
-			StudentName:         attendance.Student.FullName,
-			StudentNIM:          attendance.Student.NIM,
+			StudentName:         studentName,
+			StudentNIM:          studentNIM,
 			Status:              string(attendance.Status),
-			CheckInTime:         checkInTime,
+			CheckInTime:         checkInTimeStr,
 			Notes:               attendance.Notes,
 			VerificationMethod:  attendance.VerificationMethod,
 		})
@@ -889,7 +872,7 @@ func (s *AttendanceService) GetStudentAttendancesByExternalID(externalUserID uin
 	return responses, nil
 }
 
-// GetStudentAttendanceHistory gets detailed attendance history for a student with course info
+// GetStudentAttendanceHistory gets attendance history for a student
 func (s *AttendanceService) GetStudentAttendanceHistory(externalUserID uint) ([]models.StudentAttendanceHistoryResponse, error) {
 	// Find the student ID associated with the user ID
 	var studentID uint
@@ -905,16 +888,14 @@ func (s *AttendanceService) GetStudentAttendanceHistory(externalUserID uint) ([]
 		return nil, fmt.Errorf("no student found with user ID %d", externalUserID)
 	}
 
-	// Get all student attendances with necessary relations
+	// Get all attendance records with related session, course, and room info
 	var attendances []models.StudentAttendance
 	err = s.db.Preload("AttendanceSession").
 		Preload("AttendanceSession.CourseSchedule").
 		Preload("AttendanceSession.CourseSchedule.Course").
 		Preload("AttendanceSession.CourseSchedule.Room").
 		Preload("AttendanceSession.CourseSchedule.Room.Building").
-		Preload("Student").
 		Where("student_id = ?", studentID).
-		Order("attendance_session_id DESC"). // Latest sessions first
 		Find(&attendances).Error
 
 	if err != nil {
@@ -930,12 +911,8 @@ func (s *AttendanceService) GetStudentAttendanceHistory(externalUserID uint) ([]
 			continue
 		}
 
-		checkInTime := ""
-		if attendance.CheckInTime != nil {
-			// Convert to Indonesia time if needed
-			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
-			checkInTime = indonesiaTime.Format("15:04")
-		}
+		// Gunakan fungsi helper untuk format waktu
+		checkInTimeStr := FormatCheckInTimeForResponse(attendance.CheckInTime)
 
 		roomName := attendance.AttendanceSession.CourseSchedule.Room.Name
 		buildingName := ""
@@ -948,17 +925,29 @@ func (s *AttendanceService) GetStudentAttendanceHistory(externalUserID uint) ([]
 			fullRoomName = fmt.Sprintf("%s - %s", buildingName, roomName)
 		}
 
+		// Untuk sorting, gunakan format ISO (YYYY-MM-DD)
+		dateForSorting := attendance.AttendanceSession.Date.Format("2006-01-02")
+
+		// Untuk tampilan, gunakan format Indonesia lengkap
+		dateForDisplay := FormatDateIndonesian(attendance.AttendanceSession.Date)
+
 		responses = append(responses, models.StudentAttendanceHistoryResponse{
 			ID:                 attendance.ID,
-			Date:               attendance.AttendanceSession.Date.Format("2006-01-02"),
+			Date:               dateForDisplay, // Format tanggal Indonesia lengkap
 			CourseCode:         attendance.AttendanceSession.CourseSchedule.Course.Code,
 			CourseName:         attendance.AttendanceSession.CourseSchedule.Course.Name,
 			RoomName:           fullRoomName,
-			CheckInTime:        checkInTime,
+			CheckInTime:        checkInTimeStr,
 			Status:             string(attendance.Status),
 			VerificationMethod: attendance.VerificationMethod,
+			SortDate:           dateForSorting, // Untuk keperluan sorting
 		})
 	}
+
+	// Urutkan berdasarkan tanggal (terbaru di atas)
+	sort.Slice(responses, func(i, j int) bool {
+		return responses[i].SortDate > responses[j].SortDate
+	})
 
 	return responses, nil
 }
@@ -1118,4 +1107,79 @@ func getIndonesiaLocation() *time.Location {
 		location = time.FixedZone("WIB", 7*60*60)
 	}
 	return location
+}
+
+// FormatCheckInTimeForResponse formats the time for display in response
+func FormatCheckInTimeForResponse(checkInTime *time.Time) string {
+	if checkInTime == nil {
+		return ""
+	}
+	// Convert to Indonesia time and format
+	return checkInTime.In(getIndonesiaLocation()).Format("15:04")
+}
+
+// hasAccessToSession checks if a user has access to a session
+func (s *AttendanceService) hasAccessToSession(userID uint, session *models.AttendanceSession) bool {
+	// Check if the user is the lecturer for this session
+	if session.LecturerID == userID {
+		return true
+	}
+
+	// Jika course schedule tidak terload, perlu mendapatkan course ID
+	var courseID uint
+	if session.CourseSchedule.ID == 0 || session.CourseSchedule.CourseID == 0 {
+		// Load course ID manually
+		if err := s.db.Model(&models.CourseSchedule{}).
+			Where("id = ?", session.CourseScheduleID).
+			Select("course_id").
+			First(&courseID).Error; err != nil {
+			return false // Gagal mendapatkan course ID
+		}
+	} else {
+		courseID = session.CourseSchedule.CourseID
+	}
+
+	// Check if the user is a teaching assistant for this course
+	var isAssistant bool
+	err := s.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM teaching_assistant_assignments 
+			WHERE user_id = ? AND course_id = ?
+		) as is_assistant`,
+		userID, courseID).Scan(&isAssistant).Error
+
+	return err == nil && isAssistant
+}
+
+// FormatDateIndonesian formats a date in Indonesian format (e.g., "Senin, 10 Januari 2023")
+func FormatDateIndonesian(date time.Time) string {
+	// Convert to Indonesia timezone
+	indoDate := date.In(getIndonesiaLocation())
+
+	// Hari dalam bahasa Indonesia
+	days := []string{"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"}
+	day := days[indoDate.Weekday()]
+
+	// Bulan dalam bahasa Indonesia
+	months := []string{
+		"Januari", "Februari", "Maret", "April", "Mei", "Juni",
+		"Juli", "Agustus", "September", "Oktober", "November", "Desember",
+	}
+	month := months[indoDate.Month()-1]
+
+	// Format: "Senin, 10 Januari 2023"
+	return fmt.Sprintf("%s, %d %s %d", day, indoDate.Day(), month, indoDate.Year())
+}
+
+// FormatDateTimeIndonesian formats a date with time in Indonesian format (e.g., "Senin, 10 Januari 2023 15:04 WIB")
+func FormatDateTimeIndonesian(dateTime time.Time) string {
+	// Get formatted date
+	dateStr := FormatDateIndonesian(dateTime)
+
+	// Add time
+	indoDateTime := dateTime.In(getIndonesiaLocation())
+	timeStr := indoDateTime.Format("15:04")
+
+	// Format: "Senin, 10 Januari 2023 15:04 WIB"
+	return fmt.Sprintf("%s %s WIB", dateStr, timeStr)
 }

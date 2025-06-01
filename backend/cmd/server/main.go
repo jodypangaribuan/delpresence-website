@@ -71,6 +71,7 @@ func main() {
 	teachingAssistantAssignmentHandler := handlers.NewTeachingAssistantAssignmentHandler()
 	courseScheduleHandler := handlers.NewCourseScheduleHandler()
 	attendanceHandler := handlers.NewAttendanceHandler()
+	faceRecognitionHandler := handlers.NewFaceRecognitionHandler()
 
 	// Protected routes
 	authRequired := router.Group("/api")
@@ -282,6 +283,17 @@ func main() {
 
 			// Add new endpoint for attendance history
 			studentRoutes.GET("/attendance/history", studentAttendanceHandler.GetAttendanceHistory)
+
+			// Register face recognition endpoints
+			studentRoutes.POST("/face-registration", faceRecognitionHandler.RegisterFace)
+			studentRoutes.GET("/:id/registered-faces", faceRecognitionHandler.GetRegisteredFaces)
+			studentRoutes.DELETE("/face", faceRecognitionHandler.DeleteFace)
+		}
+
+		// Attendance face verification route
+		attendanceRoutes := authRequired.Group("/attendance")
+		{
+			attendanceRoutes.POST("/face-verification", faceRecognitionHandler.VerifyFace)
 		}
 	}
 

@@ -131,13 +131,14 @@ type StudentAttendanceResponse struct {
 // StudentAttendanceHistoryResponse represents detailed attendance history for the mobile app
 type StudentAttendanceHistoryResponse struct {
 	ID                 uint   `json:"id"`
-	Date               string `json:"date"`
+	Date               string `json:"date"` // Format tanggal dalam bahasa Indonesia
 	CourseCode         string `json:"course_code"`
 	CourseName         string `json:"course_name"`
 	RoomName           string `json:"room_name"`
-	CheckInTime        string `json:"check_in_time,omitempty"`
-	Status             string `json:"status"` // "PRESENT", "LATE", "ABSENT", "EXCUSED"
+	CheckInTime        string `json:"check_in_time,omitempty"` // Format waktu Indonesia
+	Status             string `json:"status"`                  // "PRESENT", "LATE", "ABSENT", "EXCUSED"
 	VerificationMethod string `json:"verification_method"`
+	SortDate           string `json:"-"` // Untuk keperluan sorting saja, tidak dikirim ke client
 }
 
 // AttendanceStatistics represents statistics for attendance sessions
