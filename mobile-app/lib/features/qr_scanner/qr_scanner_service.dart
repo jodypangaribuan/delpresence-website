@@ -32,6 +32,18 @@ class QRScannerService {
     {int? scheduleId, Function(int)? onSuccessCallback}
   ) async {
     try {
+      // Check if this schedule has already been attended
+      if (scheduleId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final bool isAlreadyAttended = prefs.getBool('attendance_completed_$scheduleId') ?? false;
+        
+        if (isAlreadyAttended) {
+          // Show a message that attendance is already done
+          ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
+          return false;
+        }
+      }
+      
       // Scan QR code without showing toast
       final qrResult = await scanQRCode(context);
       
@@ -300,6 +312,33 @@ class QRScannerService {
       debugPrint('Error verifying schedule session: $e');
       return null;
     }
+  }
+  
+  // Static utility methods for debugging/testing
+
+  /// Check if a schedule has been marked as attended
+  static Future<bool> isScheduleAttended(int scheduleId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('attendance_completed_$scheduleId') ?? false;
+  }
+  
+  /// Reset attendance status for a specific schedule (for testing/debugging only)
+  static Future<void> resetAttendanceStatus(int scheduleId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('attendance_completed_$scheduleId');
+    debugPrint('Reset attendance status for schedule $scheduleId');
+  }
+  
+  /// Reset all attendance statuses (for testing/debugging only)
+  static Future<void> resetAllAttendanceStatuses() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().where((key) => key.startsWith('attendance_completed_')).toList();
+    
+    for (String key in keys) {
+      await prefs.remove(key);
+    }
+    
+    debugPrint('Reset all attendance statuses (${keys.length} entries)');
   }
   
   static int min(int a, int b) => a < b ? a : b;

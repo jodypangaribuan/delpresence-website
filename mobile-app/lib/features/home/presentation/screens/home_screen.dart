@@ -890,160 +890,223 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     final bool hasActiveSession = classData['hasActiveSession'] ?? false;
     final bool isActive = classData['isActive'] as bool;
     
-    return GestureDetector(
-      onTap: () {
-        // Navigate to today's schedule screen
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const TodaySchedulePage(),
+    // Check if student has already attended this class
+    bool hasAttended = false;
+    
+    // Use FutureBuilder to check attendance status from SharedPreferences
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && scheduleId != null) {
+          hasAttended = snapshot.data!.getBool('attendance_completed_$scheduleId') ?? false;
+        }
+        
+        // Determine button state based on active session and attendance status
+        bool canAttend = hasActiveSession && !hasAttended;
+        
+        // Determine status text and color
+        String statusText;
+        Color statusColor;
+        
+        if (hasAttended) {
+          statusText = 'Sudah Diabsen';
+          statusColor = AppColors.success;
+        } else if (hasActiveSession) {
+          statusText = 'Sedang Berlangsung';
+          statusColor = AppColors.primary;
+        } else if (!isActive && classData['isFactuallyCompleted'] == true) {
+          statusText = 'Selesai';
+          statusColor = Colors.grey.shade600;
+        } else {
+          statusText = classData['status'] as String;
+          statusColor = AppColors.textSecondary;
+        }
+        
+        return GestureDetector(
+          onTap: () {
+            // Navigate to today's schedule screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TodaySchedulePage(),
+              ),
+            );
+          },
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  offset: const Offset(0, 1),
+                  blurRadius: 3,
+                  spreadRadius: 0,
+                ),
+              ],
+              border: Border.all(
+                color: hasAttended
+                    ? AppColors.success.withOpacity(0.3)
+                    : canAttend
+                        ? AppColors.primary.withOpacity(0.3)
+                        : Colors.grey.withOpacity(0.1),
+                width: (canAttend || hasAttended) ? 1.5 : 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          classData['title'] as String,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: hasAttended 
+                                ? AppColors.success
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: hasAttended
+                              ? AppColors.success.withOpacity(0.08)
+                              : canAttend
+                                  ? AppColors.primary.withOpacity(0.08)
+                                  : Colors.grey.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          statusText,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        classData['time'] as String,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        classData['room'] as String,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.person_outline,
+                        size: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        classData['lecturer'] as String,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (isActive) ...[
+                    const SizedBox(height: 10),
+                    const Divider(
+                        height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: hasAttended
+                        ? ElevatedButton(
+                            onPressed: null, // Disable button if already attended
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: AppColors.success.withOpacity(0.8),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle_outline, size: 16),
+                                SizedBox(width: 8),
+                                Text('Sudah Diabsen'),
+                              ],
+                            ),
+                          )
+                        : ElevatedButton(
+                            onPressed: canAttend ? () {
+                              _showAbsensiOptionsBottomSheet(context, scheduleId!);
+                            } : null,
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: canAttend ? AppColors.primary : Colors.grey.shade400,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            child: Text(
+                              canAttend ? 'Absen Sekarang' : 'Belum Ada Sesi Absensi'
+                            ),
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              offset: const Offset(0, 1),
-              blurRadius: 3,
-              spreadRadius: 0,
-            ),
-          ],
-          border: Border.all(
-            color: (isActive && hasActiveSession)
-                ? AppColors.primary.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            width: (isActive && hasActiveSession) ? 1.5 : 1,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      classData['title'] as String,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: (isActive && hasActiveSession)
-                          ? AppColors.primary.withOpacity(0.08)
-                          : Colors.grey.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      classData['status'] as String,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                        color: (isActive && hasActiveSession)
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time_rounded,
-                    size: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    classData['time'] as String,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Icon(
-                    Icons.location_on_outlined,
-                    size: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    classData['room'] as String,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Row(
-                children: [
-                  Icon(
-                    Icons.person_outline,
-                    size: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    classData['lecturer'] as String,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              if (isActive) ...[
-                const SizedBox(height: 10),
-                const Divider(
-                    height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: hasActiveSession ? () {
-                      _showAbsensiOptionsBottomSheet(context, scheduleId!);
-                    } : null,
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: hasActiveSession ? AppColors.primary : Colors.grey.shade400,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    child: Text(
-                      hasActiveSession ? 'Absen Sekarang' : 'Belum Ada Sesi Absensi'
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -1489,9 +1552,74 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       bool isAlreadyCompleted = prefs.getBool('attendance_completed_$scheduleId') ?? false;
       
       if (isAlreadyCompleted) {
-        // If attendance is already completed, show a message and refresh data
-        ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
-        _fetchTodaySchedules(); // Refresh data
+        // If attendance is already completed, show a success message
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (context) => Container(
+            height: MediaQuery.of(context).size.height * 0.3, // Smaller height for success message
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                
+                // Success icon
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle_outline,
+                    color: AppColors.success,
+                    size: 40,
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Success message
+                Text(
+                  'Absensi Sudah Tercatat',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.success,
+                  ),
+                ),
+                
+                const SizedBox(height: 8),
+                
+                Text(
+                  'Anda sudah berhasil melakukan absensi untuk kelas ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
         return;
       }
       

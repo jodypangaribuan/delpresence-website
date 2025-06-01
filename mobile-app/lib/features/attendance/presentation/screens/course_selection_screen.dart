@@ -134,9 +134,74 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
       bool isAlreadyCompleted = prefs.getBool('attendance_completed_${schedule.id}') ?? false;
       
       if (isAlreadyCompleted) {
-        // If attendance is already completed, show a message and refresh data
-        ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
-        _fetchTodaySchedules(); // Refresh data
+        // If attendance is already completed, show a success message
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (context) => Container(
+            height: MediaQuery.of(context).size.height * 0.3, // Smaller height for success message
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                
+                // Success icon
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle_outline,
+                    color: AppColors.success,
+                    size: 40,
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Success message
+                Text(
+                  'Absensi Sudah Tercatat',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.success,
+                  ),
+                ),
+                
+                const SizedBox(height: 8),
+                
+                Text(
+                  'Anda sudah berhasil melakukan absensi untuk kelas ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
         return;
       }
       
