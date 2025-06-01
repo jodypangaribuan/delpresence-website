@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/services"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // StudentAttendanceHandler handles attendance-related HTTP requests for students
 type StudentAttendanceHandler struct {
 	attendanceService *services.AttendanceService
 	scheduleService   *services.CourseScheduleService
+	db                *gorm.DB
 }
 
 // NewStudentAttendanceHandler creates a new student attendance handler
@@ -20,6 +23,7 @@ func NewStudentAttendanceHandler() *StudentAttendanceHandler {
 	return &StudentAttendanceHandler{
 		attendanceService: services.NewAttendanceService(),
 		scheduleService:   services.NewCourseScheduleService(),
+		db:                database.GetDB(),
 	}
 }
 
@@ -120,6 +124,7 @@ func (h *StudentAttendanceHandler) SubmitQRAttendance(c *gin.Context) {
 	// Parse request body
 	var req struct {
 		SessionID          uint   `json:"session_id" binding:"required"`
+		ScheduleID         uint   `json:"schedule_id"` // Optional, used for verification
 		VerificationMethod string `json:"verification_method" binding:"required"`
 		QRData             string `json:"qr_data"`
 		Timestamp          string `json:"timestamp"`
@@ -134,8 +139,8 @@ func (h *StudentAttendanceHandler) SubmitQRAttendance(c *gin.Context) {
 	}
 
 	// Log the request
-	fmt.Printf("QR attendance submission received - User: %d, Session: %d, Method: %s\n",
-		userID, req.SessionID, req.VerificationMethod)
+	fmt.Printf("QR attendance submission received - User: %d, Session: %d, Schedule: %d, Method: %s\n",
+		userID, req.SessionID, req.ScheduleID, req.VerificationMethod)
 
 	// Ensure the verification method is QR_CODE
 	if req.VerificationMethod != "QR_CODE" {
@@ -146,8 +151,36 @@ func (h *StudentAttendanceHandler) SubmitQRAttendance(c *gin.Context) {
 		return
 	}
 
-	// Call the service to record attendance
-	err := h.attendanceService.MarkStudentAttendanceViaQR(
+	// If schedule ID is provided, verify that the session belongs to this schedule
+	if req.ScheduleID > 0 {
+		// Check if this session belongs to the specified schedule
+		var isValidSession bool
+		err := h.db.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM attendance_sessions
+				WHERE id = ? AND course_schedule_id = ?
+			) as is_valid_session`,
+			req.SessionID, req.ScheduleID).Scan(&isValidSession).Error
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status": "error",
+				"error":  "Failed to validate session",
+			})
+			return
+		}
+
+		if !isValidSession {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status": "error",
+				"error":  "QR code tidak sesuai dengan jadwal yang dipilih",
+			})
+			return
+		}
+	}
+
+	// Call the service to record attendance directly using the external user ID
+	err := h.attendanceService.MarkStudentAttendanceByExternalID(
 		req.SessionID,
 		userID,
 		models.StudentAttendanceStatusPresent,

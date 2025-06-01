@@ -216,6 +216,7 @@ func main() {
 			lecturerRoutes.PUT("/attendance/sessions/:id/students/:studentId", attendanceHandler.MarkStudentAttendance)
 			lecturerRoutes.GET("/attendance/statistics/course/:courseScheduleId", attendanceHandler.GetAttendanceStatistics)
 			lecturerRoutes.GET("/attendance/qrcode/:id", attendanceHandler.GetQRCode)
+			lecturerRoutes.GET("/attendance/sessions/:id/report", attendanceHandler.DownloadAttendanceReport)
 
 			// Teaching assistant management endpoints for lecturers
 			lecturerRoutes.GET("/ta-assignments", teachingAssistantAssignmentHandler.GetMyTeachingAssistantAssignments)
@@ -257,6 +258,7 @@ func main() {
 			assistantRoutes.GET("/attendance/sessions/:id/students", teachingAssistantAttendanceHandler.GetStudentAttendances)
 			assistantRoutes.PUT("/attendance/sessions/:id/students/:studentId", teachingAssistantAttendanceHandler.MarkStudentAttendance)
 			assistantRoutes.GET("/attendance/qrcode/:id", teachingAssistantAttendanceHandler.GetQRCode)
+			assistantRoutes.GET("/attendance/sessions/:id/report", teachingAssistantAttendanceHandler.DownloadAttendanceReport)
 		}
 
 		// Student routes

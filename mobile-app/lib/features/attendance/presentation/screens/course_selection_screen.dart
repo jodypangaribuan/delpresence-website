@@ -171,8 +171,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context); // Close bottom sheet
-                    // Use the enhanced QR scanner service method
-                    QRScannerService.scanAndSubmitAttendance(context);
+                    // Use the enhanced QR scanner service method with original schedule ID
+                    QRScannerService.scanAndSubmitAttendance(context, scheduleId: schedule.id);
                   },
                 ),
                 const SizedBox(height: 16),

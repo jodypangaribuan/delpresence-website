@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/delpresence/backend/internal/database"
@@ -96,7 +97,7 @@ func (s *AttendanceService) CreateAttendanceSession(userID uint, courseScheduleI
 		CourseScheduleID: courseScheduleID,
 		LecturerID:       userID,
 		Date:             date,
-		StartTime:        time.Now(),
+		StartTime:        GetIndonesiaTime(),
 		Type:             attendanceType,
 		Status:           models.AttendanceStatusActive,
 		AutoClose:        true,
@@ -224,7 +225,7 @@ func (s *AttendanceService) CloseAttendanceSession(sessionID uint, userID uint) 
 	}
 
 	// Update session status and end time
-	now := time.Now()
+	now := GetIndonesiaTime()
 	session.Status = models.AttendanceStatusClosed
 	session.EndTime = &now
 
@@ -279,7 +280,7 @@ func (s *AttendanceService) MarkStudentAttendance(sessionID uint, studentID uint
 		}
 	}
 
-	now := time.Now()
+	now := GetIndonesiaTime()
 
 	if isNewRecord {
 		// Create a new attendance record
@@ -539,14 +540,27 @@ func (s *AttendanceService) GetStudentAttendances(sessionID uint, userID uint) (
 	for _, attendance := range attendances {
 		checkInTime := ""
 		if attendance.CheckInTime != nil {
-			checkInTime = attendance.CheckInTime.Format("15:04:05")
+			// Convert to Indonesia time first
+			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
+			checkInTime = indonesiaTime.Format("15:04:05")
 		}
+
+		// Get external user ID either from notes or from student record
+		externalUserID := uint(0)
+		if strings.Contains(attendance.Notes, "EXTID:") {
+			externalUserID = parseExternalUserIDFromNotes(attendance.Notes)
+		} else if attendance.Student.UserID > 0 {
+			externalUserID = uint(attendance.Student.UserID)
+		}
+
+		// Add external ID to student name if available
+		studentName := attendance.Student.FullName
 
 		responses = append(responses, models.StudentAttendanceResponse{
 			ID:                  attendance.ID,
 			AttendanceSessionID: attendance.AttendanceSessionID,
-			StudentID:           attendance.StudentID,
-			StudentName:         attendance.Student.FullName,
+			StudentID:           externalUserID, // Use external user ID if available
+			StudentName:         studentName,
 			StudentNIM:          attendance.Student.NIM,
 			Status:              string(attendance.Status),
 			CheckInTime:         checkInTime,
@@ -608,22 +622,31 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 
 	// Check if the student is enrolled in this course
 	var student *models.Student
-	result := s.db.Where("external_user_id = ?", userID).First(&student)
+	result := s.db.Where("user_id = ?", userID).First(&student)
 	if result.Error != nil {
 		return errors.New("student record not found")
+	}
+
+	// Get the course schedule to find the student group
+	var schedule models.CourseSchedule
+	if err := s.db.First(&schedule, session.CourseScheduleID).Error; err != nil {
+		return errors.New("course schedule not found")
 	}
 
 	// Check if the student is in the course's student group
 	var isEnrolled bool
 	err = s.db.Raw(`
 		SELECT EXISTS (
-			SELECT 1 FROM course_schedule_student_groups AS cssg
-			JOIN student_group_members AS sgm ON sgm.student_group_id = cssg.student_group_id
-			WHERE cssg.course_schedule_id = ? AND sgm.student_id = ?
+			SELECT 1 FROM student_to_groups
+			WHERE student_group_id = ? AND student_id = ?
 		) as is_enrolled`,
-		session.CourseScheduleID, student.ID).Scan(&isEnrolled).Error
+		schedule.StudentGroupID, student.ID).Scan(&isEnrolled).Error
 
-	if err != nil || !isEnrolled {
+	if err != nil {
+		return errors.New("error checking enrollment: " + err.Error())
+	}
+
+	if !isEnrolled {
 		return errors.New("student is not enrolled in this course")
 	}
 
@@ -635,7 +658,7 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 	}
 
 	// Calculate if the student is late based on session settings
-	now := time.Now()
+	now := GetIndonesiaTime()
 	checkInTime := now
 
 	// Check if the student is late based on session settings
@@ -643,12 +666,15 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 		status = models.StudentAttendanceStatusLate
 	}
 
+	// Create notes that include external user ID information
+	notes := fmt.Sprintf("External UserID: %d | NIM: %s", student.UserID, student.NIM)
+
 	// Try to update existing entry first
 	result = s.db.Exec(`
 		UPDATE student_attendances
-		SET status = ?, verification_method = ?, check_in_time = ?
+		SET status = ?, verification_method = ?, check_in_time = ?, notes = ?
 		WHERE attendance_session_id = ? AND student_id = ?`,
-		status, "QR_CODE", checkInTime, sessionID, student.ID)
+		status, "QR_CODE", checkInTime, notes, sessionID, student.ID)
 
 	if result.Error != nil {
 		return result.Error
@@ -663,6 +689,7 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 			Status:              status,
 			CheckInTime:         &checkInTime,
 			VerificationMethod:  "QR_CODE",
+			Notes:               notes,
 		}
 
 		if err := s.db.Create(&attendance).Error; err != nil {
@@ -671,6 +698,176 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 	}
 
 	return nil
+}
+
+// GetIndonesiaTime returns current time in Indonesia Western Time (WIB/UTC+7)
+func GetIndonesiaTime() time.Time {
+	return time.Now().In(getIndonesiaLocation())
+}
+
+// MarkStudentAttendanceByExternalID marks a student's attendance using their external user ID
+func (s *AttendanceService) MarkStudentAttendanceByExternalID(sessionID uint, externalUserID uint, status models.StudentAttendanceStatus, qrData string) error {
+	// Get the session by ID
+	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
+	if err != nil {
+		return errors.New("attendance session not found")
+	}
+
+	// Check if the session is active
+	if session.Status != models.AttendanceStatusActive {
+		return errors.New("attendance session is not active")
+	}
+
+	// Check that this is a QR code attendance or combined method
+	if session.Type != models.AttendanceTypeQRCode && session.Type != models.AttendanceTypeBoth {
+		return errors.New("this attendance session does not support QR code verification")
+	}
+
+	// Check if the student exists with this external user ID
+	var student *models.Student
+	result := s.db.Where("user_id = ?", externalUserID).First(&student)
+	if result.Error != nil {
+		return errors.New("student record not found")
+	}
+
+	// Get the course schedule to find the student group
+	var schedule models.CourseSchedule
+	if err := s.db.First(&schedule, session.CourseScheduleID).Error; err != nil {
+		return errors.New("course schedule not found")
+	}
+
+	// Check if the student is in the course's student group
+	var isEnrolled bool
+	err = s.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM student_to_groups
+			WHERE student_group_id = ? AND student_id = ?
+		) as is_enrolled`,
+		schedule.StudentGroupID, student.ID).Scan(&isEnrolled).Error
+
+	if err != nil {
+		return errors.New("error checking enrollment: " + err.Error())
+	}
+
+	if !isEnrolled {
+		return errors.New("student is not enrolled in this course")
+	}
+
+	// If QR data was provided, verify it
+	if qrData != "" && qrData != fmt.Sprintf("delpresence:attendance:%d", sessionID) && qrData != session.QRCodeData {
+		fmt.Printf("QR Code verification failed. Provided: %s, Expected: %s or %s\n",
+			qrData, fmt.Sprintf("delpresence:attendance:%d", sessionID), session.QRCodeData)
+		return errors.New("invalid QR code data")
+	}
+
+	// Calculate if the student is late based on session settings
+	now := GetIndonesiaTime()
+	checkInTime := now
+
+	// Check if the student is late based on session settings
+	if session.AllowLate && time.Since(session.StartTime).Minutes() > float64(session.LateThreshold) {
+		status = models.StudentAttendanceStatusLate
+	}
+
+	// Keep notes empty - as requested
+	notes := ""
+
+	// Find existing attendance record by external user ID
+	var attendanceExists bool
+	err = s.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM student_attendances sa
+			JOIN students s ON sa.student_id = s.id
+			WHERE sa.attendance_session_id = ? AND s.user_id = ?
+		) as attendance_exists
+	`, sessionID, externalUserID).Scan(&attendanceExists).Error
+
+	if err != nil {
+		return errors.New("error checking existing attendance: " + err.Error())
+	}
+
+	if attendanceExists {
+		// Update existing record using SQL that links by external user ID
+		result = s.db.Exec(`
+			UPDATE student_attendances 
+			SET status = ?, verification_method = ?, check_in_time = ?, notes = ?
+			WHERE attendance_session_id = ? 
+			AND student_id IN (
+				SELECT id FROM students WHERE user_id = ?
+			)`,
+			status, "QR_CODE", checkInTime, notes, sessionID, externalUserID)
+
+		if result.Error != nil {
+			return errors.New("failed to update attendance: " + result.Error.Error())
+		}
+	} else {
+		// For new records, log only the essential information
+		fmt.Printf("Recording attendance for session %d, student ID %d\n", sessionID, student.ID)
+
+		// Insert new record
+		attendance := models.StudentAttendance{
+			AttendanceSessionID: sessionID,
+			StudentID:           student.ID, // We still need to use the internal ID here
+			Status:              status,
+			CheckInTime:         &checkInTime,
+			VerificationMethod:  "QR_CODE",
+			Notes:               notes,
+		}
+
+		if err := s.db.Create(&attendance).Error; err != nil {
+			return errors.New("failed to record attendance: " + err.Error())
+		}
+	}
+
+	return nil
+}
+
+// GetStudentAttendancesByExternalID gets attendance records for a student by external user ID
+func (s *AttendanceService) GetStudentAttendancesByExternalID(externalUserID uint) ([]models.StudentAttendanceResponse, error) {
+	// First find the student from their external user ID
+	var student *models.Student
+	result := s.db.Where("user_id = ?", externalUserID).First(&student)
+	if result.Error != nil {
+		return nil, errors.New("student record not found")
+	}
+
+	// Now get all attendances for this student
+	var attendances []models.StudentAttendance
+	err := s.db.Preload("AttendanceSession").Preload("AttendanceSession.CourseSchedule").
+		Where("student_id = ?", student.ID).
+		Find(&attendances).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Transform to response objects
+	var responses []models.StudentAttendanceResponse
+	for _, attendance := range attendances {
+		checkInTime := ""
+		if attendance.CheckInTime != nil {
+			// Convert to Indonesia time first
+			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
+			checkInTime = indonesiaTime.Format("15:04:05")
+		}
+
+		// Add external user ID to response
+		studentName := student.FullName
+
+		responses = append(responses, models.StudentAttendanceResponse{
+			ID:                  attendance.ID,
+			AttendanceSessionID: attendance.AttendanceSessionID,
+			StudentID:           uint(student.UserID), // Convert int to uint
+			StudentName:         studentName,
+			StudentNIM:          student.NIM,
+			Status:              string(attendance.Status),
+			CheckInTime:         checkInTime,
+			Notes:               attendance.Notes,
+			VerificationMethod:  attendance.VerificationMethod,
+		})
+	}
+
+	return responses, nil
 }
 
 // Helper functions
@@ -791,4 +988,31 @@ func generateQRCodeData() (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// Helper function to parse external user ID from notes field
+func parseExternalUserIDFromNotes(notes string) uint {
+	// Look for the EXTID: pattern in the notes
+	if strings.Contains(notes, "EXTID:") {
+		parts := strings.Split(notes, "|")
+		for _, part := range parts {
+			if strings.HasPrefix(part, "EXTID:") {
+				idStr := strings.TrimPrefix(part, "EXTID:")
+				if id, err := strconv.ParseUint(idStr, 10, 32); err == nil {
+					return uint(id)
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// getIndonesiaLocation returns the location for Indonesia
+func getIndonesiaLocation() *time.Location {
+	location, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		// Fallback: Manually create WIB (UTC+7) if timezone data isn't available
+		location = time.FixedZone("WIB", 7*60*60)
+	}
+	return location
 }

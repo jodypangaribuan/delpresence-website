@@ -27,7 +27,7 @@ class QRScannerService {
   }
 
   /// Scan QR code and process attendance submission
-  static Future<bool> scanAndSubmitAttendance(BuildContext context) async {
+  static Future<bool> scanAndSubmitAttendance(BuildContext context, {int? scheduleId}) async {
     try {
       // Scan QR code without showing toast
       final qrResult = await scanQRCode(context);
@@ -40,7 +40,7 @@ class QRScannerService {
       ToastUtils.showInfoToast(context, 'Memproses QR Code...');
       
       // Process QR data and submit attendance
-      final success = await processQRCodeAttendance(context, qrResult);
+      final success = await processQRCodeAttendance(context, qrResult, scheduleId: scheduleId);
       
       if (success) {
         ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
@@ -55,21 +55,33 @@ class QRScannerService {
   }
   
   /// Process QR code data and submit attendance to backend
-  static Future<bool> processQRCodeAttendance(BuildContext context, String qrData) async {
+  static Future<bool> processQRCodeAttendance(BuildContext context, String qrData, {int? scheduleId}) async {
     try {
-      debugPrint('Processing QR data: $qrData');
+      debugPrint('Processing QR data: $qrData for schedule ID: $scheduleId');
       
       // Decode the data
-      final sessionId = extractSessionIdFromQR(qrData);
-      debugPrint('Extracted session ID: $sessionId');
+      final scannedSessionId = extractSessionIdFromQR(qrData);
+      debugPrint('Extracted session ID from QR: $scannedSessionId');
       
-      if (sessionId == null) {
+      if (scannedSessionId == null) {
         ToastUtils.showErrorToast(context, 'QR Code tidak valid untuk presensi');
         return false;
       }
       
+      // Verify that the scanned QR belongs to the selected schedule/session
+      if (scheduleId != null) {
+        // Check if there is an active session for this schedule and if it matches the scanned QR
+        final expectedSessionId = await verifySessionForSchedule(scheduleId);
+        
+        if (expectedSessionId != null && scannedSessionId != expectedSessionId) {
+          // QR code doesn't match the selected schedule
+          ToastUtils.showErrorToast(context, 'QR Code tidak sesuai dengan jadwal yang dipilih');
+          return false;
+        }
+      }
+      
       // Submit attendance to API
-      return await submitAttendance(context, sessionId);
+      return await submitAttendance(context, scannedSessionId, scheduleId: scheduleId);
     } catch (e) {
       debugPrint('Error processing QR code: $e');
       ToastUtils.showErrorToast(context, 'Format QR Code tidak valid');
@@ -112,7 +124,7 @@ class QRScannerService {
   }
   
   /// Submit attendance to backend API
-  static Future<bool> submitAttendance(BuildContext context, int sessionId) async {
+  static Future<bool> submitAttendance(BuildContext context, int sessionId, {int? scheduleId}) async {
     try {
       // Get auth token
       final prefs = await SharedPreferences.getInstance();
@@ -147,13 +159,19 @@ class QRScannerService {
       debugPrint('Request headers: $headers');
       
       // Request body with complete information
-      final body = jsonEncode({
+      final reqBody = {
         'verification_method': 'QR_CODE',
         'session_id': sessionId,
         'qr_data': 'delpresence:attendance:$sessionId',
         'timestamp': DateTime.now().toIso8601String(),
-      });
+      };
       
+      // Add schedule ID if available (for additional validation)
+      if (scheduleId != null) {
+        reqBody['schedule_id'] = scheduleId;
+      }
+      
+      final body = jsonEncode(reqBody);
       debugPrint('Request body: $body');
       
       // Create HTTP client with proper timeout
@@ -205,6 +223,64 @@ class QRScannerService {
       debugPrint('Error submitting attendance: $e');
       ToastUtils.showErrorToast(context, 'Gagal terhubung ke server');
       return false;
+    }
+  }
+  
+  /// Verify the active session ID for a specific schedule
+  static Future<int?> verifySessionForSchedule(int scheduleId) async {
+    try {
+      // Get auth token
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      if (token == null) {
+        return null;
+      }
+      
+      // Use ApiConfig for proper API endpoint construction
+      final apiConfig = ApiConfig.instance;
+      final baseUrl = apiConfig.baseUrl;
+      
+      // Endpoint to get active sessions for student
+      final url = Uri.parse('$baseUrl/api/student/attendance/active-sessions');
+      
+      // Set up headers
+      final headers = Map<String, String>.from(apiConfig.defaultHeaders);
+      headers['Authorization'] = 'Bearer $token';
+      
+      // Create HTTP client with proper timeout
+      final client = http.Client();
+      try {
+        // Make API request
+        final response = await client.get(url, headers: headers).timeout(apiConfig.timeout);
+        
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          try {
+            final responseData = jsonDecode(response.body);
+            debugPrint('Active sessions response: ${response.body}');
+            
+            if (responseData['status'] == 'success' && responseData['data'] is List) {
+              final sessions = responseData['data'] as List;
+              
+              // Find session that matches the given schedule ID
+              for (var session in sessions) {
+                if (session['course_schedule_id'] == scheduleId) {
+                  return session['id'] as int;  // Return the session ID for this schedule
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('Error parsing active sessions: $e');
+          }
+        }
+      } finally {
+        client.close();
+      }
+      
+      return null;  // No matching session found
+    } catch (e) {
+      debugPrint('Error verifying schedule session: $e');
+      return null;
     }
   }
   

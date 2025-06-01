@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { SelectValue, SelectTrigger, SelectContent, SelectItem, Select } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/utils/api";
+import { API_CONFIG } from '@/config';
+import { getAuthToken } from '@/lib/auth/storage';
 
 // Define interfaces for the API data
 interface AttendanceSession {
@@ -216,6 +218,65 @@ export default function AttendanceDetailPage() {
   const totalStudents = attendances.length;
   const attendanceRate = totalStudents > 0 ? ((presentCount + lateCount) / totalStudents) * 100 : 0;
 
+  const handleDownloadReport = async () => {
+    if (!session) return;
+    
+    try {
+      // Set loading state for button if needed
+      // Create URL for the report endpoint
+      const reportUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.API_PREFIX}/lecturer/attendance/sessions/${sessionId}/report`;
+      
+      // Get the auth token
+      const token = getAuthToken();
+      
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      // Create a link and trigger download
+      const link = document.createElement('a');
+      link.href = reportUrl;
+      link.setAttribute('download', `laporan-presensi-${session.courseCode}.xlsx`);
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+      
+      // Add authorization header through cookie or local storage
+      // The browser will automatically include auth cookies 
+      // For authorization header with Bearer token, we need to make a direct fetch call
+      
+      // Create a temporary fetch request to get the file
+      toast.info('Mengunduh laporan...');
+      
+      fetch(reportUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }).then(response => {
+        // Check if response is ok
+        if (!response.ok) {
+          throw new Error('Gagal mengunduh laporan');
+        }
+        // Return blob data
+        return response.blob();
+      }).then(blob => {
+        // Create a blob URL and trigger download
+        const url = window.URL.createObjectURL(blob);
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Laporan berhasil diunduh');
+      }).catch(error => {
+        console.error('Download error:', error);
+        toast.error('Gagal mengunduh laporan');
+      });
+    } catch (error) {
+      console.error('Download report error:', error);
+      toast.error('Gagal mengunduh laporan');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between items-center gap-4">
@@ -229,7 +290,10 @@ export default function AttendanceDetailPage() {
         </Button>
         
         {!isLoading && session && (
-          <Button className="bg-[#0687C9] hover:bg-[#0572aa]">
+          <Button 
+            className="bg-[#0687C9] hover:bg-[#0572aa]"
+            onClick={handleDownloadReport}
+          >
             <Download className="h-4 w-4 mr-2" />
             Unduh Laporan
           </Button>
