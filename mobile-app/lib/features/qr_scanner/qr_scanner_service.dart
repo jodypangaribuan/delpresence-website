@@ -28,35 +28,22 @@ class QRScannerService {
 
   /// Scan QR code and process attendance submission
   static Future<bool> scanAndSubmitAttendance(BuildContext context) async {
-    OverlayEntry? loadingOverlay;
-    OverlayEntry? processingOverlay;
-    
     try {
-      // Show loading indicator - safely add overlay
-      loadingOverlay = _createLoadingOverlay();
-      _safelyAddOverlay(context, loadingOverlay);
+      // Show a simple loading toast instead of overlay
+      ToastUtils.showInfoToast(context, 'Membuka Scanner QR...');
       
       // Scan QR code
       final qrResult = await scanQRCode(context);
-      
-      // Remove loading indicator - safely remove overlay
-      _safelyRemoveOverlay(loadingOverlay);
-      loadingOverlay = null;
       
       if (qrResult == null) {
         return false;
       }
       
-      // Show processing indicator - safely add overlay
-      processingOverlay = _createProcessingOverlay();
-      _safelyAddOverlay(context, processingOverlay);
+      // Show processing toast
+      ToastUtils.showInfoToast(context, 'Memproses QR Code...');
       
       // Process QR data and submit attendance
       final success = await processQRCodeAttendance(context, qrResult);
-      
-      // Remove processing indicator - safely remove overlay
-      _safelyRemoveOverlay(processingOverlay);
-      processingOverlay = null;
       
       if (success) {
         ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
@@ -65,38 +52,8 @@ class QRScannerService {
       return success;
     } catch (e) {
       debugPrint('Error in scanAndSubmitAttendance: $e');
-      
-      // Ensure overlays are removed in case of error
-      _safelyRemoveOverlay(loadingOverlay);
-      _safelyRemoveOverlay(processingOverlay);
-      
       ToastUtils.showErrorToast(context, 'Gagal memproses QR Code');
       return false;
-    }
-  }
-  
-  /// Safely add overlay to the context
-  static void _safelyAddOverlay(BuildContext context, OverlayEntry? entry) {
-    if (entry != null) {
-      try {
-        final overlay = Overlay.of(context);
-        if (overlay.mounted) {
-          overlay.insert(entry);
-        }
-      } catch (e) {
-        debugPrint('Error adding overlay: $e');
-      }
-    }
-  }
-  
-  /// Safely remove overlay
-  static void _safelyRemoveOverlay(OverlayEntry? entry) {
-    if (entry != null) {
-      try {
-        entry.remove();
-      } catch (e) {
-        debugPrint('Error removing overlay: $e');
-      }
     }
   }
   
@@ -104,9 +61,6 @@ class QRScannerService {
   static Future<bool> processQRCodeAttendance(BuildContext context, String qrData) async {
     try {
       debugPrint('Processing QR data: $qrData');
-      
-      // Check if QR data is valid for attendance
-      // Format: delpresence:attendance:sessionId or base64 encoded session data
       
       // Decode the data
       final sessionId = extractSessionIdFromQR(qrData);
@@ -181,20 +135,12 @@ class QRScannerService {
       
       debugPrint('Using API base URL: $baseUrl');
       
-      // Get user ID from shared prefs if available (for logs)
+      // Get user ID from shared prefs if available
       final userId = prefs.getInt('user_id');
       debugPrint('User ID: $userId');
       
-      // Try all possible API endpoints based on backend implementation
-      
-      // Format 4: Direct endpoint for QR attendance
-      final url4 = Uri.parse('$baseUrl/api/attendance/submit-qr');
-      
-      // Format 5: Student-specific attendance endpoint
-      final url5 = Uri.parse('$baseUrl/api/student/attendance');
-      
-      // Format 6: Generic attendance endpoint
-      final url6 = Uri.parse('$baseUrl/api/attendance');
+      // New endpoint for QR code attendance submission
+      final url = Uri.parse('$baseUrl/api/student/attendance/qr-submit');
       
       // Get default headers from ApiConfig and add auth token
       final headers = Map<String, String>.from(apiConfig.defaultHeaders);
@@ -207,7 +153,6 @@ class QRScannerService {
       final body = jsonEncode({
         'verification_method': 'QR_CODE',
         'session_id': sessionId,
-        'student_id': userId,
         'qr_data': 'delpresence:attendance:$sessionId',
         'timestamp': DateTime.now().toIso8601String(),
       });
@@ -217,58 +162,20 @@ class QRScannerService {
       // Create HTTP client with proper timeout
       final client = http.Client();
       try {
-        // Try new endpoints
-        debugPrint('Attempting to submit attendance to: ${url4.toString()}');
-        var response = await client.post(
-          url4,
+        // Make API request
+        debugPrint('Submitting attendance to: ${url.toString()}');
+        final response = await client.post(
+          url,
           headers: headers,
           body: body,
         ).timeout(apiConfig.timeout);
-        
-        // If first format fails, try the second format
-        if (response.statusCode >= 400) {
-          debugPrint('First endpoint failed (${response.statusCode}), trying endpoint 5');
-          response = await client.post(
-            url5,
-            headers: headers,
-            body: body,
-          ).timeout(apiConfig.timeout);
-          
-          // If second format fails, try the third format
-          if (response.statusCode >= 400) {
-            debugPrint('Second endpoint failed (${response.statusCode}), trying endpoint 6');
-            response = await client.post(
-              url6,
-              headers: headers,
-              body: body,
-            ).timeout(apiConfig.timeout);
-            
-            // Try the PUT method as fallback
-            if (response.statusCode >= 400) {
-              debugPrint('POST methods failed, trying PUT method');
-              // Try a PUT request to mark attendance
-              response = await client.put(
-                Uri.parse('$baseUrl/api/student/attendance/$sessionId'),
-                headers: headers,
-                body: body,
-              ).timeout(apiConfig.timeout);
-            }
-          }
-        }
         
         // Log response
         debugPrint('🌐 QR Attendance Response [${response.statusCode}]: ${response.body}');
         
         // Consider 2xx responses as success
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          return true;
-        }
-        
-        // Special case: If we get a 404 on all endpoints, simulate success for testing
-        // IMPORTANT: This is just for testing and should be removed in production
-        if (response.statusCode == 404) {
-          debugPrint('⚠️ All endpoints returned 404. SIMULATING SUCCESS for testing purposes! ⚠️');
-          ToastUtils.showSuccessToast(context, 'Presensi berhasil dicatat (simulated)');
+          ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
           return true;
         }
         
@@ -305,63 +212,4 @@ class QRScannerService {
   }
   
   static int min(int a, int b) => a < b ? a : b;
-  
-  /// Create loading overlay widget
-  static OverlayEntry _createLoadingOverlay() {
-    return OverlayEntry(
-      builder: (context) => Container(
-        color: Colors.black.withOpacity(0.5),
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
-    );
-  }
-  
-  /// Create processing overlay widget
-  static OverlayEntry _createProcessingOverlay() {
-    return OverlayEntry(
-      builder: (context) => Container(
-        color: Colors.black.withOpacity(0.5),
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                const Text(
-                  'Memproses Presensi',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sedang mengirim data ke server...',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 } 

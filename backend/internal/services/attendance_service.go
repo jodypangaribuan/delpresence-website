@@ -588,6 +588,91 @@ func (s *AttendanceService) GetActiveSessionsBySchedules(scheduleIDs []uint) ([]
 	return sessions, nil
 }
 
+// MarkStudentAttendanceViaQR marks a student's attendance for a session using QR code
+func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID uint, status models.StudentAttendanceStatus, qrData string) error {
+	// Get the session by ID
+	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
+	if err != nil {
+		return errors.New("attendance session not found")
+	}
+
+	// Check if the session is active
+	if session.Status != models.AttendanceStatusActive {
+		return errors.New("attendance session is not active")
+	}
+
+	// Check that this is a QR code attendance or combined method
+	if session.Type != models.AttendanceTypeQRCode && session.Type != models.AttendanceTypeBoth {
+		return errors.New("this attendance session does not support QR code verification")
+	}
+
+	// Check if the student is enrolled in this course
+	var student *models.Student
+	result := s.db.Where("auth_user_id = ?", userID).First(&student)
+	if result.Error != nil {
+		return errors.New("student record not found")
+	}
+
+	// Check if the student is in the course's student group
+	var isEnrolled bool
+	err = s.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM course_schedule_student_groups AS cssg
+			JOIN student_group_members AS sgm ON sgm.student_group_id = cssg.student_group_id
+			WHERE cssg.course_schedule_id = ? AND sgm.student_id = ?
+		) as is_enrolled`,
+		session.CourseScheduleID, student.ID).Scan(&isEnrolled).Error
+
+	if err != nil || !isEnrolled {
+		return errors.New("student is not enrolled in this course")
+	}
+
+	// If QR data was provided, verify it
+	if qrData != "" && qrData != fmt.Sprintf("delpresence:attendance:%d", sessionID) && qrData != session.QRCodeData {
+		fmt.Printf("QR Code verification failed. Provided: %s, Expected: %s or %s\n",
+			qrData, fmt.Sprintf("delpresence:attendance:%d", sessionID), session.QRCodeData)
+		return errors.New("invalid QR code data")
+	}
+
+	// Calculate if the student is late based on session settings
+	now := time.Now()
+	checkInTime := now
+
+	// Check if the student is late based on session settings
+	if session.AllowLate && time.Since(session.StartTime).Minutes() > float64(session.LateThreshold) {
+		status = models.StudentAttendanceStatusLate
+	}
+
+	// Try to update existing entry first
+	result = s.db.Exec(`
+		UPDATE student_attendances
+		SET status = ?, verification_method = ?, check_in_time = ?
+		WHERE attendance_session_id = ? AND student_id = ?`,
+		status, "QR_CODE", checkInTime, sessionID, student.ID)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// If no rows affected, insert a new record
+	if result.RowsAffected == 0 {
+		// Create the attendance record
+		attendance := models.StudentAttendance{
+			AttendanceSessionID: sessionID,
+			StudentID:           student.ID,
+			Status:              status,
+			CheckInTime:         &checkInTime,
+			VerificationMethod:  "QR_CODE",
+		}
+
+		if err := s.db.Create(&attendance).Error; err != nil {
+			return errors.New("failed to record attendance: " + err.Error())
+		}
+	}
+
+	return nil
+}
+
 // Helper functions
 
 // initializeStudentAttendances creates initial "absent" records for all students

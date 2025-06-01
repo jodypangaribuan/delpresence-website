@@ -274,6 +274,9 @@ func main() {
 			// Add new endpoint for students to check active attendance sessions
 			studentAttendanceHandler := handlers.NewStudentAttendanceHandler()
 			studentRoutes.GET("/attendance/active-sessions", studentAttendanceHandler.GetActiveAttendanceSessions)
+
+			// Add new endpoint for QR code attendance submission
+			studentRoutes.POST("/attendance/qr-submit", studentAttendanceHandler.SubmitQRAttendance)
 		}
 	}
 

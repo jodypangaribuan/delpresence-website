@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
@@ -108,5 +109,62 @@ func (h *StudentAttendanceHandler) GetActiveAttendanceSessions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data":   activeSessions,
+	})
+}
+
+// SubmitQRAttendance handles QR code scanned attendance submission from mobile app
+func (h *StudentAttendanceHandler) SubmitQRAttendance(c *gin.Context) {
+	// Extract student ID from the authenticated user
+	userID := c.MustGet("userID").(uint)
+
+	// Parse request body
+	var req struct {
+		SessionID          uint   `json:"session_id" binding:"required"`
+		VerificationMethod string `json:"verification_method" binding:"required"`
+		QRData             string `json:"qr_data"`
+		Timestamp          string `json:"timestamp"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": "error",
+			"error":  "Invalid request format",
+		})
+		return
+	}
+
+	// Log the request
+	fmt.Printf("QR attendance submission received - User: %d, Session: %d, Method: %s\n",
+		userID, req.SessionID, req.VerificationMethod)
+
+	// Ensure the verification method is QR_CODE
+	if req.VerificationMethod != "QR_CODE" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": "error",
+			"error":  "Invalid verification method, expected QR_CODE",
+		})
+		return
+	}
+
+	// Call the service to record attendance
+	err := h.attendanceService.MarkStudentAttendanceViaQR(
+		req.SessionID,
+		userID,
+		models.StudentAttendanceStatusPresent,
+		req.QRData,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status": "error",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	// Return success response
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Attendance recorded successfully",
 	})
 }
