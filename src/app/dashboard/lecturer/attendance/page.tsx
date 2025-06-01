@@ -760,93 +760,99 @@ export default function AttendancePage() {
                           </div>
                         ) : (
                           <div>
-                            {activeSessions.map((session) => (
-                              <Card key={session.id} className="border border-gray-200 overflow-hidden mb-4">
-                                <div className="bg-[#0687C9] h-1.5"></div>
-                                <CardContent className="p-4 sm:p-6">
-                                  <div className="flex flex-col lg:flex-row lg:justify-between gap-4">
-                                    <div className="space-y-4">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <Badge 
-                                          variant="outline" 
-                                          className="bg-green-50 text-green-700 border-green-200 px-2 py-1"
-                                        >
-                                          <div className="flex items-center gap-1">
-                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                            <span>Aktif</span>
-                                          </div>
-                                        </Badge>
-                                        <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
-                                          {session.type}
-                                        </Badge>
-                                      </div>
-                                      
-                                      <div>
-                                        <h3 className="text-lg font-semibold">
-                                          {session.courseCode}: {session.courseName}
-                                        </h3>
-                                        <div className="text-sm text-muted-foreground mt-1 space-y-1">
-                                          <div className="flex items-center">
-                                            <Clock className="h-4 w-4 mr-2" />
-                                            <span>{session.scheduleStartTime} - {session.scheduleEndTime}</span>
-                                          </div>
-                                          <div className="flex items-center">
-                                            <QrCode className="h-4 w-4 mr-2" />
-                                            <span>Tipe: {session.type}</span>
-                                          </div>
+                            {activeSessions.map((session) => {
+                              const schedule = schedules.find(s => s.id === session.courseScheduleId);
+                              const resolvedTotalStudents = (schedule && schedule.totalStudents > 0) ? schedule.totalStudents : (session.totalStudents || 0);
+                              const attendancePercentage = resolvedTotalStudents > 0 ? (session.attendedCount / resolvedTotalStudents) * 100 : 0;
+
+                              return (
+                                <Card key={session.id} className="border border-gray-200 overflow-hidden mb-4">
+                                  <div className="bg-[#0687C9] h-1.5"></div>
+                                  <CardContent className="p-4 sm:p-6">
+                                    <div className="flex flex-col lg:flex-row lg:justify-between gap-4">
+                                      <div className="space-y-4">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <Badge 
+                                            variant="outline" 
+                                            className="bg-green-50 text-green-700 border-green-200 px-2 py-1"
+                                          >
+                                            <div className="flex items-center gap-1">
+                                              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                              <span>Aktif</span>
+                                            </div>
+                                          </Badge>
+                                          <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
+                                            {session.type}
+                                          </Badge>
                                         </div>
-                                      </div>
-                                      
-                                      <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-                                        <div className="w-full sm:w-48">
-                                          <div className="text-sm mb-1">
-                                            Kehadiran: <span className="font-medium">{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                            <div 
-                                              className="bg-[#0687C9] h-2.5 rounded-full" 
-                                              style={{ width: `${((session.attendedCount + session.lateCount) / session.totalStudents) * 100}%` }}
-                                            ></div>
+                                        
+                                        <div>
+                                          <h3 className="text-lg font-semibold">
+                                            {session.courseCode}: {session.courseName}
+                                          </h3>
+                                          <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                                            <div className="flex items-center">
+                                              <Clock className="h-4 w-4 mr-2" />
+                                              <span>{session.scheduleStartTime} - {session.scheduleEndTime}</span>
+                                            </div>
+                                            <div className="flex items-center">
+                                              <QrCode className="h-4 w-4 mr-2" />
+                                              <span>Tipe: {session.type}</span>
+                                            </div>
                                           </div>
                                         </div>
                                         
-                                        {/* Always show the timer for active sessions */}
-                                        <div className="flex items-center gap-2 bg-[#E6F3FB] px-3 py-2 rounded-md">
-                                          <TimerIcon className="h-4 w-4 text-[#0687C9]" />
-                                          <div>
-                                            <span className="text-sm text-muted-foreground">Sisa waktu:</span>
-                                            <span className="ml-1 font-semibold text-[#0687C9]">
-                                              {getDisplayTime(session)}
-                                            </span>
+                                        <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+                                          <div className="w-full sm:w-48">
+                                            <div className="text-sm mb-1">
+                                              Kehadiran: <span className="font-medium">{session.attendedCount}/{resolvedTotalStudents}</span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                              <div 
+                                                className="bg-[#0687C9] h-2.5 rounded-full" 
+                                                style={{ width: `${attendancePercentage}%` }}
+                                              ></div>
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Always show the timer for active sessions */}
+                                          <div className="flex items-center gap-2 bg-[#E6F3FB] px-3 py-2 rounded-md">
+                                            <TimerIcon className="h-4 w-4 text-[#0687C9]" />
+                                            <div>
+                                              <span className="text-sm text-muted-foreground">Sisa waktu:</span>
+                                              <span className="ml-1 font-semibold text-[#0687C9]">
+                                                {getDisplayTime(session)}
+                                              </span>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                    
-                                    <div className="flex flex-row sm:flex-col gap-2 sm:w-44">
-                                      {(session.type === "QR Code" || session.type === "Keduanya") && (
+                                      
+                                      <div className="flex flex-row sm:flex-col gap-2 sm:w-44">
+                                        {(session.type === "QR Code" || session.type === "Keduanya") && (
+                                          <Button 
+                                            variant="default" 
+                                            className="flex-1 bg-[#0687C9] hover:bg-[#0572aa]"
+                                            onClick={() => openQrCodeModal(session)}
+                                          >
+                                            <QrCode className="h-4 w-4 mr-2" />
+                                            Lihat QR
+                                          </Button>
+                                        )}
                                         <Button 
-                                          variant="default" 
-                                          className="flex-1 bg-[#0687C9] hover:bg-[#0572aa]"
-                                          onClick={() => openQrCodeModal(session)}
+                                          variant="outline" 
+                                          className="flex-1 border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
+                                          onClick={() => endAttendanceSession(session.id)}
                                         >
-                                          <QrCode className="h-4 w-4 mr-2" />
-                                          Lihat QR
+                                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                                          Akhiri Sesi
                                         </Button>
-                                      )}
-                                      <Button 
-                                        variant="outline" 
-                                        className="flex-1 border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
-                                        onClick={() => endAttendanceSession(session.id)}
-                                      >
-                                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                                        Akhiri Sesi
-                                      </Button>
+                                      </div>
                                     </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -901,46 +907,52 @@ export default function AttendancePage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {pastSessions.map((session, index) => (
-                              <TableRow key={session.id}>
-                                <TableCell>{index + 1}</TableCell>
-                                <TableCell>{session.date}</TableCell>
-                                <TableCell className="font-medium">{session.courseCode}</TableCell>
-                                <TableCell>{session.courseName}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={
-                                    session.type === "QR Code" 
-                                      ? "bg-blue-50 text-[#0687C9] border-[#0687C9]/20" 
-                                      : "bg-purple-50 text-purple-700 border-purple-200"
-                                  }>
-                                    {session.type}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>{session.duration} menit</TableCell>
-                                <TableCell>
-                                  <div className="flex items-center">
-                                    <span>{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
-                                    <div className="w-20 bg-gray-200 rounded-full h-2 ml-2">
-                                      <div 
-                                        className="bg-[#0687C9] h-2 rounded-full" 
-                                        style={{ width: `${((session.attendedCount + session.lateCount) / session.totalStudents) * 100}%` }}
-                                      ></div>
+                            {pastSessions.map((session, index) => {
+                              const schedule = schedules.find(s => s.id === session.courseScheduleId);
+                              const resolvedTotalStudents = (schedule && schedule.totalStudents > 0) ? schedule.totalStudents : (session.totalStudents || 0);
+                              const attendancePercentage = resolvedTotalStudents > 0 ? (session.attendedCount / resolvedTotalStudents) * 100 : 0;
+
+                              return (
+                                <TableRow key={session.id}>
+                                  <TableCell>{index + 1}</TableCell>
+                                  <TableCell>{session.date}</TableCell>
+                                  <TableCell className="font-medium">{session.courseCode}</TableCell>
+                                  <TableCell>{session.courseName}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={
+                                      session.type === "QR Code" 
+                                        ? "bg-blue-50 text-[#0687C9] border-[#0687C9]/20" 
+                                        : "bg-purple-50 text-purple-700 border-purple-200"
+                                    }>
+                                      {session.type}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>{session.duration} menit</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center">
+                                      <span>{session.attendedCount}/{resolvedTotalStudents}</span>
+                                      <div className="w-20 bg-gray-200 rounded-full h-2 ml-2">
+                                        <div 
+                                          className="bg-[#0687C9] h-2 rounded-full" 
+                                          style={{ width: `${attendancePercentage}%` }}
+                                        ></div>
+                                      </div>
                                     </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
-                                    onClick={() => window.location.href = `/dashboard/lecturer/attendance/detail/${session.id}`}
-                                  >
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    Detail
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
+                                      onClick={() => window.location.href = `/dashboard/lecturer/attendance/detail/${session.id}`}
+                                    >
+                                      <FileText className="h-4 w-4 mr-2" />
+                                      Detail
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                             {pastSessions.length === 0 && (
                               <TableRow>
                                 <TableCell colSpan={8} className="h-32 text-center">
