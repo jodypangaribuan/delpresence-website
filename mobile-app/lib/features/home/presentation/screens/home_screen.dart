@@ -25,7 +25,6 @@ import '../../../../core/services/network_service.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../schedule/data/services/schedule_service.dart';
 import '../../../schedule/data/models/schedule_model.dart';
-import '../../../attendance/presentation/screens/qr_scanner_screen.dart';
 
 // Custom refresh indicator controller class
 class IndicatorController extends ChangeNotifier {
@@ -575,13 +574,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  // Navigate to QR code scanner
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const QrScannerScreen(),
-                    ),
-                  );
+                  // Navigate to QR code scanner (simulated for now)
+                  ToastUtils.showInfoToast(
+                      context, 'QR Scanner akan segera hadir');
                 },
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
