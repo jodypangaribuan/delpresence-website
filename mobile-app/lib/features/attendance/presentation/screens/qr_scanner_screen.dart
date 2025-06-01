@@ -1,6 +1,6 @@
 import 'dart:io'; // Needed for Platform.isAndroid || Platform.isIOS
 import 'package:flutter/material.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../schedule/data/models/schedule_model.dart';
 import '../../../../core/utils/toast_utils.dart';
