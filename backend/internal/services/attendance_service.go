@@ -32,11 +32,40 @@ func NewAttendanceService() *AttendanceService {
 }
 
 // CreateAttendanceSession creates a new attendance session for a course schedule
-func (s *AttendanceService) CreateAttendanceSession(lecturerID uint, courseScheduleID uint, date time.Time, attendanceType models.AttendanceType, settings map[string]interface{}) (*models.AttendanceSession, error) {
+func (s *AttendanceService) CreateAttendanceSession(userID uint, courseScheduleID uint, date time.Time, attendanceType models.AttendanceType, settings map[string]interface{}) (*models.AttendanceSession, error) {
 	// Check if there's already an active session for this schedule and date
 	existingSession, err := s.attendanceRepo.GetActiveSessionForSchedule(courseScheduleID, date)
 	if err == nil && existingSession.ID != 0 {
-		return nil, errors.New("there is already an active attendance session for this schedule")
+		// Check if the existing session is created by the same user
+		if existingSession.LecturerID == userID {
+			return nil, errors.New("you already have an active attendance session for this schedule")
+		}
+
+		// Check if current user is a lecturer and existing session is by a teaching assistant or vice versa
+		var isCurrentUserLecturer, isExistingSessionLecturer bool
+
+		// Get the course schedule to determine lecturer ownership
+		schedule, err := s.scheduleRepo.GetByID(courseScheduleID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Current user is the assigned lecturer for this schedule
+		isCurrentUserLecturer = (schedule.UserID == userID)
+
+		// Check if the creator of the existing session is the assigned lecturer
+		isExistingSessionLecturer = (schedule.UserID == existingSession.LecturerID)
+
+		// Allow only if current user is lecturer and existing session is by TA
+		if isCurrentUserLecturer && !isExistingSessionLecturer {
+			// Lecturer can override TA's session - proceed with creation
+		} else if !isCurrentUserLecturer && isExistingSessionLecturer {
+			// TA cannot create session when lecturer already has one
+			return nil, errors.New("there is already an active attendance session created by the lecturer")
+		} else {
+			// Both are lecturers or both are TAs - don't allow conflict
+			return nil, errors.New("there is already an active attendance session for this schedule")
+		}
 	}
 
 	// Get the course schedule to validate
@@ -45,15 +74,26 @@ func (s *AttendanceService) CreateAttendanceSession(lecturerID uint, courseSched
 		return nil, err
 	}
 
-	// Verify that the lecturer is assigned to this schedule
-	if schedule.UserID != uint(lecturerID) {
-		return nil, errors.New("lecturer is not assigned to this schedule")
+	// Verify that the user is either the assigned lecturer or a teaching assistant
+	if schedule.UserID != uint(userID) {
+		// Check if user is a teaching assistant for this course
+		var isAssistant bool
+		err = s.db.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM teaching_assistant_assignments 
+				WHERE user_id = ? AND course_id = ?
+			) as is_assistant`,
+			userID, schedule.CourseID).Scan(&isAssistant).Error
+
+		if err != nil || !isAssistant {
+			return nil, errors.New("user is neither the assigned lecturer nor a teaching assistant for this course")
+		}
 	}
 
 	// Create a new attendance session
 	session := &models.AttendanceSession{
 		CourseScheduleID: courseScheduleID,
-		LecturerID:       lecturerID,
+		LecturerID:       userID,
 		Date:             date,
 		StartTime:        time.Now(),
 		Type:             attendanceType,
@@ -62,6 +102,13 @@ func (s *AttendanceService) CreateAttendanceSession(lecturerID uint, courseSched
 		Duration:         15, // Default 15 minutes
 		AllowLate:        true,
 		LateThreshold:    10, // Default 10 minutes
+	}
+
+	// Set creator role based on whether user is lecturer or teaching assistant
+	if schedule.UserID == userID {
+		session.CreatorRole = "LECTURER"
+	} else {
+		session.CreatorRole = "ASSISTANT"
 	}
 
 	// Apply custom settings if provided
@@ -107,15 +154,37 @@ func (s *AttendanceService) CreateAttendanceSession(lecturerID uint, courseSched
 }
 
 // CloseAttendanceSession closes an active attendance session
-func (s *AttendanceService) CloseAttendanceSession(sessionID uint, lecturerID uint) error {
+func (s *AttendanceService) CloseAttendanceSession(sessionID uint, userID uint) error {
 	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
 	if err != nil {
 		return err
 	}
 
-	// Verify that the lecturer owns this session
-	if session.LecturerID != lecturerID {
-		return errors.New("lecturer does not own this attendance session")
+	// First check if the user is the creator of this session
+	if session.LecturerID != userID {
+		// If not, check if they are a teaching assistant for this course
+		var isAssistant bool
+
+		// Get the course ID from the session's schedule
+		var courseID uint
+		if err := s.db.Model(&models.CourseSchedule{}).
+			Where("id = ?", session.CourseScheduleID).
+			Select("course_id").
+			First(&courseID).Error; err != nil {
+			return errors.New("failed to verify course assignment")
+		}
+
+		// Check if the user is a teaching assistant for this course
+		err = s.db.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM teaching_assistant_assignments 
+				WHERE user_id = ? AND course_id = ?
+			) as is_assistant`,
+			userID, courseID).Scan(&isAssistant).Error
+
+		if err != nil || !isAssistant {
+			return errors.New("user does not have permission to close this attendance session")
+		}
 	}
 
 	// Verify that the session is active
@@ -204,11 +273,48 @@ func (s *AttendanceService) MarkStudentAttendance(sessionID uint, studentID uint
 	}
 }
 
-// GetActiveSessionsForLecturer gets all active attendance sessions for a lecturer
-func (s *AttendanceService) GetActiveSessionsForLecturer(lecturerID uint) ([]models.AttendanceSessionResponse, error) {
-	sessions, err := s.attendanceRepo.ListActiveSessions(lecturerID)
+// GetActiveSessionsForUser gets all active attendance sessions for a user (lecturer or teaching assistant)
+func (s *AttendanceService) GetActiveSessionsForUser(userID uint) ([]models.AttendanceSessionResponse, error) {
+	// First, get sessions where the user is directly the lecturer
+	sessions, err := s.attendanceRepo.ListActiveSessions(userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// For teaching assistants, also get sessions from courses where they are assigned as TAs
+	// First, get all course IDs where the user is a teaching assistant
+	var courseIDs []uint
+	if err := s.db.Raw(`
+		SELECT course_id FROM teaching_assistant_assignments 
+		WHERE user_id = ?`,
+		userID).Scan(&courseIDs).Error; err != nil {
+		// Just log the error but continue with direct sessions
+		fmt.Printf("Error fetching TA assignments for user %d: %v\n", userID, err)
+	} else if len(courseIDs) > 0 {
+		// Get schedules for these courses
+		var scheduleIDs []uint
+		if err := s.db.Model(&models.CourseSchedule{}).
+			Where("course_id IN (?)", courseIDs).
+			Pluck("id", &scheduleIDs).Error; err != nil {
+			fmt.Printf("Error fetching course schedules for TA %d: %v\n", userID, err)
+		} else if len(scheduleIDs) > 0 {
+			// Get active sessions for these schedules
+			taSessions, err := s.attendanceRepo.ListActiveSessionsBySchedules(scheduleIDs)
+			if err == nil {
+				// Add these sessions to the list, avoiding duplicates
+				sessionMap := make(map[uint]models.AttendanceSession)
+				for _, s := range sessions {
+					sessionMap[s.ID] = s
+				}
+
+				for _, s := range taSessions {
+					if _, exists := sessionMap[s.ID]; !exists {
+						sessionMap[s.ID] = s
+						sessions = append(sessions, s)
+					}
+				}
+			}
+		}
 	}
 
 	// Transform to response objects
@@ -255,11 +361,55 @@ func (s *AttendanceService) GetActiveSessionsByCourse(courseID uint) ([]models.A
 	return allResponses, nil
 }
 
-// GetSessionsByDateRange gets attendance sessions for a lecturer within a date range
-func (s *AttendanceService) GetSessionsByDateRange(lecturerID uint, startDate, endDate time.Time) ([]models.AttendanceSessionResponse, error) {
-	sessions, err := s.attendanceRepo.ListSessionsByDateRange(lecturerID, startDate, endDate)
+// GetSessionsByDateRange gets attendance sessions for a user within a date range
+func (s *AttendanceService) GetSessionsByDateRange(userID uint, startDate, endDate time.Time) ([]models.AttendanceSessionResponse, error) {
+	// First, get sessions where the user is directly the lecturer
+	sessions, err := s.attendanceRepo.ListSessionsByDateRange(userID, startDate, endDate)
 	if err != nil {
 		return nil, err
+	}
+
+	// For teaching assistants, also get sessions from courses where they are assigned as TAs
+	// First, get all course IDs where the user is a teaching assistant
+	var courseIDs []uint
+	if err := s.db.Raw(`
+		SELECT course_id FROM teaching_assistant_assignments 
+		WHERE user_id = ?`,
+		userID).Scan(&courseIDs).Error; err != nil {
+		// Just log the error but continue with direct sessions
+		fmt.Printf("Error fetching TA assignments for user %d: %v\n", userID, err)
+	} else if len(courseIDs) > 0 {
+		// Get schedules for these courses
+		var scheduleIDs []uint
+		if err := s.db.Model(&models.CourseSchedule{}).
+			Where("course_id IN (?)", courseIDs).
+			Pluck("id", &scheduleIDs).Error; err != nil {
+			fmt.Printf("Error fetching course schedules for TA %d: %v\n", userID, err)
+		} else if len(scheduleIDs) > 0 {
+			// Get sessions for these schedules in the given date range
+			var taSessions []models.AttendanceSession
+			err := s.db.Preload("CourseSchedule").
+				Preload("CourseSchedule.Course").
+				Preload("CourseSchedule.Room").
+				Where("course_schedule_id IN (?) AND date BETWEEN ? AND ?",
+					scheduleIDs, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+				Find(&taSessions).Error
+
+			if err == nil {
+				// Add these sessions to the list, avoiding duplicates
+				sessionMap := make(map[uint]models.AttendanceSession)
+				for _, s := range sessions {
+					sessionMap[s.ID] = s
+				}
+
+				for _, s := range taSessions {
+					if _, exists := sessionMap[s.ID]; !exists {
+						sessionMap[s.ID] = s
+						sessions = append(sessions, s)
+					}
+				}
+			}
+		}
 	}
 
 	// Transform to response objects
@@ -276,30 +426,75 @@ func (s *AttendanceService) GetSessionsByDateRange(lecturerID uint, startDate, e
 }
 
 // GetSessionDetails gets detailed information for an attendance session
-func (s *AttendanceService) GetSessionDetails(sessionID uint, lecturerID uint) (*models.AttendanceSessionResponse, error) {
+func (s *AttendanceService) GetSessionDetails(sessionID uint, userID uint) (*models.AttendanceSessionResponse, error) {
 	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Verify that the lecturer has access to this session
-	if session.LecturerID != lecturerID {
-		return nil, errors.New("lecturer does not have access to this session")
+	// Check if user is the assigned lecturer for this session
+	if session.LecturerID != userID {
+		// If not, check if they are a teaching assistant for this course
+		var isAssistant bool
+
+		// Get the course ID from the session's schedule
+		var courseID uint
+		if err := s.db.Model(&models.CourseSchedule{}).
+			Where("id = ?", session.CourseScheduleID).
+			Select("course_id").
+			First(&courseID).Error; err != nil {
+			return nil, errors.New("failed to verify course assignment")
+		}
+
+		// Check if the user is a teaching assistant for this course
+		err = s.db.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM teaching_assistant_assignments 
+				WHERE user_id = ? AND course_id = ?
+			) as is_assistant`,
+			userID, courseID).Scan(&isAssistant).Error
+
+		if err != nil || !isAssistant {
+			return nil, errors.New("user does not have access to this session")
+		}
 	}
 
 	return s.mapSessionToResponse(session)
 }
 
 // GetStudentAttendances gets student attendance records for a session
-func (s *AttendanceService) GetStudentAttendances(sessionID uint, lecturerID uint) ([]models.StudentAttendanceResponse, error) {
-	// Verify the session exists and lecturer has access
+func (s *AttendanceService) GetStudentAttendances(sessionID uint, userID uint) ([]models.StudentAttendanceResponse, error) {
+	// Verify the session exists
 	session, err := s.attendanceRepo.GetAttendanceSessionByID(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if session.LecturerID != lecturerID {
-		return nil, errors.New("lecturer does not have access to this session")
+	// Check if user is the assigned lecturer for this session
+	if session.LecturerID != userID {
+		// If not, check if they are a teaching assistant for this course
+		var isAssistant bool
+
+		// Get the course ID from the session's schedule
+		var courseID uint
+		if err := s.db.Model(&models.CourseSchedule{}).
+			Where("id = ?", session.CourseScheduleID).
+			Select("course_id").
+			First(&courseID).Error; err != nil {
+			return nil, errors.New("failed to verify course assignment")
+		}
+
+		// Check if the user is a teaching assistant for this course
+		err = s.db.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM teaching_assistant_assignments 
+				WHERE user_id = ? AND course_id = ?
+			) as is_assistant`,
+			userID, courseID).Scan(&isAssistant).Error
+
+		if err != nil || !isAssistant {
+			return nil, errors.New("user does not have access to this session")
+		}
 	}
 
 	// Get all student attendances for this session
@@ -441,6 +636,7 @@ func (s *AttendanceService) mapSessionToResponse(session *models.AttendanceSessi
 		ScheduleEndTime:   session.CourseSchedule.EndTime,
 		Type:              string(session.Type),
 		Status:            string(session.Status),
+		CreatorRole:       session.CreatorRole,
 		AutoClose:         session.AutoClose,
 		Duration:          session.Duration,
 		AllowLate:         session.AllowLate,

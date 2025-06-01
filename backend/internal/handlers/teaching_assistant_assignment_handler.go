@@ -11,6 +11,7 @@ import (
 
 	"github.com/delpresence/backend/internal/models"
 	"github.com/delpresence/backend/internal/repositories"
+	"github.com/delpresence/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
@@ -646,8 +647,13 @@ func (h *TeachingAssistantAssignmentHandler) GetMyAssignedSchedules(c *gin.Conte
 		schedules = append(schedules, courseSchedules...)
 	}
 
+	// Gunakan CourseScheduleService untuk memformat jadwal dengan benar
+	// agar semua informasi yang dibutuhkan tersedia di frontend
+	courseScheduleService := services.NewCourseScheduleService()
+	formattedSchedules := courseScheduleService.FormatSchedulesForResponse(schedules)
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"data":   schedules,
+		"data":   formattedSchedules,
 	})
 }

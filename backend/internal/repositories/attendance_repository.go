@@ -124,7 +124,7 @@ func (r *AttendanceRepository) ListStudentAttendancesByStatus(sessionID uint, st
 // GetAttendanceStats gets attendance statistics for a course schedule
 func (r *AttendanceRepository) GetAttendanceStats(courseScheduleID uint) (*models.AttendanceStatistics, error) {
 	var stats models.AttendanceStatistics
-	
+
 	// Get total sessions
 	var totalSessions int64
 	if err := r.db.Model(&models.AttendanceSession{}).
@@ -133,20 +133,20 @@ func (r *AttendanceRepository) GetAttendanceStats(courseScheduleID uint) (*model
 		return nil, err
 	}
 	stats.TotalSessions = int(totalSessions)
-	
+
 	// Get total students for this course schedule
 	var courseSchedule models.CourseSchedule
 	if err := r.db.Where("id = ?", courseScheduleID).First(&courseSchedule).Error; err != nil {
 		return nil, err
 	}
 	stats.TotalStudents = courseSchedule.Enrolled
-	
+
 	// Count attendance by status
 	sessions, err := r.ListSessionsByCourseSchedule(courseScheduleID)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, session := range sessions {
 		var presentCount int64
 		err := r.db.Model(&models.StudentAttendance{}).
@@ -156,7 +156,7 @@ func (r *AttendanceRepository) GetAttendanceStats(courseScheduleID uint) (*model
 			return nil, err
 		}
 		stats.TotalAttendance += int(presentCount)
-		
+
 		var lateCount int64
 		err = r.db.Model(&models.StudentAttendance{}).
 			Where("attendance_session_id = ? AND status = ?", session.ID, models.StudentAttendanceStatusLate).
@@ -165,7 +165,7 @@ func (r *AttendanceRepository) GetAttendanceStats(courseScheduleID uint) (*model
 			return nil, err
 		}
 		stats.TotalLate += int(lateCount)
-		
+
 		var absentCount int64
 		err = r.db.Model(&models.StudentAttendance{}).
 			Where("attendance_session_id = ? AND status = ?", session.ID, models.StudentAttendanceStatusAbsent).
@@ -174,7 +174,7 @@ func (r *AttendanceRepository) GetAttendanceStats(courseScheduleID uint) (*model
 			return nil, err
 		}
 		stats.TotalAbsent += int(absentCount)
-		
+
 		var excusedCount int64
 		err = r.db.Model(&models.StudentAttendance{}).
 			Where("attendance_session_id = ? AND status = ?", session.ID, models.StudentAttendanceStatusExcused).
@@ -184,13 +184,25 @@ func (r *AttendanceRepository) GetAttendanceStats(courseScheduleID uint) (*model
 		}
 		stats.TotalExcused += int(excusedCount)
 	}
-	
+
 	// Calculate average attendance percentage
 	if stats.TotalSessions > 0 && stats.TotalStudents > 0 {
 		totalPossibleAttendances := stats.TotalSessions * stats.TotalStudents
 		totalPresent := stats.TotalAttendance + stats.TotalLate
 		stats.AverageAttendance = (totalPresent * 100) / totalPossibleAttendances
 	}
-	
+
 	return &stats, nil
-} 
+}
+
+// ListActiveSessionsBySchedules gets all active attendance sessions for given course schedule IDs
+func (r *AttendanceRepository) ListActiveSessionsBySchedules(scheduleIDs []uint) ([]models.AttendanceSession, error) {
+	var sessions []models.AttendanceSession
+	err := r.db.Preload("CourseSchedule").
+		Preload("CourseSchedule.Course").
+		Preload("CourseSchedule.Room").
+		Where("course_schedule_id IN (?) AND status = ?", scheduleIDs, models.AttendanceStatusActive).
+		Find(&sessions).Error
+
+	return sessions, err
+}

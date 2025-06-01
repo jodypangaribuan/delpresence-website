@@ -4,6 +4,7 @@ npm-debug.log
 
 # Next.js build output
 .next
+out
 
 # Environment variables
 .env
@@ -11,16 +12,14 @@ npm-debug.log
 .env.development.local
 .env.test.local
 .env.production.local
+env.example
 
 # Git files
 .git
 .gitignore
 
 # Docker files
-Dockerfile
-Dockerfile.dev
 docker-compose.yml
-docker-compose.dev.yml
 .dockerignore
 
 # Debug logs
@@ -34,6 +33,22 @@ cypress.config.js
 
 # Documentation
 README.md
+DEPLOYMENT.md
 *.md
+!public/**/*.md
+
+# Development files
+.vscode
+.idea
+*.log
+*.bak
+*.swp
+*.swo
+mobile-app
+
+# Test files
+__tests__
+*.test.js
+*.spec.js
 
  

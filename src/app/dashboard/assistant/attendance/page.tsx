@@ -9,31 +9,41 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { 
   Calendar, 
   QrCode, 
+  ScanFace, 
   Clock, 
+  Plus, 
+  Edit,
   FileText,
   BarChart,
   Filter,
   Search,
-  ArrowLeft,
+  Settings,
+  Timer,
   CheckCircle2,
   AlertCircle,
   Users,
-  Eye,
-  ExternalLink,
-  Timer
+  Timer as TimerIcon,
+  Sliders
 } from "lucide-react";
 import { SelectValue, SelectTrigger, SelectContent, SelectItem, Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { api } from "@/utils/api";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { format, parseISO } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
-import axios from "axios";
-import { API_URL } from "@/utils/env";
+import { Badge } from "@/components/ui/badge";
 
-// AttendanceSession interface
+// AttendanceSession and AttendanceSettings interfaces
+interface AttendanceSettings {
+  type: "QR Code" | "Face Recognition" | "Keduanya";
+  autoClose: boolean;
+  duration: number;
+  allowLate: boolean;
+  lateThreshold: number;
+  notes: string;
+}
+
 interface AttendanceSession {
   id: number;
   courseScheduleId: number;
@@ -71,7 +81,15 @@ interface Schedule {
   room: string;
   date: string;
   totalStudents: number;
-  lecturerName: string;
+}
+
+// Modified to match the API format
+interface ActiveSession extends AttendanceSession {
+  remainingTime?: number; // in seconds
+}
+
+interface PastSession extends AttendanceSession {
+  // No additional fields needed
 }
 
 // Define our interface for raw attendance session data from API
@@ -102,32 +120,51 @@ interface AttendanceSessionData {
   created_at: string;
 }
 
-// Direct API functions
-const getActiveAttendanceSessions = async (): Promise<AttendanceSession[]> => {
-  const token = typeof window !== 'undefined' ? 
-    localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
+// Direct API functions to replace attendance-api.ts
+const createAttendanceSession = async (
+  courseScheduleId: number,
+  date: string,
+  type: string,
+  settings: Partial<{
+    autoClose: boolean;
+    duration: number;
+    allowLate: boolean;
+    lateThreshold: number;
+    notes: string;
+  }>
+): Promise<AttendanceSession> => {
+  const mappedType = type === "QR Code" ? "QR_CODE" : 
+                    type === "Face Recognition" ? "FACE_RECOGNITION" : 
+                    type === "Keduanya" ? "BOTH" : "QR_CODE";
   
-  try {
-    const response = await axios.get(`${API_URL}/api/assistant/attendance/sessions/active`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
+  const response = await api<AttendanceSessionData>('/assistant/attendance/sessions', {
+    method: 'POST',
+    body: {
+      course_schedule_id: courseScheduleId,
+      type: mappedType,
+      date,
+      settings: {
+        autoClose: settings.autoClose,
+        duration: settings.duration,
+        allowLate: settings.allowLate,
+        lateThreshold: settings.lateThreshold,
+        notes: settings.notes
       }
-    });
-    
-    // Handle different response formats
-    const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-    return data.map((session: AttendanceSessionData) => mapSessionFromApi(session));
-  } catch (error) {
-    console.error('Error fetching active attendance sessions:', error);
-    return [];
-  }
+    }
+  });
+  
+  return mapSessionFromApi(response);
+};
+
+const getActiveAttendanceSessions = async (): Promise<AttendanceSession[]> => {
+  const response = await api<any>('/assistant/attendance/sessions/active');
+  // Handle different response formats
+  const data = Array.isArray(response) ? response : response?.data || response?.sessions || [];
+  return data.map((session: AttendanceSessionData) => mapSessionFromApi(session));
 };
 
 const getAttendanceSessions = async (startDate?: string, endDate?: string): Promise<AttendanceSession[]> => {
-  const token = typeof window !== 'undefined' ? 
-    localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
-  
-  let endpoint = `${API_URL}/api/assistant/attendance/sessions`;
+  let endpoint = '/assistant/attendance/sessions';
   if (startDate || endDate) {
     const params = new URLSearchParams();
     if (startDate) params.append('start_date', startDate);
@@ -135,54 +172,27 @@ const getAttendanceSessions = async (startDate?: string, endDate?: string): Prom
     endpoint += `?${params.toString()}`;
   }
   
-  try {
-    const response = await axios.get(endpoint, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    // Handle different response formats
-    const data = Array.isArray(response.data) ? response.data : response.data?.data || response.data?.sessions || [];
-    return data.map((session: AttendanceSessionData) => mapSessionFromApi(session));
-  } catch (error) {
-    console.error('Error fetching attendance sessions:', error);
-    return [];
-  }
+  const response = await api<any>(endpoint);
+  // Handle different response formats
+  const data = Array.isArray(response) ? response : response?.data || response?.sessions || [];
+  return data.map((session: AttendanceSessionData) => mapSessionFromApi(session));
 };
 
-const getAssistantSchedules = async (): Promise<Schedule[]> => {
-  // This endpoint will only return schedules for courses where the current user is assigned as a teaching assistant
-  const token = typeof window !== 'undefined' ? 
-    localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
-  
-  try {
-    const response = await axios.get(`${API_URL}/api/assistant/schedules`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    const schedules = response.data?.data || [];
-    
-    return schedules.map((schedule: any) => ({
-      id: schedule.id,
-      courseCode: schedule.course?.code || schedule.course_code || "",
-      courseName: schedule.course?.name || schedule.course_name || "",
-      day: schedule.day || "",
-      startTime: schedule.start_time || "",
-      endTime: schedule.end_time || "",
-      room: schedule.room ? 
-        `${schedule.room.name || ""}, ${schedule.room.building?.name || ""}` : 
-        `${schedule.room_name || ""}, ${schedule.building_name || ""}`,
-      date: schedule.date || "",
-      totalStudents: schedule.enrolled || 0,
-      lecturerName: schedule.lecturer?.full_name || schedule.lecturer_name || ""
-    }));
-  } catch (error) {
-    console.error('Error fetching assistant schedules:', error);
-    return [];
-  }
+const getAttendanceSessionDetails = async (sessionId: number): Promise<AttendanceSession> => {
+  const response = await api<any>(`/assistant/attendance/sessions/${sessionId}`);
+  // Handle different response formats
+  const sessionData = response?.data || response;
+  return mapSessionFromApi(sessionData as AttendanceSessionData);
+};
+
+const closeAttendanceSession = async (sessionId: number): Promise<void> => {
+  await api(`/assistant/attendance/sessions/${sessionId}/close`, {
+    method: 'PUT'
+  });
+};
+
+const getQRCodeUrl = (sessionId: number): string => {
+  return `/api/assistant/attendance/qrcode/${sessionId}`;
 };
 
 // Mapping function to ensure consistent format
@@ -217,213 +227,415 @@ const mapSessionFromApi = (session: AttendanceSessionData): AttendanceSession =>
 
 const mapTypeFromApi = (type: string): string => {
   switch (type) {
-    case "QR_CODE": return "QR Code";
-    case "FACE_RECOGNITION": return "Face Recognition";
-    case "BOTH": return "Keduanya";
+    case 'QR_CODE': return 'QR Code';
+    case 'FACE_RECOGNITION': return 'Face Recognition';
+    case 'BOTH': return 'Keduanya';
     default: return type;
   }
 };
 
 const mapStatusFromApi = (status: string): string => {
   switch (status) {
-    case "ACTIVE": return "Aktif";
-    case "CLOSED": return "Selesai";
-    case "PENDING": return "Menunggu";
+    case 'ACTIVE': return 'active';
+    case 'CLOSED': return 'closed';
+    case 'CANCELED': return 'canceled';
     default: return status;
   }
 };
 
-interface AcademicYear {
-  id: number;
-  name: string;
-}
-
-export default function AssistantAttendancePage() {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState("upcoming");
+export default function AttendancePage() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [activeSessions, setActiveSessions] = useState<AttendanceSession[]>([]);
-  const [pastSessions, setPastSessions] = useState<AttendanceSession[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [pastSessions, setPastSessions] = useState<PastSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dayFilter, setDayFilter] = useState("all");
-  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState("upcoming");
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+  const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings>({
+    type: "QR Code",
+    autoClose: true,
+    duration: 15,
+    allowLate: true,
+    lateThreshold: 10,
+    notes: ""
+  });
+  // Store any potential server-client time offset
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
 
-  // Fetch data on component mount
-  useEffect(() => {
-    // Debug: Check user role from token
-    const checkUserRole = async () => {
-      try {
-        const token = typeof window !== 'undefined' ? 
-          localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
-        
-        const response = await axios.get(`${API_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        console.log('Current user info:', response.data);
-        
-        // Alert if role is not "Asisten Dosen"
-        if (response.data.role !== "Asisten Dosen") {
-          console.warn('User role is not "Asisten Dosen":', response.data.role);
-        }
-      } catch (error) {
-        console.error('Error fetching user info:', error);
+  // Function to estimate server-client time difference
+  const calculateServerTimeOffset = (serverTime: string) => {
+    if (!serverTime) return 0;
+    
+    try {
+      const serverTimeMs = new Date(serverTime).getTime();
+      const clientTimeMs = Date.now();
+      const offset = serverTimeMs - clientTimeMs;
+      
+      // Only update if the offset is significant (more than 2 seconds)
+      if (Math.abs(offset) > 2000) {
+        console.log("Server time offset detected:", offset, "ms");
+        setServerTimeOffset(offset);
       }
-    };
-    
-    checkUserRole();
-    
+      
+      return offset;
+    } catch (error) {
+      console.error("Error calculating server time offset:", error);
+      return 0;
+    }
+  };
+
+  // Load data from API
+  useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch schedules where the user is assigned as a teaching assistant
-        // This endpoint will only return schedules for courses where the user is assigned
-        const schedulesData = await getAssistantSchedules();
-        setSchedules(schedulesData);
-
-        // If no schedules, no need to fetch sessions
-        if (schedulesData.length === 0) {
-          setActiveSessions([]);
-          setPastSessions([]);
-          setIsLoading(false);
-          return;
+        // Fetch lecturer schedules
+        const response = await api<{status: string, data: any[]}>('assistant/schedules');
+        
+        if (response.status === 'success' && response.data) {
+          const mappedSchedules = response.data.map((schedule: any) => ({
+            id: schedule.id,
+            courseCode: schedule.course_code,
+            courseName: schedule.course_name,
+            day: schedule.day,
+            startTime: schedule.start_time,
+            endTime: schedule.end_time,
+            room: `${schedule.room_name} (${schedule.building_name})`,
+            date: new Date().toISOString().split('T')[0], // Today's date as default
+            totalStudents: schedule.enrolled || 0
+          }));
+          setSchedules(mappedSchedules);
+        } else {
+          // Fallback to old method
+          const schedulesResponse = await api<any>('/assistant/schedules');
+          const schedulesData = Array.isArray(schedulesResponse) ? schedulesResponse : 
+                          schedulesResponse?.data || schedulesResponse?.schedules || [];
+          
+          // Filter out null or undefined items before mapping
+          const validSchedules = schedulesData.filter((schedule: any) => schedule && schedule.id);
+          
+          const mappedSchedules = validSchedules.map((schedule: any) => ({
+            id: schedule.id || 0,
+            courseCode: schedule.course?.code || "N/A",
+            courseName: schedule.course?.name || "Mata Kuliah Tidak Ditemukan",
+            day: schedule.day || "N/A",
+            startTime: schedule.start_time || "--:--",
+            endTime: schedule.end_time || "--:--",
+            room: schedule.room?.name || "N/A",
+            date: new Date().toISOString().split('T')[0], // Today's date as default
+            totalStudents: schedule.enrolled || 0
+          }));
+          setSchedules(mappedSchedules);
         }
-
-        // Create a map of course IDs that the teaching assistant is assigned to
-        const relevantScheduleIds = schedulesData.map(s => s.id);
 
         // Fetch active sessions
-        try {
-          const activeSessionsData = await getActiveAttendanceSessions();
-          
-          // Filter active sessions to only those related to schedules where user is an assistant
-          const filteredActiveSessions = activeSessionsData.filter(
-            session => relevantScheduleIds.includes(session.courseScheduleId)
-          );
-          
-          setActiveSessions(filteredActiveSessions);
-        } catch (error) {
-          console.error("Error fetching active sessions:", error);
-          setActiveSessions([]);
-        }
+        const activeSessionsResponse = await getActiveAttendanceSessions();
+        // Add remainingTime to active sessions
+        const activeWithTime = activeSessionsResponse.map(session => {
+          const remainingTime = calculateRemainingTime(session);
+          return { ...session, remainingTime };
+        });
+        setActiveSessions(activeWithTime);
 
-        // Fetch past sessions
-        try {
-          const pastSessionsData = await getAttendanceSessions();
-          
-          // Filter past sessions to only those related to schedules where user is an assistant
-          const filteredPastSessions = pastSessionsData.filter(
-            session => relevantScheduleIds.includes(session.courseScheduleId) && session.status !== "Aktif"
-          );
-          
-          setPastSessions(filteredPastSessions);
-        } catch (error) {
-          console.error("Error fetching past sessions:", error);
-          setPastSessions([]);
-        }
-
-        // Fetch academic years
-        await fetchAcademicYears();
+        // Fetch past sessions (last 30 days)
+        const today = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        
+        const pastSessionsResponse = await getAttendanceSessions(
+          thirtyDaysAgo.toISOString().split('T')[0],
+          today.toISOString().split('T')[0]
+        );
+        
+        // Filter to only closed or canceled sessions
+        const closedSessions = pastSessionsResponse.filter(
+          session => session.status === 'closed' || session.status === 'canceled'
+        );
+        
+        setPastSessions(closedSessions);
       } catch (error) {
         console.error("Error fetching data:", error);
-        toast.error("Gagal memuat data presensi");
-        // Set empty states to avoid loading
-        setSchedules([]);
-        setActiveSessions([]);
-        setPastSessions([]);
+        toast.error("Gagal memuat data");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
+  }, []);
 
-    // Set up a polling interval to refresh active sessions
-    const intervalId = setInterval(() => {
-      if (activeTab === "active") {
-        const refreshActiveSessions = async () => {
-          try {
-            const activeSessionsData = await getActiveAttendanceSessions();
-            const relevantScheduleIds = schedules.map(s => s.id);
-            const filteredActiveSessions = activeSessionsData.filter(
-              session => relevantScheduleIds.includes(session.courseScheduleId)
-            );
-            setActiveSessions(filteredActiveSessions);
-          } catch (error) {
-            console.error("Error refreshing active sessions:", error);
-          }
-        };
-        refreshActiveSessions();
+  // Calculate remaining time for a session in seconds
+  const calculateRemainingTime = (session: AttendanceSession): number => {
+    if (session.status !== 'active') return 0;
+    
+    try {
+      // Handle ISO date string from server - ensure proper parsing
+      if (!session.startTime) {
+        console.warn("Session has no start time:", session.id);
+        return session.duration * 60; // Default to full duration
       }
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(intervalId);
-  }, [activeTab]);
-
-  // Filter schedules based on search term and day filter
-  const filteredSchedules = schedules.filter(schedule => {
-    const matchesSearch = searchTerm === "" || 
-      schedule.courseCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.room.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesDay = dayFilter === "all" || schedule.day.toLowerCase() === dayFilter.toLowerCase();
-    
-    return matchesSearch && matchesDay;
-  });
-
-  // Navigate to attendance detail
-  const viewAttendanceDetail = (scheduleId: number) => {
-    router.push(`/dashboard/assistant/attendance/${scheduleId}`);
-  };
-
-  // Format date
-  const formatDate = (dateString: string) => {
-    try {
-      const date = parseISO(dateString);
-      return format(date, "d MMMM yyyy", { locale: idLocale });
-    } catch (error) {
-      return dateString;
-    }
-  };
-
-  // Calculate attendance rate
-  const calculateAttendanceRate = (session: AttendanceSession) => {
-    if (session.totalStudents === 0) return 0;
-    return ((session.attendedCount + session.lateCount) / session.totalStudents) * 100;
-  };
-
-  // Fetch academic years
-  const fetchAcademicYears = async () => {
-    try {
-      const token = typeof window !== 'undefined' ? 
-        localStorage.getItem('access_token') || sessionStorage.getItem('access_token') : null;
       
-      const response = await axios.get(`${API_URL}/api/assistant/academic-years`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      // Parse the startTime string to a Date object
+      const startTimeDate = new Date(session.startTime);
+      
+      // Validate the parsed date
+      if (isNaN(startTimeDate.getTime())) {
+        console.warn("Invalid start time:", session.startTime);
+        return session.duration * 60; // Default to full duration
+      }
+      
+      // Convert duration from minutes to milliseconds
+      const durationMs = session.duration * 60 * 1000;
+      
+      // Calculate the end time by adding duration to start time
+      const endTime = startTimeDate.getTime() + durationMs;
+      
+      // Get the current time (adjusted for any server time difference)
+      const clientNow = Date.now();
+      const adjustedNow = clientNow + serverTimeOffset;
+      
+      // Debug information
+      console.log("Time calculation for session", session.id, {
+        startTime: startTimeDate.toISOString(),
+        duration: session.duration,
+        endTime: new Date(endTime).toISOString(),
+        clientTime: new Date(clientNow).toISOString(),
+        adjustedTime: new Date(adjustedNow).toISOString(),
+        serverOffset: serverTimeOffset,
+        remainingMs: endTime - adjustedNow,
+        remainingSec: Math.floor((endTime - adjustedNow) / 1000)
       });
       
-      if (response.data?.data) {
-        if (response.data.data.length > 0) {
-          setAcademicYears(response.data.data);
-          // Just use the first year in the list if available
-          setSelectedAcademicYear(response.data.data[0].id);
-        } else {
-          // Handle case when there are no academic years
-          console.log('No academic years found');
-          setAcademicYears([]);
-        }
-      }
+      // Calculate remaining milliseconds (with server time adjustment)
+      const remainingMs = endTime - adjustedNow;
+      
+      // Return remaining seconds, minimum 0
+      return Math.max(0, Math.floor(remainingMs / 1000));
     } catch (error) {
-      console.error('Error fetching academic years:', error);
-      setAcademicYears([]);
+      console.error("Error calculating remaining time:", error, {
+        sessionId: session.id,
+        startTime: session.startTime,
+        duration: session.duration
+      });
+      // Default to full duration to prevent immediate auto-close
+      return session.duration * 60;
     }
+  };
+
+  // Update remaining time for active sessions
+  useEffect(() => {
+      let isComponentMounted = true;
+    
+    // Function to fetch active sessions and sync with the server
+    const fetchActiveSessions = async () => {
+      if (!isComponentMounted) return;
+      
+      try {
+        const activeSessionsResponse = await getActiveAttendanceSessions();
+        console.log("Active sessions from server:", activeSessionsResponse);
+        
+        // Check if we have any active sessions to synchronize time with
+        if (activeSessionsResponse.length > 0 && activeSessionsResponse[0].createdAt) {
+          // Use the most recent session's creation time to estimate server time
+          calculateServerTimeOffset(activeSessionsResponse[0].createdAt);
+        }
+        
+        // Force an immediate recalculation of remaining time for all sessions
+        // This ensures we're in sync with the server
+        const activeWithTime = activeSessionsResponse.map(session => {
+          const remainingTime = calculateRemainingTime(session);
+          return { ...session, remainingTime };
+        });
+        
+        if (isComponentMounted) {
+          setActiveSessions(activeWithTime);
+        }
+      } catch (error) {
+        console.error("Error fetching active sessions:", error);
+      }
+    };
+    
+    // Set up periodic sync with the server
+    const syncWithServer = () => {
+      // Immediate sync
+      fetchActiveSessions();
+      
+      // Set up regular sync intervals
+      // We'll sync more frequently at first to ensure we're accurate
+      const shortIntervalSync = setInterval(() => {
+        fetchActiveSessions();
+      }, 5000); // Every 5 seconds for the first minute
+      
+      // After a minute, switch to less frequent updates
+      setTimeout(() => {
+        clearInterval(shortIntervalSync);
+        setInterval(() => {
+          fetchActiveSessions();
+        }, 30000); // Every 30 seconds thereafter
+      }, 60000);
+    };
+    
+    // Initial server sync
+    syncWithServer();
+
+    // Set up timer to update countdown every second
+    const countdownTimer = setInterval(() => {
+      if (!isComponentMounted) return;
+      
+      setActiveSessions(prev => 
+        prev.map(session => {
+          if (session.status !== 'active') return session;
+          
+          // Recalculate remaining time based on server start time and duration
+          // This ensures an accurate countdown that matches the server
+          const newRemainingTime = calculateRemainingTime(session);
+          
+          // Auto-close sessions if timer has reached zero
+          if (newRemainingTime === 0 && session.autoClose) {
+            // End the session on the server
+            closeAttendanceSession(session.id).catch(err => 
+              console.error("Failed to end session automatically:", err)
+            );
+            
+            // Update local state to show session as closed
+            return { ...session, status: 'closed', remainingTime: 0 };
+          }
+          
+          return { ...session, remainingTime: newRemainingTime };
+        })
+      );
+    }, 1000);
+
+    // Cleanup function
+    return () => {
+      isComponentMounted = false;
+      clearInterval(countdownTimer);
+    };
+  }, []);
+
+  // Open settings dialog for starting attendance
+  const openSettingsDialog = (schedule: Schedule) => {
+    setSelectedSchedule(schedule);
+    setAttendanceSettings({
+      type: "QR Code",
+      autoClose: true,
+      duration: 15,
+      allowLate: true,
+      lateThreshold: 10,
+      notes: ""
+    });
+    setShowSettingsDialog(true);
+  };
+
+  // Function to start a new attendance session with advanced settings
+  const startAttendanceSession = async () => {
+    if (!selectedSchedule) return;
+
+    try {
+      setIsLoading(true);
+      const today = new Date().toISOString().split('T')[0];
+      
+      console.log("Creating new attendance session with settings:", {
+        scheduleId: selectedSchedule.id,
+        date: today,
+        type: attendanceSettings.type,
+        settings: attendanceSettings
+      });
+      
+      // Record client time before API call
+      const clientStartTime = new Date();
+      
+      const newSession = await createAttendanceSession(
+        selectedSchedule.id,
+        today,
+        attendanceSettings.type,
+        attendanceSettings
+      );
+      
+      console.log("New session created:", newSession);
+      
+      // If the server provides a creation time, use it to adjust our clock offset
+      if (newSession.createdAt) {
+        calculateServerTimeOffset(newSession.createdAt);
+      }
+      
+      // If the server doesn't provide a startTime, estimate it
+      if (!newSession.startTime && newSession.createdAt) {
+        console.log("Session doesn't have a start time, using createdAt time");
+        newSession.startTime = newSession.createdAt;
+      }
+      
+      // Calculate the actual remaining time based on server information
+      const actualRemainingTime = calculateRemainingTime(newSession);
+      
+      // Add the remaining time property for proper display
+      const sessionWithTime: ActiveSession = {
+        ...newSession,
+        // Use the calculated time if we have a valid startTime from server
+        // otherwise fallback to the full duration
+        remainingTime: newSession.startTime 
+          ? actualRemainingTime
+          : attendanceSettings.duration * 60 // Full duration in seconds
+      };
+      
+      console.log("Session with calculated time:", {
+        sessionId: sessionWithTime.id,
+        startTime: sessionWithTime.startTime,
+        remainingTime: sessionWithTime.remainingTime,
+        duration: sessionWithTime.duration
+      });
+      
+      setActiveSessions(prev => [...prev, sessionWithTime]);
+      setShowSettingsDialog(false);
+      setActiveTab("active");
+      toast.success("Sesi presensi berhasil dimulai");
+    } catch (error) {
+      console.error("Error starting attendance session:", error);
+      toast.error("Gagal memulai sesi presensi");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to end an active attendance session
+  const endAttendanceSession = async (sessionId: number) => {
+    try {
+      setIsLoading(true);
+      await closeAttendanceSession(sessionId);
+      
+      // Get updated session details
+      const updatedSession = await getAttendanceSessionDetails(sessionId);
+      
+      // Move from active to past sessions
+      setPastSessions([updatedSession, ...pastSessions]);
+      setActiveSessions(activeSessions.filter(s => s.id !== sessionId));
+      
+      toast.success("Sesi presensi berhasil diakhiri");
+    } catch (error) {
+      console.error("Error ending attendance session:", error);
+      toast.error("Gagal mengakhiri sesi presensi");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Format remaining time
+  const formatRemainingTime = (seconds: number) => {
+    // Ensure seconds is a valid number
+    if (typeof seconds !== 'number' || isNaN(seconds)) {
+      console.warn("Invalid remaining time:", seconds);
+      return "00:00";
+    }
+    
+    // Ensure positive value
+    const positiveSeconds = Math.max(0, seconds);
+    
+    // Calculate minutes and seconds
+    const minutes = Math.floor(positiveSeconds / 60);
+    const remainingSeconds = Math.floor(positiveSeconds % 60);
+    
+    // Format with leading zeros
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -435,7 +647,7 @@ export default function AssistantAttendancePage() {
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                 <div>
                   <h3 className="text-xl font-semibold text-black">Kelola Presensi</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Pantau kehadiran mahasiswa di kelas yang Anda bantu</p>
+                  <p className="text-sm text-muted-foreground mt-1">Kelola kehadiran mahasiswa dengan berbagai metode autentikasi</p>
                 </div>
                 <div>
                   <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -473,23 +685,21 @@ export default function AssistantAttendancePage() {
                         <Input
                           placeholder="Cari jadwal..."
                           className="pl-10"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
                         />
                       </div>
                       <div className="flex gap-3 items-center">
-                        <Select value={dayFilter} onValueChange={setDayFilter}>
+                        <Select defaultValue="all">
                           <SelectTrigger className="w-[240px] h-10">
                             <Filter className="h-4 w-4 mr-2" />
                             <SelectValue placeholder="Filter Hari" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">Semua Hari</SelectItem>
-                            <SelectItem value="senin">Senin</SelectItem>
-                            <SelectItem value="selasa">Selasa</SelectItem>
-                            <SelectItem value="rabu">Rabu</SelectItem>
-                            <SelectItem value="kamis">Kamis</SelectItem>
-                            <SelectItem value="jumat">Jumat</SelectItem>
+                            <SelectItem value="mon">Senin</SelectItem>
+                            <SelectItem value="tue">Selasa</SelectItem>
+                            <SelectItem value="wed">Rabu</SelectItem>
+                            <SelectItem value="thu">Kamis</SelectItem>
+                            <SelectItem value="fri">Jumat</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -507,37 +717,37 @@ export default function AssistantAttendancePage() {
                               <TableHead className="w-[50px] font-bold text-black">No</TableHead>
                               <TableHead className="w-[80px] font-bold text-black">Kode MK</TableHead>
                               <TableHead className="font-bold text-black">Mata Kuliah</TableHead>
-                              <TableHead className="font-bold text-black">Dosen</TableHead>
                               <TableHead className="font-bold text-black">Hari</TableHead>
                               <TableHead className="font-bold text-black">Jam</TableHead>
                               <TableHead className="font-bold text-black">Ruangan</TableHead>
-                              <TableHead className="w-[100px] text-right font-bold text-black">Aksi</TableHead>
+                              <TableHead className="font-bold text-black">Mahasiswa</TableHead>
+                              <TableHead className="w-[120px] text-right font-bold text-black">Aksi</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {filteredSchedules.map((schedule, index) => (
+                            {schedules.map((schedule, index) => (
                               <TableRow key={schedule.id}>
                                 <TableCell>{index + 1}</TableCell>
                                 <TableCell className="font-medium">{schedule.courseCode}</TableCell>
                                 <TableCell>{schedule.courseName}</TableCell>
-                                <TableCell>{schedule.lecturerName}</TableCell>
                                 <TableCell>{schedule.day}</TableCell>
                                 <TableCell>{schedule.startTime} - {schedule.endTime}</TableCell>
                                 <TableCell>{schedule.room}</TableCell>
+                                <TableCell>{schedule.totalStudents}</TableCell>
                                 <TableCell className="text-right">
                                   <Button 
                                     variant="default" 
                                     size="sm"
                                     className="bg-[#0687C9] hover:bg-[#0572aa]"
-                                    onClick={() => viewAttendanceDetail(schedule.id)}
+                                    onClick={() => openSettingsDialog(schedule)}
                                   >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    Detail
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Mulai Presensi
                                   </Button>
                                 </TableCell>
                               </TableRow>
                             ))}
-                            {filteredSchedules.length === 0 && (
+                            {schedules.length === 0 && (
                               <TableRow>
                                 <TableCell colSpan={8} className="h-32 text-center">
                                   <div className="flex flex-col items-center justify-center text-muted-foreground">
@@ -568,13 +778,13 @@ export default function AssistantAttendancePage() {
                             <div className="flex flex-col items-center gap-2">
                               <Clock className="h-10 w-10 text-gray-300" />
                               <p>Tidak ada sesi presensi aktif</p>
-                              <p className="text-sm">Dosen akan memulai sesi presensi saat perkuliahan berlangsung</p>
+                              <p className="text-sm">Mulai sesi baru dari tab Jadwal</p>
                             </div>
                           </div>
                         ) : (
                           <div>
-                            {activeSessions.map((session) => (
-                              <Card key={session.id} className="border border-gray-200 overflow-hidden mb-4">
+                            {activeSessions.map((session, index) => (
+                              <Card key={`session-${session.id}-${index}`} className="border border-gray-200 overflow-hidden mb-4">
                                 <div className="bg-[#0687C9] h-1.5"></div>
                                 <CardContent className="p-4 sm:p-6">
                                   <div className="flex flex-col lg:flex-row lg:justify-between gap-4">
@@ -589,60 +799,74 @@ export default function AssistantAttendancePage() {
                                             <span>Aktif</span>
                                           </div>
                                         </Badge>
-                                        <Badge 
-                                          variant="outline" 
-                                          className={
-                                            session.type === "QR Code" 
-                                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                                              : session.type === "Face Recognition"
-                                              ? "bg-purple-50 text-purple-700 border-purple-200" 
-                                              : "bg-orange-50 text-orange-700 border-orange-200"
-                                          }
-                                        >
-                                          {session.type === "QR Code" && <QrCode className="h-3.5 w-3.5 mr-1" />}
+                                        <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
                                           {session.type}
                                         </Badge>
                                       </div>
                                       
                                       <div>
-                                        <h3 className="text-lg font-semibold">{session.courseCode}: {session.courseName}</h3>
-                                        <p className="text-sm text-muted-foreground">{session.room}</p>
+                                        <h3 className="text-lg font-semibold">
+                                          {session.courseCode}: {session.courseName}
+                                        </h3>
+                                        <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                                          <div className="flex items-center">
+                                            <Clock className="h-4 w-4 mr-2" />
+                                            <span>{session.scheduleStartTime} - {session.scheduleEndTime}</span>
+                                          </div>
+                                          <div className="flex items-center">
+                                            <QrCode className="h-4 w-4 mr-2" />
+                                            <span>Tipe: {session.type}</span>
+                                          </div>
+                                        </div>
                                       </div>
                                       
-                                      <div className="grid grid-cols-2 gap-3 sm:flex sm:gap-4">
-                                        <div className="flex items-center gap-1.5">
-                                          <Calendar className="h-4 w-4 text-[#0687C9]" />
-                                          <span className="text-sm">{formatDate(session.date)}</span>
+                                      <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+                                        <div className="w-full sm:w-48">
+                                          <div className="text-sm mb-1">
+                                            Kehadiran: <span className="font-medium">{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                            <div 
+                                              className="bg-[#0687C9] h-2.5 rounded-full" 
+                                              style={{ width: `${((session.attendedCount + session.lateCount) / session.totalStudents) * 100}%` }}
+                                            ></div>
+                                          </div>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <Clock className="h-4 w-4 text-[#0687C9]" />
-                                          <span className="text-sm">{session.scheduleStartTime} - {session.scheduleEndTime}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <Timer className="h-4 w-4 text-[#0687C9]" />
-                                          <span className="text-sm">{session.duration} menit</span>
+                                        
+                                        {/* Always show the timer for active sessions */}
+                                        <div className="flex items-center gap-2 bg-[#E6F3FB] px-3 py-2 rounded-md">
+                                          <TimerIcon className="h-4 w-4 text-[#0687C9]" />
+                                          <div>
+                                            <span className="text-sm text-muted-foreground">Sisa waktu:</span>
+                                            <span className="ml-1 font-semibold text-[#0687C9]">
+                                              {session.status === 'active' 
+                                                ? formatRemainingTime(session.remainingTime || 0)
+                                                : `${session.duration}:00`}
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
                                     
-                                    <div className="flex flex-col gap-3">
-                                      <div className="flex items-center gap-1.5 text-sm">
-                                        <Users className="h-4 w-4 text-[#0687C9]" />
-                                        <span>Kehadiran: </span>
-                                        <span className="font-medium">{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
-                                        <span className="text-muted-foreground">({calculateAttendanceRate(session).toFixed(1)}%)</span>
-                                      </div>
-                                      
-                                      <div className="flex gap-2 mt-auto">
+                                    <div className="flex flex-row sm:flex-col gap-2 sm:w-44">
+                                      {(session.type === "QR Code" || session.type === "Keduanya") && (
                                         <Button 
-                                          variant="outline" 
-                                          className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
-                                          onClick={() => viewAttendanceDetail(session.courseScheduleId)}
+                                          variant="default" 
+                                          className="flex-1 bg-[#0687C9] hover:bg-[#0572aa]"
+                                          onClick={() => window.open(getQRCodeUrl(session.id), '_blank')}
                                         >
-                                          <Eye className="h-4 w-4 mr-2" />
-                                          Lihat Detail
+                                          <QrCode className="h-4 w-4 mr-2" />
+                                          Lihat QR
                                         </Button>
-                                      </div>
+                                      )}
+                                      <Button 
+                                        variant="outline" 
+                                        className="flex-1 border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
+                                        onClick={() => endAttendanceSession(session.id)}
+                                      >
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        Akhiri Sesi
+                                      </Button>
                                     </div>
                                   </div>
                                 </CardContent>
@@ -654,18 +878,31 @@ export default function AssistantAttendancePage() {
                     )}
                   </div>
                 )}
-                
+
                 {activeTab === "past" && (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row gap-4 justify-between mb-4">
-                      <div className="relative w-full sm:w-[40%]">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Cari riwayat presensi..."
-                          className="pl-10"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <div className="relative w-full md:w-64">
+                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Cari riwayat..."
+                            className="pl-8"
+                          />
+                        </div>
+                        <Select defaultValue="all">
+                          <SelectTrigger className="w-full md:w-[180px]">
+                            <Filter className="h-4 w-4 mr-2" />
+                            <SelectValue placeholder="Filter" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Semua Mata Kuliah</SelectItem>
+                            {/* Generate course filter dynamically */}
+                            {Array.from(new Set(pastSessions.map(s => s.courseCode))).map((code, index) => (
+                              <SelectItem key={`course-code-${code}-${index}`} value={code.toLowerCase()}>{code}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     
@@ -689,48 +926,42 @@ export default function AssistantAttendancePage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {pastSessions
-                              .filter(session => 
-                                !searchTerm || 
-                                formatDate(session.date).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                session.courseCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                session.courseName.toLowerCase().includes(searchTerm.toLowerCase())
-                              )
-                              .map((session, index) => (
-                              <TableRow key={session.id}>
+                            {pastSessions.map((session, index) => (
+                              <TableRow key={`past-session-${session.id}-${index}`}>
                                 <TableCell>{index + 1}</TableCell>
-                                <TableCell>{formatDate(session.date)}</TableCell>
+                                <TableCell>{session.date}</TableCell>
                                 <TableCell className="font-medium">{session.courseCode}</TableCell>
                                 <TableCell>{session.courseName}</TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className={
                                     session.type === "QR Code" 
-                                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                                      : session.type === "Face Recognition"
-                                      ? "bg-purple-50 text-purple-700 border-purple-200" 
-                                      : "bg-orange-50 text-orange-700 border-orange-200"
+                                      ? "bg-blue-50 text-[#0687C9] border-[#0687C9]/20" 
+                                      : "bg-purple-50 text-purple-700 border-purple-200"
                                   }>
                                     {session.type}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>{session.duration} menit</TableCell>
                                 <TableCell>
-                                  <div className="flex items-center gap-1.5">
-                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                  <div className="flex items-center">
                                     <span>{session.attendedCount + session.lateCount}/{session.totalStudents}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      ({calculateAttendanceRate(session).toFixed(1)}%)
-                                    </span>
+                                    <div className="w-20 bg-gray-200 rounded-full h-2 ml-2">
+                                      <div 
+                                        className="bg-[#0687C9] h-2 rounded-full" 
+                                        style={{ width: `${((session.attendedCount + session.lateCount) / session.totalStudents) * 100}%` }}
+                                      ></div>
+                                    </div>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Button 
-                                    variant="ghost" 
+                                    variant="outline" 
                                     size="sm"
-                                    className="text-[#0687C9] hover:bg-[#E6F3FB] hover:text-[#0687C9]"
-                                    onClick={() => viewAttendanceDetail(session.courseScheduleId)}
+                                    className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]"
+                                    onClick={() => window.location.href = `/dashboard/lecturer/attendance/detail/${session.id}`}
                                   >
-                                    <ExternalLink className="h-4 w-4" />
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Detail
                                   </Button>
                                 </TableCell>
                               </TableRow>
@@ -740,8 +971,8 @@ export default function AssistantAttendancePage() {
                                 <TableCell colSpan={8} className="h-32 text-center">
                                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                                     <FileText className="h-10 w-10 text-gray-300 mb-2" />
-                                    <p>Tidak ada riwayat presensi</p>
-                                    <p className="text-sm">Riwayat presensi akan muncul di sini setelah sesi presensi selesai</p>
+                                    <p>Belum ada riwayat presensi</p>
+                                    <p className="text-sm">Riwayat presensi akan muncul di sini setelah sesi selesai</p>
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -755,6 +986,140 @@ export default function AssistantAttendancePage() {
               </div>
             </div>
           </div>
+          
+          {/* Attendance Settings Dialog */}
+          <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-semibold text-black">Pengaturan Sesi Presensi</DialogTitle>
+                <DialogDescription>
+                  Atur parameter untuk sesi presensi yang akan dimulai
+                </DialogDescription>
+                {selectedSchedule && (
+                  <div className="mt-3 text-left">
+                    <div className="font-medium">{selectedSchedule.courseCode}: {selectedSchedule.courseName}</div>
+                    <div className="flex items-center text-sm text-muted-foreground mt-1">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      <span>{selectedSchedule.day}, {selectedSchedule.startTime} - {selectedSchedule.endTime}</span>
+                    </div>
+                  </div>
+                )}
+              </DialogHeader>
+              
+              <div className="grid gap-5 py-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <Label htmlFor="attendance-type" className="font-medium">Tipe Presensi</Label>
+                  <Select 
+                    value={attendanceSettings.type} 
+                    onValueChange={(value: any) => setAttendanceSettings({...attendanceSettings, type: value})}
+                  >
+                    <SelectTrigger id="attendance-type" className="bg-white">
+                      <SelectValue placeholder="Pilih tipe presensi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="QR Code">
+                        <div className="flex items-center">
+                          <QrCode className="h-4 w-4 mr-2" />
+                          QR Code
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Face Recognition">
+                        <div className="flex items-center">
+                          <ScanFace className="h-4 w-4 mr-2" />
+                          Pengenalan Wajah
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Keduanya">
+                        <div className="flex items-center">
+                          <Sliders className="h-4 w-4 mr-2" />
+                          QR Code & Pengenalan Wajah
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-3">
+                    <Label className="font-medium">Durasi Presensi</Label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Durasi: {attendanceSettings.duration} menit</span>
+                    </div>
+                    <Slider 
+                      value={[attendanceSettings.duration]} 
+                      min={5} 
+                      max={30} 
+                      step={5}
+                      onValueChange={(value: number[]) => setAttendanceSettings({...attendanceSettings, duration: value[0]})}
+                    />
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="auto-close" className="font-medium">Tutup Otomatis</Label>
+                      <Switch 
+                        id="auto-close" 
+                        checked={attendanceSettings.autoClose}
+                        onCheckedChange={(checked) => setAttendanceSettings({...attendanceSettings, autoClose: checked})}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Sesi akan otomatis ditutup setelah durasi berakhir
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="allow-late" className="font-medium">Izinkan Terlambat</Label>
+                      <Switch 
+                        id="allow-late" 
+                        checked={attendanceSettings.allowLate}
+                        onCheckedChange={(checked) => setAttendanceSettings({...attendanceSettings, allowLate: checked})}
+                      />
+                    </div>
+                    {attendanceSettings.allowLate && (
+                      <div className="mt-3">
+                        <Label className="text-sm">Batas Keterlambatan</Label>
+                        <div className="flex items-center mt-2">
+                          <Slider 
+                            value={[attendanceSettings.lateThreshold]} 
+                            min={5} 
+                            max={20} 
+                            step={5}
+                            onValueChange={(value: number[]) => setAttendanceSettings({...attendanceSettings, lateThreshold: value[0]})}
+                            className="flex-1 mr-4"
+                          />
+                          <span className="text-sm font-medium">{attendanceSettings.lateThreshold} menit</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label htmlFor="notes" className="font-medium">Catatan</Label>
+                    <Input 
+                      id="notes" 
+                      placeholder="Tambahkan catatan (opsional)" 
+                      value={attendanceSettings.notes}
+                      onChange={(e) => setAttendanceSettings({...attendanceSettings, notes: e.target.value})}
+                      className="bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <DialogFooter className="gap-2">
+                <Button variant="outline" className="border-[#0687C9] text-[#0687C9] hover:bg-[#E6F3FB]" onClick={() => setShowSettingsDialog(false)}>
+                  Batal
+                </Button>
+                <Button className="bg-[#0687C9] hover:bg-[#0572aa]" onClick={startAttendanceSession}>
+                  Mulai Sesi
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     </div>

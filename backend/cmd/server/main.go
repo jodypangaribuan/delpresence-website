@@ -245,11 +245,18 @@ func main() {
 			// Get academic years (needed for filtering courses and schedules)
 			assistantRoutes.GET("/academic-years", academicYearHandler.GetAllAcademicYears)
 
-			// Attendance management routes for assistants
-			assistantRoutes.GET("/attendance/sessions/active", attendanceHandler.GetActiveAttendanceSessions)
-			assistantRoutes.GET("/attendance/sessions", attendanceHandler.GetAttendanceSessions)
-			assistantRoutes.GET("/attendance/sessions/:id", attendanceHandler.GetAttendanceSessionDetails)
-			assistantRoutes.GET("/attendance/sessions/:id/students", attendanceHandler.GetStudentAttendances)
+			// Register teaching assistant attendance handler
+			teachingAssistantAttendanceHandler := handlers.NewTeachingAssistantAttendanceHandler()
+
+			// Attendance management routes for assistants - full capabilities like lecturers
+			assistantRoutes.POST("/attendance/sessions", teachingAssistantAttendanceHandler.CreateAttendanceSession)
+			assistantRoutes.GET("/attendance/sessions/active", teachingAssistantAttendanceHandler.GetActiveAttendanceSessions)
+			assistantRoutes.GET("/attendance/sessions", teachingAssistantAttendanceHandler.GetAttendanceSessions)
+			assistantRoutes.GET("/attendance/sessions/:id", teachingAssistantAttendanceHandler.GetAttendanceSessionDetails)
+			assistantRoutes.PUT("/attendance/sessions/:id/close", teachingAssistantAttendanceHandler.CloseAttendanceSession)
+			assistantRoutes.GET("/attendance/sessions/:id/students", teachingAssistantAttendanceHandler.GetStudentAttendances)
+			assistantRoutes.PUT("/attendance/sessions/:id/students/:studentId", teachingAssistantAttendanceHandler.MarkStudentAttendance)
+			assistantRoutes.GET("/attendance/qrcode/:id", teachingAssistantAttendanceHandler.GetQRCode)
 		}
 
 		// Student routes

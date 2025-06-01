@@ -229,7 +229,6 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
       description: Text('Gagal menginisialisasi kamera. Coba lagi nanti.'),
       autoCloseDuration: const Duration(seconds: 3),
       primaryColor: AppColors.error,
-      onTap: (_) => Navigator.of(context).pop(),
     );
     
     // Go back to previous screen after a short delay

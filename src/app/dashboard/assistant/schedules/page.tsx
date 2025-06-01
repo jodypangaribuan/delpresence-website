@@ -14,7 +14,8 @@ import {
   BookOpen, 
   FileCheck, 
   MapPin,
-  ExternalLink
+  ExternalLink,
+  Plus
 } from "lucide-react";
 import { SelectValue, SelectTrigger, SelectContent, SelectItem, Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ import { api } from "@/utils/api";
 import { toast } from "sonner";
 import axios from "axios";
 import { API_URL } from "@/utils/env";
+import { useRouter } from "next/navigation";
 
 interface Schedule {
   id: number;
@@ -43,7 +45,7 @@ interface Schedule {
   capacity: number;
   enrolled: number;
   semester: string;
-  status?: "upcoming" | "today" | "active" | "completed";
+  room?: { name: string; building?: { name: string } };
 }
 
 interface AcademicYear {
@@ -52,6 +54,7 @@ interface AcademicYear {
 }
 
 export default function AssistantSchedulePage() {
+  const router = useRouter();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -147,41 +150,15 @@ export default function AssistantSchedulePage() {
 
   // Process schedules to add status
   const processScheduleStatus = (schedules: Schedule[]): Schedule[] => {
-    const today = new Date();
-    const dayNames = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
-    const currentDay = dayNames[today.getDay()].toLowerCase();
-    
     return schedules.map(schedule => {
       const scheduleCopy = { ...schedule };
-      const day = schedule.day.toLowerCase();
       
-      if (day === currentDay) {
-        // Check if current time is within class time
-        const now = today.getHours() * 60 + today.getMinutes();
-        const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
-        const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
-        const startTime = startHour * 60 + startMinute;
-        const endTime = endHour * 60 + endMinute;
-        
-        if (now >= startTime && now <= endTime) {
-          scheduleCopy.status = 'active';
-        } else if (now < startTime) {
-          scheduleCopy.status = 'today';
-        } else {
-          scheduleCopy.status = 'completed';
-        }
-      } else {
-        // Compare day of week
-        const dayIndex = dayNames.indexOf(day);
-        const currentDayIndex = today.getDay();
-        
-        if ((dayIndex > currentDayIndex) || 
-            (dayIndex < currentDayIndex && dayIndex > 0)) { // Next week
-          scheduleCopy.status = 'upcoming';
-        } else {
-          scheduleCopy.status = 'completed';
-        }
-      }
+      // Ensure room_name and building_name are not undefined
+      if (!scheduleCopy.room_name) scheduleCopy.room_name = scheduleCopy.room?.name || "Ruangan tidak diketahui";
+      if (!scheduleCopy.building_name) scheduleCopy.building_name = scheduleCopy.room?.building?.name || "Gedung tidak diketahui";
+      
+      // Ensure student_group_name is not undefined
+      if (!scheduleCopy.student_group_name) scheduleCopy.student_group_name = "Kelas tidak tersedia";
       
       return scheduleCopy;
     });
@@ -197,7 +174,8 @@ export default function AssistantSchedulePage() {
         (schedule) =>
           schedule.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           schedule.course_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          schedule.lecturer_name.toLowerCase().includes(searchTerm.toLowerCase())
+          schedule.lecturer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (schedule.student_group_name && schedule.student_group_name.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
     
@@ -213,6 +191,11 @@ export default function AssistantSchedulePage() {
   const viewScheduleDetails = (schedule: Schedule) => {
     setSelectedSchedule(schedule);
     setShowDetails(true);
+  };
+
+  // Function to navigate to attendance page
+  const goToAttendance = (scheduleId: number) => {
+    router.push(`/dashboard/assistant/attendance/${scheduleId}`);
   };
 
   // Format time for display
@@ -235,7 +218,7 @@ export default function AssistantSchedulePage() {
             <div className="relative w-full sm:w-[40%]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Cari mata kuliah..."
+                placeholder="Cari mata kuliah, kode, dosen, atau kelas..."
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -289,8 +272,8 @@ export default function AssistantSchedulePage() {
                     <TableHead className="font-bold text-black">Hari</TableHead>
                     <TableHead className="font-bold text-black">Jam</TableHead>
                     <TableHead className="font-bold text-black">Ruangan</TableHead>
-                    <TableHead className="font-bold text-black">Status</TableHead>
-                    <TableHead className="w-[80px] text-right font-bold text-black">Aksi</TableHead>
+                    <TableHead className="font-bold text-black">Kelas</TableHead>
+                    <TableHead className="w-[120px] text-right font-bold text-black">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -303,38 +286,17 @@ export default function AssistantSchedulePage() {
                         <TableCell>{schedule.lecturer_name}</TableCell>
                         <TableCell>{schedule.day}</TableCell>
                         <TableCell>{formatTimeRange(schedule.start_time, schedule.end_time)}</TableCell>
-                        <TableCell>{`${schedule.room_name}, ${schedule.building_name}`}</TableCell>
-                        <TableCell>
-                          {schedule.status === "upcoming" && (
-                            <Badge variant="outline" className="bg-blue-50 text-[#0687C9] border-[#0687C9]/20">
-                              Akan Datang
-                            </Badge>
-                          )}
-                          {schedule.status === "today" && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              Hari Ini
-                            </Badge>
-                          )}
-                          {schedule.status === "active" && (
-                            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                              Sedang Berlangsung
-                            </Badge>
-                          )}
-                          {schedule.status === "completed" && (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                              Selesai
-                            </Badge>
-                          )}
-                        </TableCell>
+                        <TableCell>{schedule.room_name} ({schedule.building_name})</TableCell>
+                        <TableCell>{schedule.student_group_name}</TableCell>
                         <TableCell className="text-right">
                           <Button 
-                            variant="outline" 
+                            variant="default" 
                             size="sm"
-                            className="text-[#0687C9] hover:text-[#0687C9] hover:bg-[#E6F3FB] border-[#0687C9]/20"
-                            onClick={() => viewScheduleDetails(schedule)}
+                            className="bg-[#0687C9] hover:bg-[#0572aa] text-white"
+                            onClick={() => goToAttendance(schedule.id)}
                           >
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Detail
+                            <Plus className="h-4 w-4 mr-2" />
+                            Mulai Presensi
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -428,12 +390,16 @@ export default function AssistantSchedulePage() {
               </div>
               
               <div className="pt-2">
-                <a href={`/dashboard/assistant/attendance/${selectedSchedule.id}`}>
-                  <Button className="w-full">
-                    <FileCheck className="h-4 w-4 mr-2" />
-                    Kelola Presensi
-                  </Button>
-                </a>
+                <Button 
+                  className="w-full bg-[#0687C9] hover:bg-[#0572aa]"
+                  onClick={() => {
+                    setShowDetails(false);
+                    goToAttendance(selectedSchedule.id);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Mulai Presensi
+                </Button>
               </div>
             </div>
           )}

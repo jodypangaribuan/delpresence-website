@@ -10,10 +10,10 @@ import (
 type AttendanceType string
 
 const (
-	AttendanceTypeQRCode         AttendanceType = "QR_CODE"
+	AttendanceTypeQRCode          AttendanceType = "QR_CODE"
 	AttendanceTypeFaceRecognition AttendanceType = "FACE_RECOGNITION"
-	AttendanceTypeManual         AttendanceType = "MANUAL"
-	AttendanceTypeBoth           AttendanceType = "BOTH"
+	AttendanceTypeManual          AttendanceType = "MANUAL"
+	AttendanceTypeBoth            AttendanceType = "BOTH"
 )
 
 // AttendanceStatus represents the status of an attendance session
@@ -42,6 +42,7 @@ type AttendanceSession struct {
 	CourseSchedule   CourseSchedule   `json:"course_schedule,omitempty" gorm:"foreignKey:CourseScheduleID"`
 	LecturerID       uint             `json:"lecturer_id" gorm:"not null;index"`
 	Lecturer         Lecturer         `json:"lecturer,omitempty" gorm:"foreignKey:LecturerID"`
+	CreatorRole      string           `json:"creator_role" gorm:"type:varchar(20);default:'LECTURER'"` // 'LECTURER' or 'ASSISTANT'
 	Date             time.Time        `json:"date" gorm:"not null"`
 	StartTime        time.Time        `json:"start_time" gorm:"not null"`
 	EndTime          *time.Time       `json:"end_time"`
@@ -60,19 +61,19 @@ type AttendanceSession struct {
 
 // StudentAttendance represents a student's attendance record for a session
 type StudentAttendance struct {
-	ID                uint                   `json:"id" gorm:"primaryKey"`
-	AttendanceSessionID uint                 `json:"attendance_session_id" gorm:"not null;index"`
-	AttendanceSession AttendanceSession      `json:"attendance_session,omitempty" gorm:"foreignKey:AttendanceSessionID"`
-	StudentID         uint                   `json:"student_id" gorm:"not null;index"`
-	Student           Student                `json:"student,omitempty" gorm:"foreignKey:StudentID"`
-	Status            StudentAttendanceStatus `json:"status" gorm:"not null;type:varchar(20)"`
-	CheckInTime       *time.Time             `json:"check_in_time"`
-	Notes             string                 `json:"notes" gorm:"type:text"`
-	VerificationMethod string                `json:"verification_method" gorm:"type:varchar(50)"` // e.g., "QR_CODE", "FACE_RECOGNITION", "MANUAL"
-	VerifiedByID      *uint                  `json:"verified_by_id"` // ID of the lecturer or assistant who verified manually
-	CreatedAt         time.Time              `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt         time.Time              `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt         gorm.DeletedAt         `json:"deleted_at,omitempty" gorm:"index"`
+	ID                  uint                    `json:"id" gorm:"primaryKey"`
+	AttendanceSessionID uint                    `json:"attendance_session_id" gorm:"not null;index"`
+	AttendanceSession   AttendanceSession       `json:"attendance_session,omitempty" gorm:"foreignKey:AttendanceSessionID"`
+	StudentID           uint                    `json:"student_id" gorm:"not null;index"`
+	Student             Student                 `json:"student,omitempty" gorm:"foreignKey:StudentID"`
+	Status              StudentAttendanceStatus `json:"status" gorm:"not null;type:varchar(20)"`
+	CheckInTime         *time.Time              `json:"check_in_time"`
+	Notes               string                  `json:"notes" gorm:"type:text"`
+	VerificationMethod  string                  `json:"verification_method" gorm:"type:varchar(50)"` // e.g., "QR_CODE", "FACE_RECOGNITION", "MANUAL"
+	VerifiedByID        *uint                   `json:"verified_by_id"`                              // ID of the lecturer or assistant who verified manually
+	CreatedAt           time.Time               `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt           time.Time               `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt           gorm.DeletedAt          `json:"deleted_at,omitempty" gorm:"index"`
 }
 
 // TableName returns the table name for the AttendanceSession model
@@ -87,43 +88,44 @@ func (StudentAttendance) TableName() string {
 
 // AttendanceSessionResponse represents a response for an attendance session
 type AttendanceSessionResponse struct {
-	ID               uint             `json:"id"`
-	CourseScheduleID uint             `json:"course_schedule_id"`
-	CourseCode       string           `json:"course_code"`
-	CourseName       string           `json:"course_name"`
-	Room             string           `json:"room"`
-	Date             string           `json:"date"`
-	StartTime        string           `json:"start_time"`
-	EndTime          string           `json:"end_time,omitempty"`
-	ScheduleStartTime string          `json:"schedule_start_time"`
-	ScheduleEndTime  string           `json:"schedule_end_time"`
-	Type             string           `json:"type"`
-	Status           string           `json:"status"`
-	AutoClose        bool             `json:"auto_close"`
-	Duration         int              `json:"duration"`
-	AllowLate        bool             `json:"allow_late"`
-	LateThreshold    int              `json:"late_threshold"`
-	Notes            string           `json:"notes"`
-	QRCodeURL        string           `json:"qr_code_url,omitempty"`
-	TotalStudents    int              `json:"total_students"`
-	AttendedCount    int              `json:"attended_count"`
-	LateCount        int              `json:"late_count"`
-	AbsentCount      int              `json:"absent_count"`
-	ExcusedCount     int              `json:"excused_count"`
-	CreatedAt        time.Time        `json:"created_at"`
+	ID                uint      `json:"id"`
+	CourseScheduleID  uint      `json:"course_schedule_id"`
+	CourseCode        string    `json:"course_code"`
+	CourseName        string    `json:"course_name"`
+	Room              string    `json:"room"`
+	Date              string    `json:"date"`
+	StartTime         string    `json:"start_time"`
+	EndTime           string    `json:"end_time,omitempty"`
+	ScheduleStartTime string    `json:"schedule_start_time"`
+	ScheduleEndTime   string    `json:"schedule_end_time"`
+	Type              string    `json:"type"`
+	Status            string    `json:"status"`
+	CreatorRole       string    `json:"creator_role"`
+	AutoClose         bool      `json:"auto_close"`
+	Duration          int       `json:"duration"`
+	AllowLate         bool      `json:"allow_late"`
+	LateThreshold     int       `json:"late_threshold"`
+	Notes             string    `json:"notes"`
+	QRCodeURL         string    `json:"qr_code_url,omitempty"`
+	TotalStudents     int       `json:"total_students"`
+	AttendedCount     int       `json:"attended_count"`
+	LateCount         int       `json:"late_count"`
+	AbsentCount       int       `json:"absent_count"`
+	ExcusedCount      int       `json:"excused_count"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 // StudentAttendanceResponse represents a response for a student's attendance
 type StudentAttendanceResponse struct {
-	ID                uint      `json:"id"`
-	AttendanceSessionID uint    `json:"attendance_session_id"`
-	StudentID         uint      `json:"student_id"`
-	StudentName       string    `json:"student_name"`
-	StudentNIM        string    `json:"student_nim"`
-	Status            string    `json:"status"`
-	CheckInTime       string    `json:"check_in_time,omitempty"`
-	Notes             string    `json:"notes"`
-	VerificationMethod string   `json:"verification_method"`
+	ID                  uint   `json:"id"`
+	AttendanceSessionID uint   `json:"attendance_session_id"`
+	StudentID           uint   `json:"student_id"`
+	StudentName         string `json:"student_name"`
+	StudentNIM          string `json:"student_nim"`
+	Status              string `json:"status"`
+	CheckInTime         string `json:"check_in_time,omitempty"`
+	Notes               string `json:"notes"`
+	VerificationMethod  string `json:"verification_method"`
 }
 
 // AttendanceStatistics represents statistics for attendance sessions
@@ -135,4 +137,4 @@ type AttendanceStatistics struct {
 	TotalAbsent       int `json:"total_absent"`
 	TotalExcused      int `json:"total_excused"`
 	AverageAttendance int `json:"average_attendance"` // Percentage
-} 
+}

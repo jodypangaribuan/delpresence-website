@@ -33,7 +33,7 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: ["localhost:3000"],
     },
-    disableOptimizedLoading: true,
+    disableOptimizedLoading: false,
   },
 };
 
