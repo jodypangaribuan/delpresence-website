@@ -1009,19 +1009,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: hasActiveSession ? () {
-                      // Check if attendance is already completed for this schedule
-                      SharedPreferences.getInstance().then((prefs) {
-                        bool isAlreadyCompleted = prefs.getBool('attendance_completed_$scheduleId') ?? false;
-                        
-                        if (isAlreadyCompleted) {
-                          // If attendance is already completed, just show a toast
-                          ToastUtils.showInfoToast(context, 'Anda sudah melakukan absen sebelumnya');
-                          return;
-                        }
-                        
-                        // If not completed, show the attendance options
-                        _showAbsensiOptionsBottomSheet(context, scheduleId!);
-                      });
+                      _showAbsensiOptionsBottomSheet(context, scheduleId!);
                     } : null,
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
