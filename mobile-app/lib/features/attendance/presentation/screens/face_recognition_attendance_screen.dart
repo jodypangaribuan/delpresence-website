@@ -1,9 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:toastification/toastification.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../features/face/data/services/face_service.dart';
+import '../../../../features/face/data/utils/face_recognition_util.dart';
+import '../../../../core/services/network_service.dart';
+import '../../../../core/config/api_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FaceRecognitionAttendanceScreen extends StatefulWidget {
   final String courseName;
@@ -19,17 +26,85 @@ class FaceRecognitionAttendanceScreen extends StatefulWidget {
 }
 
 class _FaceRecognitionAttendanceScreenState
-    extends State<FaceRecognitionAttendanceScreen> {
+    extends State<FaceRecognitionAttendanceScreen> with WidgetsBindingObserver {
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
   bool _isFaceDetected = false;
   bool _isProcessing = false;
+  FaceRecognitionUtil? _faceRecognitionUtil;
+  FaceService? _faceService;
+  int? _studentId;
   Timer? _faceDetectionTimer;
+  bool _hasShownError = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeDependencies();
     _requestCameraPermission();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle changes
+    if (state == AppLifecycleState.inactive) {
+      // App is inactive: pause camera
+      _cameraController?.pausePreview();
+    } else if (state == AppLifecycleState.resumed) {
+      // App is resumed: resume camera if it was initialized before
+      if (_cameraController != null && _cameraController!.value.isInitialized) {
+        _cameraController?.resumePreview();
+      }
+    }
+  }
+
+  Future<void> _initializeDependencies() async {
+    // Setup network service with API config
+    final networkService = NetworkService(
+      baseUrl: ApiConfig.instance.apiUrl,
+      defaultHeaders: ApiConfig.instance.defaultHeaders,
+      timeout: ApiConfig.instance.timeout,
+    );
+
+    // Initialize face service
+    _faceService = FaceService(networkService: networkService);
+    
+    // Initialize face recognition util
+    _faceRecognitionUtil = FaceRecognitionUtil();
+    try {
+      await _faceRecognitionUtil!.initModel();
+    } catch (e) {
+      debugPrint('Error initializing face recognition model: $e');
+    }
+
+    // Get student ID from shared preferences
+    await _getStudentId();
+  }
+
+  Future<void> _getStudentId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final studentIdStr = prefs.getString('student_id');
+      if (studentIdStr != null) {
+        setState(() {
+          _studentId = int.parse(studentIdStr);
+        });
+        debugPrint('Student ID loaded: $_studentId');
+      } else {
+        debugPrint('No student_id found in SharedPreferences');
+        // For demo, set a default student ID
+        setState(() {
+          _studentId = 12345; // Demo ID
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading student ID: $e');
+      // Set demo ID as fallback
+      setState(() {
+        _studentId = 12345; // Demo ID
+      });
+    }
   }
 
   Future<void> _requestCameraPermission() async {
@@ -95,12 +170,15 @@ class _FaceRecognitionAttendanceScreenState
 
   Future<void> _initializeCamera() async {
     try {
+      // Safely dispose of any previous camera controller
+      await _cameraController?.dispose();
+      
       final cameras = await availableCameras();
 
       if (!mounted) return;
 
       if (cameras.isEmpty) {
-        print('No cameras available');
+        debugPrint('No cameras available');
         return;
       }
 
@@ -110,60 +188,156 @@ class _FaceRecognitionAttendanceScreenState
         orElse: () => cameras.first,
       );
 
-      print('Using camera: ${frontCamera.name}, ${frontCamera.lensDirection}');
+      debugPrint('Using camera: ${frontCamera.name}, ${frontCamera.lensDirection}');
 
+      // Use a more compatible resolution preset
       _cameraController = CameraController(
         frontCamera,
         ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.yuv420,
+        imageFormatGroup: Platform.isAndroid 
+            ? ImageFormatGroup.jpeg  // Use JPEG for Android
+            : ImageFormatGroup.yuv420,
       );
 
-      await _cameraController!.initialize();
+      // Initialize with error handling
+      await _cameraController!.initialize().catchError((e) {
+        debugPrint('Camera initialization error: $e');
+        _showCameraError(e.toString());
+        return null;
+      });
 
       if (!mounted) return;
 
       setState(() {
-        _isCameraInitialized = true;
+        _isCameraInitialized = _cameraController!.value.isInitialized;
       });
 
-      // Start demo face detection
-      _startDemoFaceDetection();
+      if (_isCameraInitialized) {
+        _startFaceDetection();
+      }
     } catch (e) {
-      print('Error initializing camera: $e');
+      debugPrint('Error initializing camera: $e');
+      _showCameraError(e.toString());
+    }
+  }
+
+  void _showCameraError(String error) {
+    if (!mounted || _hasShownError) return;
+    
+    setState(() {
+      _hasShownError = true; 
+    });
+    
+    // Show error notification
+    toastification.show(
+      context: context,
+      type: ToastificationType.error,
+      style: ToastificationStyle.fillColored,
+      title: const Text('Error Kamera'),
+      description: Text('Gagal menginisialisasi kamera. Coba lagi nanti.'),
+      autoCloseDuration: const Duration(seconds: 3),
+      primaryColor: AppColors.error,
+    );
+    
+    // Go back to previous screen after a short delay
+    Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  void _startFaceDetection() {
+    // Use real face detection instead of simulation
+    _faceDetectionTimer = Timer.periodic(
+      const Duration(milliseconds: 300),
+      (_) async {
+        if (!_isCameraInitialized || _isProcessing || !mounted) return;
+        
+        try {
+          final file = await _cameraController!.takePicture();
+          
+          // Use ML Kit to detect faces
+          final faceRect = await _faceRecognitionUtil?.detectFace(file.path);
+          
+          if (faceRect != null && mounted) {
+            setState(() {
+              _isFaceDetected = true;
+              _isProcessing = true;
+            });
+            
+            // Cancel the timer
+            _faceDetectionTimer?.cancel();
+            
+            // Process for attendance
+            await _processAttendance(file);
+          } else {
+            // Delete the file if no face detected
+            await File(file.path).delete();
+          }
+        } catch (e) {
+          debugPrint('Error in face detection loop: $e');
+        }
+      },
+    );
+  }
+
+  Future<void> _processAttendance(XFile imageFile) async {
+    try {
+      if (_studentId == null) {
+        throw Exception('Student ID not available');
+      }
+      
+      // Extract embedding
+      final embedding = await _faceRecognitionUtil?.processImageForEmbedding(imageFile.path);
+      
+      if (embedding == null) {
+        throw Exception('Gagal mengekstrak fitur wajah');
+      }
+      
+      // Convert image to base64 for sending to server
+      final imageBytes = await File(imageFile.path).readAsBytes();
+      final base64Image = base64Encode(imageBytes);
+      
+      // Call the API with extracted embedding
+      if (_faceService == null) {
+        throw Exception('Face service not initialized');
+      }
+      
+      final result = await _faceService!.verifyFace(_studentId!, base64Image, embedding);
+      
+      // Clean up the image file
+      await File(imageFile.path).delete();
+      
+      if (result['success'] == true) {
+        _markAttendanceSuccess();
+      } else {
+        throw Exception(result['message'] ?? 'Verifikasi wajah gagal');
+      }
+    } catch (e) {
+      debugPrint('Error during attendance: $e');
+      if (mounted) {
+        // Navigate back to previous screen
+        Navigator.pop(context);
+        
         toastification.show(
           context: context,
           type: ToastificationType.error,
           style: ToastificationStyle.fillColored,
-          title: const Text('Error'),
-          description: Text('Camera initialization failed: $e'),
           autoCloseDuration: const Duration(seconds: 3),
+          title: const Text('Gagal'),
+          description: Text('Verifikasi wajah gagal: $e'),
+          showProgressBar: true,
+          primaryColor: AppColors.error,
+          closeOnClick: true,
+          dragToClose: true,
         );
       }
     }
   }
 
-  void _startDemoFaceDetection() {
-    // For demo purposes, simulate face detection after a short delay
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted && _isCameraInitialized) {
-        setState(() {
-          _isFaceDetected = true;
-          _isProcessing = true;
-        });
-
-        // Simulate processing and mark attendance
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            _markAttendance();
-          }
-        });
-      }
-    });
-  }
-
-  void _markAttendance() {
+  void _markAttendanceSuccess() {
     // Navigate back to previous screen with a slight delay to ensure UI updates
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
@@ -189,8 +363,10 @@ class _FaceRecognitionAttendanceScreenState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _faceDetectionTimer?.cancel();
     _cameraController?.dispose();
+    _faceRecognitionUtil?.dispose();
     super.dispose();
   }
 

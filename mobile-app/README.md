@@ -172,3 +172,39 @@ go run cmd/api/main.go
 <p align="center">
   Made with :> for Del Institute of Technology
 </p>
+
+## Setup Model MobileFaceNet
+
+Aplikasi ini menggunakan model MobileFaceNet untuk ekstraksi embedding wajah. Sebelum menjalankan aplikasi, ikuti langkah berikut:
+
+1. Unduh model MobileFaceNet dalam format TensorFlow Lite (.tflite) dari sumber terpercaya seperti:
+   - https://github.com/sirius-ai/MobileFaceNet_TF
+   - https://github.com/deepinsight/insightface
+
+2. Rename file model menjadi `mobilefacenet.tflite` dan letakkan di folder `assets/models/`
+
+3. Model MobileFaceNet yang dibutuhkan harus menghasilkan vektor embedding 128-dimensi dan memiliki ukuran input 112x112 piksel
+
+## Getting Started
+
+Aplikasi ini menggunakan Flutter versi terbaru. Pastikan Anda telah menginstal Flutter SDK dan mengikuti langkah setup di [dokumentasi Flutter](https://docs.flutter.dev/get-started/install).
+
+### Menjalankan Aplikasi
+
+1. Clone repository ini
+2. Jalankan `flutter pub get` untuk menginstal dependensi
+3. Pastikan model MobileFaceNet sudah ditempatkan di lokasi yang benar
+4. Jalankan aplikasi dengan `flutter run`
+
+## Fitur-fitur
+
+- **Pendaftaran Wajah**: Daftarkan wajah untuk digunakan dalam absensi
+- **Absensi dengan Wajah**: Lakukan absensi dengan mendeteksi dan memverifikasi wajah
+- **Absensi dengan QR Code**: Alternatif absensi menggunakan QR code
+- **Jadwal Perkuliahan**: Lihat jadwal perkuliahan
+
+## Catatan Teknis
+
+- Model MobileFaceNet digunakan untuk ekstraksi fitur wajah (embedding)
+- Google ML Kit digunakan untuk deteksi wajah
+- Aplikasi menggunakan backend Go untuk proses autentikasi dan penyimpanan data
