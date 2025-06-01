@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/constants/colors.dart';
 import '../../data/models/attendance_history_model.dart';
 import '../../../../core/utils/toast_utils.dart';
+import '../../data/services/attendance_service.dart';
 
 class TodayAttendanceHistoryPage extends StatefulWidget {
   const TodayAttendanceHistoryPage({super.key});
@@ -16,7 +17,11 @@ class TodayAttendanceHistoryPage extends StatefulWidget {
 class _TodayAttendanceHistoryPageState
     extends State<TodayAttendanceHistoryPage> {
   late List<AttendanceHistoryModel> _todayRecords;
+  final AttendanceService _attendanceService = AttendanceService();
   bool _initialized = false;
+  bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -26,6 +31,7 @@ class _TodayAttendanceHistoryPageState
       if (mounted) {
         setState(() {
           _initialized = true;
+          _loadTodayAttendance();
         });
       }
     }).catchError((error) {
@@ -33,61 +39,54 @@ class _TodayAttendanceHistoryPageState
       if (mounted) {
         setState(() {
           _initialized = true; // Still mark as initialized to avoid hanging
+          _loadTodayAttendance();
         });
       }
     });
-    _loadTodayAttendance();
+    
+    _todayRecords = [];
   }
 
-  void _loadTodayAttendance() {
-    // Load sample data and filter for today only
-    final allRecords = AttendanceHistoryModel.getSampleData();
-
-    // Filter records for today
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    // First get today's records
-    _todayRecords = allRecords.where((record) {
-      final recordDate = DateTime(
-        record.dateTime.year,
-        record.dateTime.month,
-        record.dateTime.day,
-      );
-      return recordDate.isAtSameMomentAs(today);
-    }).toList();
-
-    // If in development mode, ensure we have records with all status types for demo purposes
-    if (_todayRecords.isNotEmpty) {
-      // Make sure we have one of each status type
-      // This is for demonstration only, in production this would be removed
-      final existing = _todayRecords.map((r) => r.status).toSet();
-
-      // Create copies of existing records with different statuses as needed
-      if (!existing.contains('Terlambat')) {
-        final record = _todayRecords.first;
-        _todayRecords.add(
-          AttendanceHistoryModel(
-            id: '${record.id}_terlambat',
-            courseTitle: 'Aljabar Linier',
-            roomName: record.roomName,
-            dateTime: DateTime(today.year, today.month, today.day, 11, 47),
-            status: 'Terlambat',
-          ),
-        );
+  Future<void> _loadTodayAttendance() async {
+    if (!_initialized) return;
+    
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    
+    try {
+      final records = await _attendanceService.getTodayAttendanceHistory();
+      
+      if (mounted) {
+        setState(() {
+          _todayRecords = records;
+          _isLoading = false;
+        });
       }
-
-      if (!existing.contains('Alpa')) {
-        final record = _todayRecords.first;
-        _todayRecords.add(
-          AttendanceHistoryModel(
-            id: '${record.id}_alpa',
-            courseTitle: 'Sistem Komputasi Awan',
-            roomName: 'GD 515 - 156',
-            dateTime: DateTime(today.year, today.month, today.day, 8, 5),
-            status: 'Alpa',
-          ),
-        );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Gagal memuat data: ${e.toString()}';
+          _isLoading = false;
+          
+          // Use sample data as fallback in case of error
+          final allRecords = AttendanceHistoryModel.getSampleData();
+          
+          // Filter records for today
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          
+          _todayRecords = allRecords.where((record) {
+            final recordDate = DateTime(
+              record.dateTime.year,
+              record.dateTime.month,
+              record.dateTime.day,
+            );
+            return recordDate.isAtSameMomentAs(today);
+          }).toList();
+        });
       }
     }
   }
@@ -127,12 +126,80 @@ class _TodayAttendanceHistoryPageState
             color: Colors.grey[200],
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_outlined, color: Colors.black87),
+            onPressed: _loadTodayAttendance,
+          ),
+        ],
       ),
       body: Column(
         children: [
           _buildTodayDateHeader(),
           Expanded(
-            child: _buildTodayAttendanceList(),
+            child: _isLoading 
+                ? _buildLoadingIndicator() 
+                : _hasError 
+                    ? _buildErrorView() 
+                    : _buildTodayAttendanceList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text(
+            'Memuat data absensi...',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 80,
+            color: Colors.red[300],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Terjadi kesalahan',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.red[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _loadTodayAttendance,
+            child: const Text('Coba Lagi'),
           ),
         ],
       ),

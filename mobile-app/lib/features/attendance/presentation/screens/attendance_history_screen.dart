@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../data/models/attendance_history_model.dart';
+import '../../data/services/attendance_service.dart';
 
 class AttendanceHistoryScreen extends StatefulWidget {
   const AttendanceHistoryScreen({super.key});
@@ -16,31 +17,64 @@ class AttendanceHistoryScreen extends StatefulWidget {
 class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   late List<AttendanceHistoryModel> _attendanceRecords;
   late Map<String, List<AttendanceHistoryModel>> _groupedRecords;
+  final AttendanceService _attendanceService = AttendanceService();
+  bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
+    _attendanceRecords = [];
+    _groupedRecords = {};
     _loadAttendanceData();
   }
 
-  void _loadAttendanceData() {
-    // Load sample data for now, this would be replaced with an API call in production
-    _attendanceRecords = AttendanceHistoryModel.getSampleData();
-    _groupedRecords = AttendanceHistoryModel.groupByDate(_attendanceRecords);
+  Future<void> _loadAttendanceData() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
+    try {
+      final records = await _attendanceService.getAttendanceHistory();
+      
+      if (mounted) {
+        setState(() {
+          _attendanceRecords = records;
+          _groupedRecords = AttendanceHistoryModel.groupByDate(records);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Gagal memuat data: ${e.toString()}';
+          _isLoading = false;
+          
+          // Use sample data as fallback in case of error
+          _attendanceRecords = AttendanceHistoryModel.getSampleData();
+          _groupedRecords = AttendanceHistoryModel.groupByDate(_attendanceRecords);
+        });
+      }
+    }
   }
 
-  void _fetchAttendanceHistory() {
+  Future<void> _fetchAttendanceHistory() async {
     // Show loading indicator
     ToastUtils.showInfoToast(context, 'Mengambil data absensi terbaru...');
     
-    // This would be replaced with an actual API call in production
-    // For now, just reload the sample data with a slight delay to simulate network request
-    Future.delayed(const Duration(milliseconds: 800), () {
-      setState(() {
-        _loadAttendanceData();
-      });
-      ToastUtils.showSuccessToast(context, 'Data absensi berhasil diperbarui');
-    });
+    try {
+      await _loadAttendanceData();
+      if (mounted) {
+        ToastUtils.showSuccessToast(context, 'Data absensi berhasil diperbarui');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastUtils.showErrorToast(context, 'Gagal memperbarui data: ${e.toString()}');
+      }
+    }
   }
 
   @override
@@ -79,7 +113,69 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
           ),
         ),
       ),
-      body: _buildAttendanceList(),
+      body: _isLoading 
+          ? _buildLoadingIndicator() 
+          : _hasError 
+              ? _buildErrorView() 
+              : _buildAttendanceList(),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text(
+            'Memuat data absensi...',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 80,
+            color: Colors.red[300],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Terjadi kesalahan',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.red[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _loadAttendanceData,
+            child: const Text('Coba Lagi'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -108,21 +204,24 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 24),
-      itemCount: _groupedRecords.keys.length,
-      itemBuilder: (context, index) {
-        final dateKey = _groupedRecords.keys.elementAt(index);
-        final records = _groupedRecords[dateKey]!;
+    return RefreshIndicator(
+      onRefresh: _loadAttendanceData,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 24),
+        itemCount: _groupedRecords.keys.length,
+        itemBuilder: (context, index) {
+          final dateKey = _groupedRecords.keys.elementAt(index);
+          final records = _groupedRecords[dateKey]!;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDateHeader(dateKey),
-            ...records.map((record) => _buildAttendanceItem(record)),
-          ],
-        );
-      },
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDateHeader(dateKey),
+              ...records.map((record) => _buildAttendanceItem(record)),
+            ],
+          );
+        },
+      ),
     );
   }
 

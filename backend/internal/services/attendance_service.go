@@ -824,46 +824,123 @@ func (s *AttendanceService) MarkStudentAttendanceByExternalID(sessionID uint, ex
 
 // GetStudentAttendancesByExternalID gets attendance records for a student by external user ID
 func (s *AttendanceService) GetStudentAttendancesByExternalID(externalUserID uint) ([]models.StudentAttendanceResponse, error) {
-	// First find the student from their external user ID
-	var student *models.Student
-	result := s.db.Where("user_id = ?", externalUserID).First(&student)
-	if result.Error != nil {
-		return nil, errors.New("student record not found")
+	// Find the student ID associated with the user ID
+	var studentID uint
+	err := s.db.Raw(`
+		SELECT id FROM students WHERE user_id = ?
+	`, externalUserID).Scan(&studentID).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find student with user ID %d: %v", externalUserID, err)
 	}
 
-	// Now get all attendances for this student
+	if studentID == 0 {
+		return nil, fmt.Errorf("no student found with user ID %d", externalUserID)
+	}
+
+	// Get all student attendances
 	var attendances []models.StudentAttendance
-	err := s.db.Preload("AttendanceSession").Preload("AttendanceSession.CourseSchedule").
-		Where("student_id = ?", student.ID).
+	err = s.db.Preload("AttendanceSession").
+		Preload("AttendanceSession.CourseSchedule").
+		Preload("AttendanceSession.CourseSchedule.Course").
+		Preload("AttendanceSession.CourseSchedule.Room").
+		Preload("Student").
+		Where("student_id = ?", studentID).
 		Find(&attendances).Error
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch attendances: %v", err)
 	}
 
-	// Transform to response objects
 	var responses []models.StudentAttendanceResponse
 	for _, attendance := range attendances {
 		checkInTime := ""
 		if attendance.CheckInTime != nil {
-			// Convert to Indonesia time first
-			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
-			checkInTime = indonesiaTime.Format("15:04:05")
+			checkInTime = attendance.CheckInTime.Format("15:04")
 		}
-
-		// Add external user ID to response
-		studentName := student.FullName
 
 		responses = append(responses, models.StudentAttendanceResponse{
 			ID:                  attendance.ID,
 			AttendanceSessionID: attendance.AttendanceSessionID,
-			StudentID:           uint(student.UserID), // Convert int to uint
-			StudentName:         studentName,
-			StudentNIM:          student.NIM,
+			StudentID:           attendance.StudentID,
+			StudentName:         attendance.Student.FullName,
+			StudentNIM:          attendance.Student.NIM,
 			Status:              string(attendance.Status),
 			CheckInTime:         checkInTime,
 			Notes:               attendance.Notes,
 			VerificationMethod:  attendance.VerificationMethod,
+		})
+	}
+
+	return responses, nil
+}
+
+// GetStudentAttendanceHistory gets detailed attendance history for a student with course info
+func (s *AttendanceService) GetStudentAttendanceHistory(externalUserID uint) ([]models.StudentAttendanceHistoryResponse, error) {
+	// Find the student ID associated with the user ID
+	var studentID uint
+	err := s.db.Raw(`
+		SELECT id FROM students WHERE user_id = ?
+	`, externalUserID).Scan(&studentID).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find student with user ID %d: %v", externalUserID, err)
+	}
+
+	if studentID == 0 {
+		return nil, fmt.Errorf("no student found with user ID %d", externalUserID)
+	}
+
+	// Get all student attendances with necessary relations
+	var attendances []models.StudentAttendance
+	err = s.db.Preload("AttendanceSession").
+		Preload("AttendanceSession.CourseSchedule").
+		Preload("AttendanceSession.CourseSchedule.Course").
+		Preload("AttendanceSession.CourseSchedule.Room").
+		Preload("AttendanceSession.CourseSchedule.Room.Building").
+		Preload("Student").
+		Where("student_id = ?", studentID).
+		Order("attendance_session_id DESC"). // Latest sessions first
+		Find(&attendances).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch attendance history: %v", err)
+	}
+
+	var responses []models.StudentAttendanceHistoryResponse
+	for _, attendance := range attendances {
+		if attendance.AttendanceSession.ID == 0 ||
+			attendance.AttendanceSession.CourseSchedule.ID == 0 ||
+			attendance.AttendanceSession.CourseSchedule.Course.ID == 0 {
+			// Skip records with incomplete relations
+			continue
+		}
+
+		checkInTime := ""
+		if attendance.CheckInTime != nil {
+			checkInTime = attendance.CheckInTime.Format("15:04")
+		}
+
+		roomName := attendance.AttendanceSession.CourseSchedule.Room.Name
+		buildingName := ""
+		if attendance.AttendanceSession.CourseSchedule.Room.Building.ID != 0 {
+			buildingName = attendance.AttendanceSession.CourseSchedule.Room.Building.Name
+		}
+
+		fullRoomName := roomName
+		if buildingName != "" {
+			fullRoomName = fmt.Sprintf("%s - %s", buildingName, roomName)
+		}
+
+		responses = append(responses, models.StudentAttendanceHistoryResponse{
+			ID:                 attendance.ID,
+			Date:               attendance.AttendanceSession.Date.Format("2006-01-02"),
+			CourseCode:         attendance.AttendanceSession.CourseSchedule.Course.Code,
+			CourseName:         attendance.AttendanceSession.CourseSchedule.Course.Name,
+			RoomName:           fullRoomName,
+			CheckInTime:        checkInTime,
+			Status:             string(attendance.Status),
+			VerificationMethod: attendance.VerificationMethod,
 		})
 	}
 

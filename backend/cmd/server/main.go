@@ -279,6 +279,9 @@ func main() {
 
 			// Add new endpoint for QR code attendance submission
 			studentRoutes.POST("/attendance/qr-submit", studentAttendanceHandler.SubmitQRAttendance)
+
+			// Add new endpoint for attendance history
+			studentRoutes.GET("/attendance/history", studentAttendanceHandler.GetAttendanceHistory)
 		}
 	}
 

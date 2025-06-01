@@ -128,6 +128,18 @@ type StudentAttendanceResponse struct {
 	VerificationMethod  string `json:"verification_method"`
 }
 
+// StudentAttendanceHistoryResponse represents detailed attendance history for the mobile app
+type StudentAttendanceHistoryResponse struct {
+	ID                 uint   `json:"id"`
+	Date               string `json:"date"`
+	CourseCode         string `json:"course_code"`
+	CourseName         string `json:"course_name"`
+	RoomName           string `json:"room_name"`
+	CheckInTime        string `json:"check_in_time,omitempty"`
+	Status             string `json:"status"` // "PRESENT", "LATE", "ABSENT", "EXCUSED"
+	VerificationMethod string `json:"verification_method"`
+}
+
 // AttendanceStatistics represents statistics for attendance sessions
 type AttendanceStatistics struct {
 	TotalSessions     int `json:"total_sessions"`

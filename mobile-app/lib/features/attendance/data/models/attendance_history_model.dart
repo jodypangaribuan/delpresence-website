@@ -43,15 +43,36 @@ class AttendanceHistoryModel {
     return DateFormat('EEEE, d MMM yyyy', 'id_ID').format(dateTime);
   }
 
+  // Convert API status to Indonesian status
+  static String _mapStatus(String apiStatus) {
+    switch (apiStatus) {
+      case 'PRESENT':
+        return 'Hadir';
+      case 'LATE':
+        return 'Terlambat';
+      case 'ABSENT':
+        return 'Alpa';
+      case 'EXCUSED':
+        return 'Izin';
+      default:
+        return apiStatus;
+    }
+  }
+
   factory AttendanceHistoryModel.fromJson(Map<String, dynamic> json) {
+    // Parse date and time
+    final dateStr = json['date'] as String;
+    final timeStr = json['check_in_time'] as String? ?? '00:00';
+    
+    // Combine date and time
+    final dateTime = DateTime.parse('${dateStr}T${timeStr}');
+    
     return AttendanceHistoryModel(
-      id: json['id'] ?? '',
-      courseTitle: json['courseTitle'] ?? '',
-      roomName: json['roomName'] ?? '',
-      dateTime: json['dateTime'] != null
-          ? DateTime.parse(json['dateTime'])
-          : DateTime.now(),
-      status: json['status'] ?? 'Hadir',
+      id: json['id'].toString(),
+      courseTitle: json['course_name'] ?? '',
+      roomName: json['room_name'] ?? '',
+      dateTime: dateTime,
+      status: _mapStatus(json['status'] ?? 'ABSENT'),
     );
   }
 

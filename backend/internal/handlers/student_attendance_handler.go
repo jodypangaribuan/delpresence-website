@@ -201,3 +201,29 @@ func (h *StudentAttendanceHandler) SubmitQRAttendance(c *gin.Context) {
 		"message": "Attendance recorded successfully",
 	})
 }
+
+// GetAttendanceHistory retrieves the attendance history for a student
+func (h *StudentAttendanceHandler) GetAttendanceHistory(c *gin.Context) {
+	// Extract student ID from the authenticated user
+	userID := c.MustGet("userID").(uint)
+
+	// Log the request
+	fmt.Printf("Getting attendance history for user ID=%d\n", userID)
+
+	// Get attendance history from service
+	history, err := h.attendanceService.GetStudentAttendanceHistory(userID)
+	if err != nil {
+		fmt.Printf("Error getting attendance history for user ID=%d: %v\n", userID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status": "error",
+			"error":  fmt.Sprintf("Failed to fetch attendance history: %v", err),
+		})
+		return
+	}
+
+	// Return the attendance history
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   history,
+	})
+}
