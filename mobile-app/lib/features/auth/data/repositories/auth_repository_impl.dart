@@ -3,11 +3,13 @@ import 'package:flutter/foundation.dart';
 import '../datasources/auth_remote_datasource.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/auth_response_model.dart';
+import '../../../../core/utils/secure_storage.dart';
 import 'dart:convert';
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
   final SharedPreferences prefs;
+  final SecureStorage secureStorage = SecureStorage();
 
   // Constants for SharedPreferences keys
   static const String _keyUsername = 'saved_username';
@@ -48,11 +50,20 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> saveToken(String token) async {
     await prefs.setString(_keyAuthToken, token);
-    debugPrint('Token saved successfully');
+    // Also save the token to secure storage for use by other services
+    await secureStorage.storeToken(token);
+    debugPrint('Token saved successfully in both SharedPreferences and SecureStorage');
   }
 
   @override
   Future<String?> getToken() async {
+    // First try to get from secure storage
+    final secureToken = await secureStorage.getToken();
+    if (secureToken != null) {
+      return secureToken;
+    }
+    
+    // Fall back to SharedPreferences
     return prefs.getString(_keyAuthToken);
   }
 
@@ -62,7 +73,11 @@ class AuthRepositoryImpl implements AuthRepository {
     await prefs.remove(_keyToken); // Clear API token if exists
     await prefs.remove(_keyUserId); // Clear user_id
     await prefs.setBool(_keyAccessDenied, false); // Reset access_denied flag
-    debugPrint('Token and user data cleared successfully');
+    
+    // Also clear from secure storage
+    await secureStorage.clearAll();
+    
+    debugPrint('Token and user data cleared successfully from all storages');
   }
 
   @override

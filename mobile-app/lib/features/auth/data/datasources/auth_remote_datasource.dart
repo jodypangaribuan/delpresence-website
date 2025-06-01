@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../core/utils/api_logger.dart';
+import '../../../../core/utils/secure_storage.dart';
 import '../models/auth_response_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -14,6 +15,7 @@ abstract class AuthRemoteDataSource {
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final http.Client client;
+  final SecureStorage secureStorage = SecureStorage();
 
   AuthRemoteDataSourceImpl({required this.client});
 
@@ -90,8 +92,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           await prefs.setString('refresh_token', refreshToken ?? '');
           await prefs.setString('user_role', userRole);
 
+          // Also save tokens in SecureStorage
+          await secureStorage.storeToken(token);
+          if (refreshToken != null) {
+            await secureStorage.storeRefreshToken(refreshToken);
+          }
+
           // Save username for display purposes
           await prefs.setString('username', username);
+          await secureStorage.storeUserName(username);
 
           // Extract user ID and external_user_id
           final userId = user['id'] ?? '';
@@ -99,6 +108,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
           // Save external_user_id for fetching student data
           await prefs.setInt('external_user_id', externalUserId);
+          await secureStorage.storeUserId(externalUserId.toString());
+          
+          // Save user role in secure storage as well
+          await secureStorage.storeUserRole(userRole);
 
           // Create a proper response structure
           final userData = {
