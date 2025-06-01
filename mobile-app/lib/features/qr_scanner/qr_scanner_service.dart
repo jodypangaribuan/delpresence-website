@@ -27,10 +27,7 @@ class QRScannerService {
   }
 
   /// Scan QR code and process attendance submission
-  static Future<bool> scanAndSubmitAttendance(
-    BuildContext context, 
-    {int? scheduleId, Function(int)? onSuccessCallback}
-  ) async {
+  static Future<bool> scanAndSubmitAttendance(BuildContext context, {int? scheduleId}) async {
     try {
       // Scan QR code without showing toast
       final qrResult = await scanQRCode(context);
@@ -47,11 +44,6 @@ class QRScannerService {
       
       if (success) {
         ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
-        
-        // Call the success callback if provided and scheduleId exists
-        if (onSuccessCallback != null && scheduleId != null) {
-          onSuccessCallback(scheduleId);
-        }
       }
       
       return success;
@@ -198,12 +190,6 @@ class QRScannerService {
         
         // Consider 2xx responses as success
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          // Save attendance status in SharedPreferences to prevent duplicate submissions
-          if (scheduleId != null) {
-            await prefs.setBool('attendance_completed_$scheduleId', true);
-            debugPrint('✅ Marked attendance as completed for schedule $scheduleId');
-          }
-          
           ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
           return true;
         }

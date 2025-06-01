@@ -7,7 +7,6 @@ import '../../../../core/config/api_config.dart'; // For ApiConfig
 import 'face_recognition_attendance_screen.dart';
 import '../../../../core/utils/toast_utils.dart'; // Added for ToastUtils
 import 'package:delpresence/features/qr_scanner/qr_scanner_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class CourseSelectionScreen extends StatefulWidget {
   const CourseSelectionScreen({super.key});
@@ -119,18 +118,6 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
   // Adapted from home_screen.dart
   void _showAbsensiBottomSheet(BuildContext context, ScheduleModel schedule) {
-    // Check if attendance has already been submitted for this schedule
-    SharedPreferences.getInstance().then((prefs) {
-      bool isAlreadyCompleted = prefs.getBool('attendance_completed_${schedule.id}') ?? false;
-      
-      if (isAlreadyCompleted) {
-        // If attendance is already completed, show a message and refresh data
-        ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
-        _fetchTodaySchedules(); // Refresh data
-        return;
-      }
-      
-      // Continue with showing the bottom sheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -184,39 +171,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context); // Close bottom sheet
-                      
-                      // Callback for when scan is successful
-                      void onQrScanSuccessCallback(int successScheduleId) {
-                        // Update the status for this schedule
-                        setState(() {
-                          // Update active sessions map
-                          _activeSessionsMap[successScheduleId] = false;
-                          
-                          // Find and update the schedule in the list
-                          for (var i = 0; i < _todaySchedules.length; i++) {
-                            if (_todaySchedules[i].id == successScheduleId) {
-                              _todaySchedules[i] = _todaySchedules[i].copyWith(
-                                status: "Selesai"
-                              );
-                              break;
-                            }
-                          }
-                        });
-                        
-                        // Refresh the data after a short delay
-                        Future.delayed(const Duration(milliseconds: 500), () {
-                          if (mounted) {
-                            _fetchTodaySchedules();
-                          }
-                        });
-                      }
-                      
-                      // Use the enhanced QR scanner service method with original schedule ID and callback
-                      QRScannerService.scanAndSubmitAttendance(
-                        context, 
-                        scheduleId: schedule.id,
-                        onSuccessCallback: onQrScanSuccessCallback,
-                      );
+                    // Use the enhanced QR scanner service method with original schedule ID
+                    QRScannerService.scanAndSubmitAttendance(context, scheduleId: schedule.id);
                   },
                 ),
                 const SizedBox(height: 16),
@@ -247,7 +203,6 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
         ),
       ),
     );
-    });
   }
 
   // Adapted from home_screen.dart
@@ -454,37 +409,9 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                               final bool statusBasedActive = schedule.status?.toLowerCase() == 'sedang berlangsung';
                               final bool isCurrentlyActiveClass = timeBasedActive || statusBasedActive;
 
-                              return FutureBuilder<SharedPreferences>(
-                                future: SharedPreferences.getInstance(),
-                                builder: (context, snapshot) {
-                                  // Default values if prefs not yet loaded
-                                  bool isAttendanceCompleted = false;
-                                  
-                                  // Update values if prefs are loaded
-                                  if (snapshot.hasData) {
-                                    isAttendanceCompleted = snapshot.data!.getBool('attendance_completed_${schedule.id}') ?? false;
-                                  }
-                                  
-                                  // Determine if the schedule is active and can be selected
-                                  final bool canSelectForAttendance = 
-                                      isCurrentlyActiveClass && 
-                                      hasActiveSession && 
-                                      !isAttendanceCompleted;
-                                  
-                                  // Set the status text based on various conditions
-                                  String statusText;
-                                  if (isAttendanceCompleted) {
-                                    statusText = 'Sudah Absen';
-                                  } else if (hasActiveSession) {
-                                    statusText = 'Bisa Absen';
-                                  } else if (schedule.status?.toLowerCase() == 'selesai') {
-                                    statusText = 'Selesai';
-                                  } else {
-                                    statusText = schedule.status ?? 'Tidak Aktif';
-                                  }
 
                               return GestureDetector(
-                                    onTap: canSelectForAttendance
+                                onTap: (isCurrentlyActiveClass && hasActiveSession)
                                     ? () {
                                         // Show bottom sheet instead of direct navigation
                                         _showAbsensiBottomSheet(context, schedule);
@@ -493,7 +420,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                                 child: Container(
                                   margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
-                                        color: canSelectForAttendance
+                                    color: (isCurrentlyActiveClass && hasActiveSession)
                                         ? Colors.white
                                         : Colors.white.withOpacity(0.8),
                                     borderRadius: BorderRadius.circular(8),
@@ -506,12 +433,10 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                                       ),
                                     ],
                                     border: Border.all(
-                                          color: canSelectForAttendance
+                                      color: (isCurrentlyActiveClass && hasActiveSession)
                                           ? AppColors.primary.withOpacity(0.3)
-                                              : isAttendanceCompleted
-                                                ? AppColors.success.withOpacity(0.3)
                                           : Colors.grey.withOpacity(0.1),
-                                          width: canSelectForAttendance || isAttendanceCompleted ? 1.5 : 1,
+                                      width: (isCurrentlyActiveClass && hasActiveSession) ? 1.5 : 1,
                                     ),
                                   ),
                                   child: Padding(
@@ -528,9 +453,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                                                 style: TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w600,
-                                                      color: isAttendanceCompleted
-                                                          ? AppColors.success
-                                                          : canSelectForAttendance
+                                                  color: (isCurrentlyActiveClass && hasActiveSession)
                                                       ? AppColors.textPrimary
                                                       : AppColors.textSecondary,
                                                 ),
@@ -540,22 +463,20 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                                               padding: const EdgeInsets.symmetric(
                                                   horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
-                                                    color: isAttendanceCompleted
+                                                color: (isCurrentlyActiveClass && hasActiveSession)
                                                     ? AppColors.success.withOpacity(0.08)
-                                                        : canSelectForAttendance
-                                                          ? AppColors.primary.withOpacity(0.08)
                                                     : Colors.grey.withOpacity(0.08),
                                                 borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Text(
-                                                    statusText,
+                                                (isCurrentlyActiveClass && hasActiveSession)
+                                                    ? 'Bisa Absen'
+                                                    : schedule.status ?? 'Tidak Aktif', // Show actual status or 'Tidak Aktif'
                                                 style: TextStyle(
                                                   fontSize: 9,
                                                   fontWeight: FontWeight.w500,
-                                                      color: isAttendanceCompleted
+                                                  color: (isCurrentlyActiveClass && hasActiveSession)
                                                       ? AppColors.success
-                                                          : canSelectForAttendance
-                                                            ? AppColors.primary
                                                       : AppColors.textSecondary,
                                                 ),
                                               ),
@@ -615,7 +536,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                                             ),
                                           ],
                                         ),
-                                            if (!(canSelectForAttendance || isAttendanceCompleted))
+                                        if (!(isCurrentlyActiveClass && hasActiveSession))
                                           Padding(
                                             padding: const EdgeInsets.only(top: 8.0),
                                             child: Text(
@@ -631,8 +552,6 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                                     ),
                                   ),
                                 ),
-                                  );
-                                },
                               );
                             },
                           ),
