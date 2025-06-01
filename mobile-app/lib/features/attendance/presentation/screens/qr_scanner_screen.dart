@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/utils/toast_utils.dart';
+import 'package:mobile_app/lib/core/utils/toast_utils.dart';
 import '../../data/repositories/attendance_repository.dart';
 // TODO: Import a BLoC/Provider if you use state management for this
 
@@ -169,7 +170,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.no_photography_outlined, size: 64, color: Colors.grey),
+            const Icon(Icons.camera_alt, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             const Text(
               'Camera permission is required to scan QR codes',
