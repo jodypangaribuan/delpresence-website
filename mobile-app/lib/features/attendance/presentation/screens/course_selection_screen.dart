@@ -5,7 +5,6 @@ import '../../../schedule/data/services/schedule_service.dart';
 import '../../../../core/services/network_service.dart'; // For NetworkService
 import '../../../../core/config/api_config.dart'; // For ApiConfig
 import 'face_recognition_attendance_screen.dart';
-import 'qr_scanner_screen.dart'; // Import the new QR Scanner screen
 import '../../../../core/utils/toast_utils.dart'; // Added for ToastUtils
 
 class CourseSelectionScreen extends StatefulWidget {
@@ -171,12 +170,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context); // Close bottom sheet
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => QrScannerScreen(schedule: schedule),
-                      ),
-                    );
+                    // For now, shows a toast. Replace with actual QR scanner navigation later.
+                    ToastUtils.showInfoToast(context, 'QR Scanner akan segera hadir');
                   },
                 ),
                 const SizedBox(height: 16),

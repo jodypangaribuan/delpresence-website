@@ -12,8 +12,6 @@ import '../../../schedule/presentation/screens/schedule_screen.dart';
 import '../../../attendance/presentation/screens/attendance_history_screen.dart';
 import '../../../attendance/presentation/screens/today_attendance_history_page.dart';
 import '../../../attendance/presentation/screens/course_selection_screen.dart';
-import '../../../attendance/presentation/screens/qr_scanner_screen.dart';
-import '../../../attendance/presentation/screens/face_recognition_attendance_screen.dart';
 import '../widgets/home_header.dart';
 import '../bloc/student_bloc.dart';
 import '../../domain/repositories/student_repository.dart';
@@ -419,7 +417,68 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
             extendBody: true,
             body: _getPageForIndex(_currentIndex),
             // Toggleable floating action button with swipe gesture
-            floatingActionButton: _buildFloatingActionButton(),
+            floatingActionButton: GestureDetector(
+              onHorizontalDragEnd: (details) {
+                // Toggle mode on any horizontal swipe, regardless of direction
+                if (details.primaryVelocity != null &&
+                    details.primaryVelocity!.abs() > 200) {
+                  // Only toggle if the swipe has enough velocity
+                  _toggleAttendanceMethod();
+                }
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Main Button
+                  FloatingActionButton(
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+
+                      // Always navigate to course selection screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CourseSelectionScreen(),
+                        ),
+                      );
+                    },
+                    backgroundColor: AppColors.primary,
+                    elevation: 4,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder:
+                          (Widget child, Animation<double> animation) {
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: _isFaceRecognition
+                                ? const Offset(-1.5, 0.0)
+                                : const Offset(1.5, 0.0),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _isFaceRecognition
+                          ? const Icon(
+                              Icons.face_outlined,
+                              key: ValueKey('face'),
+                              color: Colors.white,
+                              size: 28,
+                            )
+                          : const Icon(
+                              Icons.qr_code_scanner_rounded,
+                              key: ValueKey('qr'),
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.centerDocked,
             bottomNavigationBar: GlobalBottomNav(
@@ -820,16 +879,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     final bool hasActiveSession = classData['hasActiveSession'] ?? false;
     final bool isActive = classData['isActive'] as bool;
     
-    // Find the corresponding ScheduleModel
-    ScheduleModel? currentSchedule;
-    if (scheduleId != null) {
-      try {
-        currentSchedule = _todaySchedules.firstWhere((s) => s.id == scheduleId);
-      } catch (e) {
-        currentSchedule = null; // Not found
-      }
-    }
-    
     return GestureDetector(
       onTap: () {
         // Navigate to today's schedule screen
@@ -958,8 +1007,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: (isActive && hasActiveSession && currentSchedule != null) ? () {
-                      _showAbsensiBottomSheet(context, schedule: currentSchedule);
+                    onPressed: hasActiveSession ? () {
+                      _showAbsensiBottomSheet(context);
                     } : null,
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
@@ -1254,7 +1303,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   }
 
   // Improved bottom sheet method
-  void _showAbsensiBottomSheet(BuildContext context, {ScheduleModel? schedule}) {
+  void _showAbsensiBottomSheet(BuildContext context) {
     // Check if there are any active sessions (based on the boolean map)
     bool hasAnyActiveSession = _activeSessionsMap.values.contains(true);
     
@@ -1322,22 +1371,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context);
-                    if (schedule != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => QrScannerScreen(schedule: schedule),
-                        ),
-                      );
-                    } else {
-                      // If no specific schedule, go to CourseSelectionScreen first
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CourseSelectionScreen(),
-                        ),
-                      );
-                    }
+                    ToastUtils.showInfoToast(context, 'Scan QR dipilih');
                   },
                 ),
 
@@ -1353,25 +1387,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   description: 'Gunakan pengenalan wajah untuk absensi',
                   onTap: () {
                     Navigator.pop(context);
-                    if (schedule != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => FaceRecognitionAttendanceScreen(
-                            courseName: schedule.courseName,
-                            // Potentially pass schedule.id if FaceRecognitionAttendanceScreen is updated
-                          ),
-                        ),
-                      );
-                    } else {
-                      // If no specific schedule, go to CourseSelectionScreen first
-                       Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CourseSelectionScreen(),
-                        ),
-                      );
-                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CourseSelectionScreen(),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -1442,71 +1463,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
           ],
         ),
       ),
-    );
-  }
-
-  // Main Floating Action Button
-  Widget _buildFloatingActionButton() {
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        // Animated FAB Container
-        Container(
-          margin: EdgeInsets.only(
-              bottom: kBottomNavigationBarHeight +
-                  MediaQuery.of(context).padding.bottom -
-                  40), // Adjust to position above navbar
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOutQuart,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.3),
-                  spreadRadius: 0,
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(28),
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  // For the main FAB, no specific schedule is selected yet
-                  _showAbsensiBottomSheet(context, schedule: null); 
-                },
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.calendar_today,
-                            color: Colors.white, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Absensi Sekarang',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
