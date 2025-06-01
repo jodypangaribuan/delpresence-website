@@ -669,20 +669,32 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 	// Create notes that include external user ID information
 	notes := fmt.Sprintf("External UserID: %d | NIM: %s", student.UserID, student.NIM)
 
-	// Try to update existing entry first
-	result = s.db.Exec(`
-		UPDATE student_attendances
-		SET status = ?, verification_method = ?, check_in_time = ?, notes = ?
-		WHERE attendance_session_id = ? AND student_id = ?`,
-		status, "QR_CODE", checkInTime, notes, sessionID, student.ID)
+	// Find existing attendance record
+	var attendanceExists bool
+	err = s.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM student_attendances
+			WHERE attendance_session_id = ? AND student_id = ?
+		) as attendance_exists
+	`, sessionID, student.ID).Scan(&attendanceExists).Error
 
-	if result.Error != nil {
-		return result.Error
+	if err != nil {
+		return errors.New("error checking existing attendance: " + err.Error())
 	}
 
-	// If no rows affected, insert a new record
-	if result.RowsAffected == 0 {
-		// Create the attendance record
+	if attendanceExists {
+		// Update existing record
+		result = s.db.Exec(`
+			UPDATE student_attendances 
+			SET status = ?, verification_method = ?, check_in_time = ?, notes = ?
+			WHERE attendance_session_id = ? AND student_id = ?`,
+			status, "QR_CODE", checkInTime, notes, sessionID, student.ID)
+
+		if result.Error != nil {
+			return errors.New("failed to update attendance: " + result.Error.Error())
+		}
+	} else {
+		// Insert new record
 		attendance := models.StudentAttendance{
 			AttendanceSessionID: sessionID,
 			StudentID:           student.ID,
@@ -807,7 +819,7 @@ func (s *AttendanceService) MarkStudentAttendanceByExternalID(sessionID uint, ex
 		// Insert new record
 		attendance := models.StudentAttendance{
 			AttendanceSessionID: sessionID,
-			StudentID:           student.ID, // We still need to use the internal ID here
+			StudentID:           student.ID,
 			Status:              status,
 			CheckInTime:         &checkInTime,
 			VerificationMethod:  "QR_CODE",
@@ -856,7 +868,9 @@ func (s *AttendanceService) GetStudentAttendancesByExternalID(externalUserID uin
 	for _, attendance := range attendances {
 		checkInTime := ""
 		if attendance.CheckInTime != nil {
-			checkInTime = attendance.CheckInTime.Format("15:04")
+			// Convert to Indonesia time if needed
+			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
+			checkInTime = indonesiaTime.Format("15:04")
 		}
 
 		responses = append(responses, models.StudentAttendanceResponse{
@@ -918,7 +932,9 @@ func (s *AttendanceService) GetStudentAttendanceHistory(externalUserID uint) ([]
 
 		checkInTime := ""
 		if attendance.CheckInTime != nil {
-			checkInTime = attendance.CheckInTime.Format("15:04")
+			// Convert to Indonesia time if needed
+			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
+			checkInTime = indonesiaTime.Format("15:04")
 		}
 
 		roomName := attendance.AttendanceSession.CourseSchedule.Room.Name
