@@ -200,9 +200,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   // Map to track active attendance sessions for each schedule
   Map<int, bool> _activeSessionsMap = {};
   bool _isCheckingActiveSessions = false;
-  
-  // Keep track of previous index for auto-refresh
-  int _previousIndex = 0;
 
   // Halaman yang akan ditampilkan berdasarkan index bottom navbar
   late final List<Widget> _pages;
@@ -210,29 +207,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   void _onNavTap(int index) {
     print('Bottom navbar tapped with index: $index');
     
-    // Store previous index before updating
-    _previousIndex = _currentIndex;
+    // Only refresh when navigating TO the home tab (index 0)
+    bool navigatingToHome = (_currentIndex != 0 && index == 0);
     
+    // Update current index
     setState(() {
       _currentIndex = index;
     });
     
-    // If navigating back to home screen (index 0), refresh data
-    if (index == 0 && _previousIndex != 0) {
-      _refreshHomeScreenData();
+    // If navigating back to home screen, refresh data
+    if (navigatingToHome) {
+      _fetchTodaySchedules();
     }
   }
   
   // Method to refresh home screen data
-  void _refreshHomeScreenData() {
+  Future<void> _refreshHomeScreenData() async {
     debugPrint('🔄 Refreshing home screen data');
     // Clear active sessions to avoid stale data
     setState(() {
       _activeSessionsMap.clear();
       _isLoadingSchedules = true; // Show loading indicator
     });
-    // Fetch fresh data
-    _fetchTodaySchedules();
+    // Fetch fresh data and wait for it
+    await _fetchTodaySchedules();
   }
 
   void _toggleAttendanceMethod({bool isAutomatic = false}) {
@@ -1534,6 +1532,14 @@ class _HomePage extends StatelessWidget {
     // Get the HomeScreen parent state using findAncestorStateOfType
     final homeState = context.findAncestorStateOfType<_HomeScreenState>();
     
+    // Automatically refresh data when this widget is built
+    if (homeState != null) {
+      // Use a post-frame callback to avoid potential build phase issues
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        homeState._refreshHomeScreenData();
+      });
+    }
+    
     // Check if there are any active sessions
     bool hasAnyActiveSession = false;
     if (homeState != null) {
@@ -1595,16 +1601,20 @@ class _HomePage extends StatelessWidget {
                     child: RefreshIndicator(
                       color: AppColors.primary,
                       backgroundColor: Colors.white,
+                      displacement: 20.0,
+                      strokeWidth: 3.0, // Make the indicator more visible
                       onRefresh: () async {
-                        // Only refresh home screen components directly from API
-                        // instead of refreshing all bloc data
+                        // Properly refresh data and wait for completion
                         if (homeState != null) {
-                          homeState._refreshHomeScreenData();
+                          await homeState._fetchTodaySchedules();
+                          // This forces the UI to update properly
+                          homeState.setState(() {});
                         }
                         // Return a completed future to satisfy the RefreshIndicator
                         return Future<void>.value();
                       },
                       child: SingleChildScrollView(
+                        // Use AlwaysScrollableScrollPhysics to ensure refresh works even when content doesn't fill screen
                         physics: const AlwaysScrollableScrollPhysics(),
                         child: Padding(
                           padding: const EdgeInsets.only(bottom: 100),
@@ -1791,31 +1801,6 @@ class _HomePage extends StatelessWidget {
                                           ),
                                         ),
                                         const Spacer(),
-                                        // Add refresh button
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.refresh,
-                                            color: AppColors.primary,
-                                            size: 20,
-                                          ),
-                                          onPressed: () {
-                                            if (homeState != null) {
-                                              // Show loading indicator
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Memperbarui jadwal dan sesi aktif...'),
-                                                  duration: Duration(milliseconds: 1500),
-                                                  backgroundColor: Colors.blue,
-                                                ),
-                                              );
-                                              // Refresh data
-                                              homeState._refreshHomeScreenData();
-                                            }
-                                          },
-                                          tooltip: 'Refresh jadwal',
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                        ),
                                       ],
                                     ),
                                     const SizedBox(height: 12),
