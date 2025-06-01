@@ -92,6 +92,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
   // Adapted from home_screen.dart - updated to use ScheduleModel
   void _showAbsensiBottomSheet(BuildContext context, ScheduleModel schedule) {
+    debugPrint('📋 Opening attendance bottom sheet for schedule ID: ${schedule.id}');
+    
     // Show loading indicator
     showDialog(
       context: context,
@@ -103,6 +105,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     AttendanceService().checkAttendanceStatus(schedule.id).then((isAlreadyCompleted) {
       // Close loading dialog
       Navigator.pop(context);
+      
+      debugPrint('📝 Backend returned attendance status: $isAlreadyCompleted for schedule ID: ${schedule.id}');
       
       if (isAlreadyCompleted) {
         // If attendance is already completed according to server, show a message and refresh data

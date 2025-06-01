@@ -420,6 +420,8 @@ func (h *StudentAttendanceHandler) CheckAttendanceStatus(c *gin.Context) {
 	// Extract student ID from the authenticated user
 	userID := c.MustGet("userID").(uint)
 
+	fmt.Printf("Check attendance status - User ID: %d\n", userID)
+
 	// Extract schedule ID from URL parameters
 	scheduleIDStr := c.Param("scheduleId")
 	scheduleID, err := strconv.ParseUint(scheduleIDStr, 10, 64)
@@ -431,6 +433,8 @@ func (h *StudentAttendanceHandler) CheckAttendanceStatus(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("Check attendance status - Schedule ID: %d\n", scheduleID)
+
 	// Find the student record associated with this user
 	var student models.Student
 	if err := h.db.Where("user_id = ?", userID).First(&student).Error; err != nil {
@@ -441,9 +445,13 @@ func (h *StudentAttendanceHandler) CheckAttendanceStatus(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("Check attendance status - Student found: %s (ID: %d)\n", student.FullName, student.ID)
+
 	// Find any active attendance session for this schedule
 	var activeSession models.AttendanceSession
 	todayDate := time.Now().Format("2006-01-02")
+
+	fmt.Printf("Check attendance status - Looking for active session on date: %s\n", todayDate)
 
 	err = h.db.Where("course_schedule_id = ? AND date = ? AND status = ?",
 		scheduleID, todayDate, models.AttendanceStatusActive).
@@ -451,6 +459,7 @@ func (h *StudentAttendanceHandler) CheckAttendanceStatus(c *gin.Context) {
 
 	// If there's no active session, the student can't have completed attendance
 	if err != nil {
+		fmt.Printf("Check attendance status - No active session found: %v\n", err)
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "success",
 			"completed": false,
@@ -458,11 +467,16 @@ func (h *StudentAttendanceHandler) CheckAttendanceStatus(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("Check attendance status - Active session found: ID %d, Start time: %s\n",
+		activeSession.ID, activeSession.StartTime)
+
 	// Check if student has any attendance record for this session
 	var attendanceCount int64
 	h.db.Model(&models.StudentAttendance{}).
 		Where("student_id = ? AND attendance_session_id = ?", student.ID, activeSession.ID).
 		Count(&attendanceCount)
+
+	fmt.Printf("Check attendance status - Attendance count: %d\n", attendanceCount)
 
 	// Return the result
 	c.JSON(http.StatusOK, gin.H{

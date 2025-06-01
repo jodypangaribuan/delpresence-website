@@ -174,6 +174,8 @@ class AttendanceService {
   /// Check if attendance is already completed for a specific schedule
   Future<bool> checkAttendanceStatus(int scheduleId) async {
     try {
+      debugPrint('🔍 Checking attendance status for schedule ID: $scheduleId');
+      
       // Get auth headers
       final headers = await _getAuthHeaders();
       
@@ -183,19 +185,25 @@ class AttendanceService {
         headers: headers,
       );
       
+      // Log response for debugging
+      debugPrint('📊 Check attendance response: ${response.data}');
+      
       // Parse response
       if (response.success && response.data != null) {
         final responseData = response.data;
         if (responseData != null && responseData['status'] == 'success') {
           // Return the completed status from the server
-          return responseData['completed'] == true;
+          final bool isCompleted = responseData['completed'] == true;
+          debugPrint('📝 Attendance completed status: $isCompleted');
+          return isCompleted;
         }
       }
       
+      debugPrint('⚠️ Check attendance failed or returned invalid data');
       // Default to not completed in case of errors
       return false;
     } catch (e) {
-      debugPrint('Error checking attendance status: $e');
+      debugPrint('❌ Error checking attendance status: $e');
       return false;
     }
   }
