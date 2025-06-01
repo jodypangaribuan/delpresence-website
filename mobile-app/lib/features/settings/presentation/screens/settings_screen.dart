@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/constants/colors.dart';
-import '../../../../core/utils/toast_utils.dart';
-import '../../../../core/utils/secure_storage.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../../core/constants/colors.dart';
 import 'face_registration_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -16,60 +13,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final SecureStorage _secureStorage = SecureStorage();
-  String _secureToken = 'Checking...';
-  String _sharedPrefsToken = 'Checking...';
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkTokenStatus();
-  }
-
-  Future<void> _checkTokenStatus() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Check SecureStorage token
-    final secureToken = await _secureStorage.getToken();
-    
-    // Check SharedPreferences token
-    final prefs = await SharedPreferences.getInstance();
-    final sharedPrefsToken = prefs.getString('auth_token');
-    
-    setState(() {
-      _secureToken = secureToken != null ? 'Token exists (${secureToken.length} chars)' : 'No token found';
-      _sharedPrefsToken = sharedPrefsToken != null ? 'Token exists (${sharedPrefsToken.length} chars)' : 'No token found';
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _syncTokens() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    final prefs = await SharedPreferences.getInstance();
-    final sharedPrefsToken = prefs.getString('auth_token');
-    
-    if (sharedPrefsToken != null) {
-      await _secureStorage.storeToken(sharedPrefsToken);
-      ToastUtils.showSuccessToast(context, 'Token synchronized to SecureStorage');
-    } else {
-      final secureToken = await _secureStorage.getToken();
-      if (secureToken != null) {
-        await prefs.setString('auth_token', secureToken);
-        ToastUtils.showSuccessToast(context, 'Token synchronized to SharedPreferences');
-      } else {
-        ToastUtils.showErrorToast(context, 'No token found in either storage');
-      }
-    }
-    
-    await _checkTokenStatus();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,44 +58,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _showFaceRegistrationDialog(context);
               },
             ),
-
-            // Debug Section (only shown in debug mode)
-            _buildSectionTitle('Diagnostik'),
-            _buildDebugItem(
-              title: 'Secure Storage Token',
-              value: _secureToken,
-              isLoading: _isLoading,
-            ),
-            _buildDebugItem(
-              title: 'SharedPreferences Token',
-              value: _sharedPrefsToken,
-              isLoading: _isLoading,
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _syncTokens,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 40),
-                ),
-                child: _isLoading 
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Text('Sync Tokens'),
-              ),
-            ),
             
             // Logout Button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
               child: ElevatedButton(
                 onPressed: () {
                   context.read<AuthBloc>().add(LogoutEvent());
@@ -171,66 +80,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDebugItem({
-    required String title,
-    required String value,
-    required bool isLoading,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey[100]!,
-            width: 1,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 18,
-            color: Colors.grey[700],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                SizedBox(height: 4),
-                isLoading
-                    ? Container(
-                        width: 100,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      )
-                    : Text(
-                        value,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: value.contains('No token') ? Colors.red : Colors.green[700],
-                        ),
-                      ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
