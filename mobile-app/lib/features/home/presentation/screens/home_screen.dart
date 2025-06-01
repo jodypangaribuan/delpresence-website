@@ -13,6 +13,7 @@ import '../../../attendance/presentation/screens/attendance_history_screen.dart'
 import '../../../attendance/presentation/screens/today_attendance_history_page.dart';
 import '../../../attendance/presentation/screens/course_selection_screen.dart';
 import '../../../attendance/presentation/screens/qr_scanner_screen.dart';
+import '../../../attendance/presentation/screens/face_recognition_attendance_screen.dart';
 import '../widgets/home_header.dart';
 import '../bloc/student_bloc.dart';
 import '../../domain/repositories/student_repository.dart';
@@ -822,7 +823,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     // Find the corresponding ScheduleModel
     ScheduleModel? currentSchedule;
     if (scheduleId != null) {
-      currentSchedule = _todaySchedules.firstWhere((s) => s.id == scheduleId, orElse: () => null);
+      try {
+        currentSchedule = _todaySchedules.firstWhere((s) => s.id == scheduleId);
+      } catch (e) {
+        currentSchedule = null; // Not found
+      }
     }
     
     return GestureDetector(
