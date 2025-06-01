@@ -330,9 +330,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     // Create new timer to check every 30 seconds
     _activeSessionsRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      // Only check if not already checking
+      // Only check if not already checking and we have schedules to check
       if (!_isCheckingActiveSessions && _todaySchedules.isNotEmpty) {
-        debugPrint('🔄 Periodic check for active attendance sessions');
         _checkActiveSessionsForSchedules(_todaySchedules);
       }
     });
@@ -573,10 +572,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     setState(() {
       _isLoadingSchedules = true;
       _scheduleError = null;
-      _activeSessionsMap.clear();
     });
     
     try {
+      debugPrint('🔄 Refreshing home screen data from API...');
+      
       // Get academic years first to get the active one
       final academicYears = await _scheduleService.getAcademicYears();
       
@@ -590,26 +590,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         academicYearId = activeYear['id'];
       }
       
-      // Get all schedules
-      final schedules = await _scheduleService.getStudentSchedules(
-        academicYearId: academicYearId != null ? academicYearId : null,
-      );
-      
-      // Get today name
+      // Get all schedules for today directly
       final today = DateTime.now();
       final dayName = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'][today.weekday - 1];
+      
+      final schedules = await _scheduleService.getStudentSchedules(
+        academicYearId: academicYearId,
+      );
       
       // Filter schedules for today
       final todaySchedules = ScheduleModel.getSchedulesByDay(schedules, dayName);
       
+      // Update state with results
       setState(() {
         _todaySchedules = todaySchedules;
         _isLoadingSchedules = false;
       });
       
       // After loading schedules, check for active sessions
-      _checkActiveSessionsForSchedules(todaySchedules);
+      if (todaySchedules.isNotEmpty) {
+        _checkActiveSessionsForSchedules(todaySchedules);
+      }
     } catch (e) {
+      debugPrint('🔍 Error refreshing home screen data: $e');
       setState(() {
         _scheduleError = e.toString();
         _isLoadingSchedules = false;
@@ -626,46 +629,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
     
     try {
-      debugPrint('🔍 Starting check for active sessions...');
-      debugPrint('🔍 Number of schedules to check: ${schedules.length}');
+      debugPrint('🔍 Checking for active attendance sessions...');
       
       // Create a temporary map to store results
       Map<int, bool> tempMap = {};
       
-      // First, get all active sessions at once to see what's available
-      try {
-        final allActiveSessions = await _scheduleService.getAllActiveAttendanceSessions();
-        debugPrint('🔍 Got ${allActiveSessions.length} total active sessions from API');
-      } catch (e) {
-        debugPrint('🔍 Error getting all active sessions (informational only): $e');
-      }
-      
       // Check each schedule for active sessions
       for (var schedule in schedules) {
         if (schedule.id != null && schedule.id > 0) {
-          debugPrint('🔍 Checking schedule ${schedule.id} - ${schedule.courseName}');
           try {
             final hasActiveSession = await _scheduleService.isAttendanceSessionActive(schedule.id);
             tempMap[schedule.id] = hasActiveSession;
-            debugPrint('🔍 Schedule ${schedule.id} has active session: $hasActiveSession');
           } catch (e) {
             debugPrint('🔍 Error checking schedule ${schedule.id}: $e');
             // Default to false on error
             tempMap[schedule.id] = false;
           }
-        } else {
-          debugPrint('🔍 Schedule has invalid ID: ${schedule.id}');
         }
       }
       
-      // Debug output for all results
-      debugPrint('🔍 Active session check results: $tempMap');
-      
-      // Check if any active sessions were found
-      final hasAnyActive = tempMap.values.contains(true);
-      debugPrint('🔍 Has any active sessions: $hasAnyActive');
-      
-      // Update state with results
+      // Update state with results if the component is still mounted
       if (mounted) {
         setState(() {
           _activeSessionsMap = tempMap;
@@ -1571,14 +1554,13 @@ class _HomePage extends StatelessWidget {
                       color: AppColors.primary,
                       backgroundColor: Colors.white,
                       onRefresh: () async {
-                        context
-                            .read<StudentBloc>()
-                            .add(const LoadStudentDataEvent());
-                        
-                        // Also refresh schedule data
+                        // Only refresh home screen components directly from API
+                        // instead of refreshing all bloc data
                         if (homeState != null) {
                           await homeState._fetchTodaySchedules();
                         }
+                        // Return a completed future to satisfy the RefreshIndicator
+                        return Future<void>.value();
                       },
                       child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
