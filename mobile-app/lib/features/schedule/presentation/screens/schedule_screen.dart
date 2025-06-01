@@ -741,35 +741,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 ),
               ],
             ),
-            
-            // Add "Absen" button for ongoing classes
-            if (schedule.status == 'Sedang Berlangsung') ...[
-              const SizedBox(height: 10),
-              const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate to attendance screen
-                  },
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  child: const Text('Absen Sekarang'),
-            ),
-          ),
-        ],
           ],
         ),
       ),
