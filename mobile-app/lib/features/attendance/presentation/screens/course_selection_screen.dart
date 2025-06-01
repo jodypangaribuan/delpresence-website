@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/colors.dart';
-import '../../../home/data/models/schedule_model.dart'; // Assuming ScheduleModel is needed
-import '../../../home/data/services/schedule_service.dart'; // Assuming ScheduleService is needed
+import '../../../schedule/data/models/schedule_model.dart';
+import '../../../schedule/data/services/schedule_service.dart';
 import '../../../../core/services/network_service.dart'; // For NetworkService
 import '../../../../core/config/api_config.dart'; // For ApiConfig
 import 'face_recognition_attendance_screen.dart';
@@ -266,7 +266,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                                             builder: (context) =>
                                                 FaceRecognitionAttendanceScreen(
                                               courseName: schedule.courseName,
-                                              scheduleId: schedule.id, // Pass schedule ID
+                                              // scheduleId: schedule.id, // Removed for now
                                             ),
                                           ),
                                         );
