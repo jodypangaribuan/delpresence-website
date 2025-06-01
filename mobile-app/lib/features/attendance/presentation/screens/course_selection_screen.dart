@@ -171,14 +171,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context); // Close bottom sheet
-                    // Replace toast with QR scanner
-                    QRScannerService.scanQRCode(context).then((qrResult) {
-                      if (qrResult != null) {
-                        // Process QR code result for attendance
-                        ToastUtils.showSuccessToast(context, 'QR Code berhasil dipindai: $qrResult');
-                        // Here you would process the attendance with the QR code data
-                      }
-                    });
+                    // Use the enhanced QR scanner service method
+                    QRScannerService.scanAndSubmitAttendance(context);
                   },
                 ),
                 const SizedBox(height: 16),

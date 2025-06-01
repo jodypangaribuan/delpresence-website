@@ -570,9 +570,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  // Navigate to QR code scanner (simulated for now)
-                  ToastUtils.showInfoToast(
-                      context, 'QR Scanner akan segera hadir');
+                  // Use the enhanced QR scanner service method
+                  QRScannerService.scanAndSubmitAttendance(context);
                 },
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
@@ -1372,13 +1371,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context);
-                    // Import and use the QR Scanner Service
-                    QRScannerService.scanQRCode(context).then((qrResult) {
-                      if (qrResult != null) {
-                        // Process QR code result
-                        ToastUtils.showSuccessToast(context, 'QR Code berhasil dipindai: $qrResult');
-                      }
-                    });
+                    // Use the enhanced QR scanner service method
+                    QRScannerService.scanAndSubmitAttendance(context);
                   },
                 ),
 
