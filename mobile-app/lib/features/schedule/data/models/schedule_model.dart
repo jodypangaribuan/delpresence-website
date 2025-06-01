@@ -144,9 +144,4 @@ class ScheduleModel {
   static List<ScheduleModel> getSchedulesByDay(List<ScheduleModel> schedules, String day) {
     return schedules.where((schedule) => schedule.day.toLowerCase() == day.toLowerCase()).toList();
   }
-  
-  // Convert a list of JSON objects to a list of ScheduleModel instances
-  static List<ScheduleModel> fromJsonList(List<dynamic> jsonList) {
-    return jsonList.map((json) => ScheduleModel.fromJson(json)).toList();
-  }
 }
