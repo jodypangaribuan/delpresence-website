@@ -56,9 +56,8 @@ class StorageService {
       final userDataString = prefs.getString(_userDataKey);
       if (userDataString == null) return null;
       
-      return Map<String, dynamic>.from(
-        await compute(jsonDecode, userDataString)
-      );
+      // Use direct jsonDecode instead of compute to avoid type issues
+      return Map<String, dynamic>.from(jsonDecode(userDataString));
     } catch (e) {
       debugPrint('🔑 Error retrieving user data: $e');
       return null;
@@ -69,7 +68,8 @@ class StorageService {
   Future<bool> saveUserData(Map<String, dynamic> userData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userDataString = await compute(jsonEncode, userData);
+      // Use direct jsonEncode instead of compute
+      final userDataString = jsonEncode(userData);
       return await prefs.setString(_userDataKey, userDataString);
     } catch (e) {
       debugPrint('🔑 Error saving user data: $e');

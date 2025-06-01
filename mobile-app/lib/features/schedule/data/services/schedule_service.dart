@@ -72,7 +72,7 @@ class ScheduleService {
       debugPrint('🔍 Schedule API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
 
       if (!response.success || response.data == null) {
-        throw Exception(response.message ?? 'Failed to get student schedules');
+        throw Exception(response.errorMessage ?? 'Failed to get student schedules');
       }
 
       // Get schedules from response
@@ -130,7 +130,7 @@ class ScheduleService {
       debugPrint('🔍 Academic years API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
 
       if (!response.success || response.data == null) {
-        throw Exception(response.message ?? 'Failed to get academic years');
+        throw Exception(response.errorMessage ?? 'Failed to get academic years');
       }
 
       // Get academic years from response
@@ -186,7 +186,7 @@ class ScheduleService {
       debugPrint('🔍 Active sessions API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
 
       if (!response.success || response.data == null) {
-        final errorMsg = response.message ?? 'Failed to get active sessions';
+        final errorMsg = response.errorMessage ?? 'Failed to get active sessions';
         debugPrint('🔍 API error or no data: $errorMsg');
         return false;
       }
@@ -243,7 +243,7 @@ class ScheduleService {
       debugPrint('🔍 Active sessions API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
 
       if (!response.success || response.data == null) {
-        final errorMsg = response.message ?? 'Failed to get active sessions';
+        final errorMsg = response.errorMessage ?? 'Failed to get active sessions';
         debugPrint('🔍 Error fetching active sessions: $errorMsg');
         return [];
       }
