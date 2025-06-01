@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/delpresence/backend/internal/database"
@@ -197,12 +198,38 @@ func (r *AttendanceRepository) GetAttendanceStats(courseScheduleID uint) (*model
 
 // ListActiveSessionsBySchedules gets all active attendance sessions for given course schedule IDs
 func (r *AttendanceRepository) ListActiveSessionsBySchedules(scheduleIDs []uint) ([]models.AttendanceSession, error) {
+	// Handle empty schedule IDs
+	if len(scheduleIDs) == 0 {
+		fmt.Printf("No schedule IDs provided for active sessions query\n")
+		return []models.AttendanceSession{}, nil
+	}
+
+	fmt.Printf("Querying active sessions for schedule IDs: %v\n", scheduleIDs)
+
 	var sessions []models.AttendanceSession
-	err := r.db.Preload("CourseSchedule").
+	query := r.db.Preload("CourseSchedule").
 		Preload("CourseSchedule.Course").
 		Preload("CourseSchedule.Room").
-		Where("course_schedule_id IN (?) AND status = ?", scheduleIDs, models.AttendanceStatusActive).
-		Find(&sessions).Error
+		Preload("CourseSchedule.Room.Building").
+		Where("course_schedule_id IN (?) AND status = ?", scheduleIDs, models.AttendanceStatusActive)
 
-	return sessions, err
+	// Execute the query
+	err := query.Find(&sessions).Error
+
+	// Log the result
+	if err != nil {
+		fmt.Printf("Error querying active sessions: %v\n", err)
+		return []models.AttendanceSession{}, err
+	}
+
+	fmt.Printf("Found %d active sessions for schedule IDs: %v\n", len(sessions), scheduleIDs)
+
+	// Log details of found sessions for debugging
+	for i, session := range sessions {
+		fmt.Printf("Session %d: ID=%d, ScheduleID=%d, CourseID=%d, Type=%s, Status=%s\n",
+			i+1, session.ID, session.CourseScheduleID,
+			session.CourseSchedule.CourseID, session.Type, session.Status)
+	}
+
+	return sessions, nil
 }

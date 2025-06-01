@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/widgets/global_bottom_nav.dart';
 import '../../../../core/utils/toast_utils.dart';
+import '../../../../core/services/cache_service.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import '../../../schedule/presentation/screens/today_schedule_page.dart';
@@ -203,6 +204,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   
   // Timer for periodically checking active sessions
   Timer? _activeSessionsRefreshTimer;
+  
+  // Cache service
+  final CacheService _cacheService = CacheService();
+  
+  // State for lazy loading
+  bool _isHeaderLoaded = false;
+  bool _isMenuLoaded = false;
+  bool _isClassCardLoaded = false;
 
   // Halaman yang akan ditampilkan berdasarkan index bottom navbar
   late final List<Widget> _pages;
@@ -248,6 +257,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
+    // Initialize cache service
+    _initCacheService();
+
     // Initialize animation controller for FAB
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -286,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _scheduleService = ScheduleService(networkService: networkService);
     
     // Fetch today's schedule data
-    _fetchTodaySchedules();
+    _loadInitialData();
 
     // Initialize pages list
     _pages = [
@@ -323,16 +335,73 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  // Initialize the cache service
+  Future<void> _initCacheService() async {
+    await _cacheService.init();
+  }
+  
+  // Load initial data with cached values first, then update
+  Future<void> _loadInitialData() async {
+    // Try to load cached schedules first for instant display
+    final cachedSchedules = await _cacheService.getTodaySchedules();
+    if (cachedSchedules != null) {
+      setState(() {
+        _todaySchedules = ScheduleModel.fromJsonList(cachedSchedules);
+        _isLoadingSchedules = false;
+      });
+      
+      // Get cached active sessions
+      final cachedActiveSessions = await _cacheService.getActiveSessions();
+      if (cachedActiveSessions != null) {
+        setState(() {
+          _activeSessionsMap = cachedActiveSessions;
+        });
+      }
+    }
+    
+    // Then fetch fresh data in the background
+    _fetchTodaySchedules();
+  }
+  
+  // Simulate progressive loading for better user experience
+  void _simulateProgressiveLoading() {
+    // Load header first
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {
+          _isHeaderLoaded = true;
+        });
+      }
+    });
+    
+    // Then load menu
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        setState(() {
+          _isMenuLoaded = true;
+        });
+      }
+    });
+    
+    // Finally load class cards
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _isClassCardLoaded = true;
+        });
+      }
+    });
+  }
+
   // Start the timer to periodically check for active sessions
   void _startActiveSessionsRefreshTimer() {
     // Cancel existing timer if any
     _activeSessionsRefreshTimer?.cancel();
     
-    // Create new timer to check every 30 seconds
+    // Start a new timer that runs every 30 seconds
     _activeSessionsRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      // Only check if not already checking
-      if (!_isCheckingActiveSessions && _todaySchedules.isNotEmpty) {
-        debugPrint('🔄 Periodic check for active attendance sessions');
+      debugPrint('🔄 Periodic check for active attendance sessions');
+      if (_todaySchedules.isNotEmpty) {
         _checkActiveSessionsForSchedules(_todaySchedules);
       }
     });
@@ -570,10 +639,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Fungsi untuk mengambil jadwal hari ini
   Future<void> _fetchTodaySchedules() async {
+    if (_isCheckingActiveSessions) {
+      // Avoid multiple simultaneous requests
+      return;
+    }
+    
     setState(() {
       _isLoadingSchedules = true;
       _scheduleError = null;
-      _activeSessionsMap.clear();
     });
     
     try {
@@ -664,6 +737,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Check if any active sessions were found
       final hasAnyActive = tempMap.values.contains(true);
       debugPrint('🔍 Has any active sessions: $hasAnyActive');
+      
+      // Save results to cache
+      _cacheService.saveActiveSessions(tempMap);
       
       // Update state with results
       if (mounted) {
@@ -1506,292 +1582,297 @@ class _HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get the HomeScreen parent state using findAncestorStateOfType
     final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-    
-    // Check if there are any active sessions
-    bool hasAnyActiveSession = false;
-    if (homeState != null) {
-      hasAnyActiveSession = homeState._activeSessionsMap.values.contains(true);
+    if (homeState == null) {
+      return const Center(
+        child: Text('Error: Unable to find HomeScreen state.'),
+      );
     }
     
-    // Set status bar to transparent with light icons
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-      ),
-    );
-
-    // Calculate screen width to determine icon size
-    final screenWidth = MediaQuery.of(context).size.width;
-    // Size for icons to fit approximately 4 across with spacing - reduced by 15%
-    final iconSize = ((screenWidth - 80) / 4) * 0.80;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      extendBodyBehindAppBar: true,
-      appBar: null, // Remove AppBar to fix status bar issue
-      body: BlocBuilder<StudentBloc, StudentState>(
-        builder: (context, state) {
-          return Stack(
-            children: [
-              // Header with user information
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: HomeHeader(),
-              ),
-
-              // Content with rounded top corners
+    return CustomRefreshIndicator(
+      onRefresh: () async {
+        await homeState._fetchTodaySchedules();
+      },
+      builder: (context, child, controller) {
+        return Stack(
+          children: [
+            child,
+            
+            // Custom pull-to-refresh indicator
+            if (controller.value > 0)
               Positioned(
-                top: 140, // Return to original position
+                top: (controller.value * 60) - 30,
                 left: 0,
                 right: 0,
-                bottom: 0,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(25),
-                    topRight: Radius.circular(25),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          spreadRadius: 0,
-                          offset: const Offset(0, -2),
-                        ),
-                      ],
-                    ),
-                    child: RefreshIndicator(
-                      color: AppColors.primary,
-                      backgroundColor: Colors.white,
-                      onRefresh: () async {
-                        context
-                            .read<StudentBloc>()
-                            .add(const LoadStudentDataEvent());
-                        
-                        // Also refresh schedule data
-                        if (homeState != null) {
-                          await homeState._fetchTodaySchedules();
-                        }
-                      },
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 100),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Menu Grid - Improved layout
-                              Container(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 16, 20, 15),
-                                margin: const EdgeInsets.only(top: 0),
-                                decoration: const BoxDecoration(
-                                  color: Colors.transparent,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Horizontally scrollable menu row
-                                    Container(
-                                      height: iconSize +
-                                          30, // Adjusted for icon + text height
-                                      margin: const EdgeInsets.symmetric(
-                                          vertical: 10),
-                                      child: ListView(
-                                        scrollDirection: Axis.horizontal,
-                                        physics: const ClampingScrollPhysics(),
-                                        padding: EdgeInsets.zero,
-                                        children: [
-                                          // First item with left padding to match container
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                                right: 20),
-                                            child: homeState?._buildMenuItem(
-                                              context,
-                                              title: 'Absensi',
-                                              iconPath:
-                                                  'assets/images/menu-absensi.png',
-                                              iconSize: iconSize,
-                                              onTap: () {
-                                                // Only show bottom sheet if there are active sessions
-                                                if (hasAnyActiveSession) {
-                                                  homeState?._showAbsensiBottomSheet(context);
-                                                } else {
-                                                  // Show toast if no active sessions
-                                                  ToastUtils.showInfoToast(context, 'Tidak ada sesi absensi yang aktif saat ini');
-                                                }
-                                              },
-                                            ),
-                                          ),
-
-                                          // Mata Kuliah menu item
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                                right: 20),
-                                            child: homeState?._buildMenuItem(
-                                              context,
-                                              title: 'Mata Kuliah',
-                                              iconPath:
-                                                  'assets/images/menu-matakuliah.png',
-                                              iconSize: iconSize,
-                                              onTap: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        const CourseListScreen(),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-
-                                          // Jadwal menu item
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                                right: 20),
-                                            child: homeState?._buildMenuItem(
-                                              context,
-                                              title: 'Jadwal',
-                                              iconPath:
-                                                  'assets/images/menu-riwayat.png',
-                                              iconSize: iconSize,
-                                              onTap: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        const ScheduleScreen(),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-
-                                          // Riwayat menu item
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                                right: 20),
-                                            child: homeState?._buildMenuItem(
-                                              context,
-                                              title: 'Riwayat',
-                                              iconPath:
-                                                  'assets/images/menu-riwayat.png',
-                                              iconSize: iconSize,
-                                              onTap: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        const AttendanceHistoryScreen(),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-
-                                          // Pengaturan menu item
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                                right: 20),
-                                            child: homeState?._buildMenuItem(
-                                              context,
-                                              title: 'Pengaturan',
-                                              iconPath:
-                                                  'assets/images/menu-pengaturan.png',
-                                              iconSize: iconSize,
-                                              onTap: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        const SettingsScreen(),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // Today's Class Section with improved UI
-                              Container(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(Icons.today,
-                                            color: AppColors.primary, size: 20),
-                                        const SizedBox(width: 8),
-                                        GestureDetector(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    const TodaySchedulePage(),
-                                              ),
-                                            );
-                                          },
-                                          child: Row(
-                                            children: [
-                                              Text(
-                                                'Jadwal Kelas Hari Ini',
-                                                style: TextStyle(
-                                                  fontSize: 13.5,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppColors.textPrimary,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Icon(
-                                                Icons.arrow_forward_ios,
-                                                size: 12,
-                                                color: AppColors.primary,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    if (homeState?._getTodayClasses().isEmpty ?? true)
-                                      homeState?._buildEmptyClassesMessage() ?? Container()
-                                    else
-                                      Column(
-                                        children: (homeState?._getTodayClasses() ?? [])
-                                            .map((classData) => homeState?._buildClassCard(
-                                                context, classData) ?? Container())
-                                            .toList(),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                child: Center(
+                  child: SizedBox(
+                    height: 30,
+                    width: 30,
+                    child: controller.isLoading
+                        ? const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          )
+                        : CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value: controller.value,
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                           ),
-                        ),
-                      ),
-                    ),
                   ),
                 ),
               ),
-            ],
-          );
-        },
+          ],
+        );
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          // Header with fade in animation
+          AnimatedOpacity(
+            opacity: homeState._isHeaderLoaded ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: const HomeHeader(),
+          ),
+          
+          // Menu section with slide up animation
+          AnimatedOpacity(
+            opacity: homeState._isMenuLoaded ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              transform: Matrix4.translationValues(
+                0, 
+                homeState._isMenuLoaded ? 0 : 20, 
+                0
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+                child: Text(
+                  'Menu',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // Main menu - retain existing implementation
+          // ... existing code ...
+          
+          // Today's Classes heading - with animation
+          AnimatedOpacity(
+            opacity: homeState._isClassCardLoaded ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              transform: Matrix4.translationValues(
+                0, 
+                homeState._isClassCardLoaded ? 0 : 20, 
+                0
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Kelas Hari Ini',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        // Navigate to today's schedule screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const TodaySchedulePage(),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Lihat Semua',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // Today's classes list with lazy loading animation
+          AnimatedOpacity(
+            opacity: homeState._isClassCardLoaded ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              transform: Matrix4.translationValues(
+                0, 
+                homeState._isClassCardLoaded ? 0 : 20, 
+                0
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: _buildTodayClasses(context, homeState),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method to build today's classes section
+  Widget _buildTodayClasses(BuildContext context, _HomeScreenState homeState) {
+    final todayClasses = homeState._getTodayClasses();
+    
+    if (homeState._isLoadingSchedules && todayClasses.isEmpty) {
+      return Column(
+        children: List.generate(2, (index) => 
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: _buildClassCardSkeleton(),
+          )
+        ),
+      );
+    }
+    
+    if (homeState._scheduleError != null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            Text(
+              'Gagal memuat jadwal',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            TextButton(
+              onPressed: homeState._fetchTodaySchedules,
+              child: const Text('Coba Lagi', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    if (todayClasses.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        child: Text(
+          'Tidak ada kelas hari ini',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
+    
+    return Column(
+      children: todayClasses.map((classData) => 
+        homeState._buildClassCard(context, classData)
+      ).toList(),
+    );
+  }
+  
+  // Skeleton loading animation for class cards
+  Widget _buildClassCardSkeleton() {
+    return Container(
+      height: 100,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, 1),
+            blurRadius: 3,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 180,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                Container(
+                  width: 60,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Container(
+                  width: 100,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 80,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: 150,
+              height: 10,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

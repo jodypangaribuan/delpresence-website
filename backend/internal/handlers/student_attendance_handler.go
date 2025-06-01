@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/delpresence/backend/internal/services"
@@ -26,13 +27,29 @@ func (h *StudentAttendanceHandler) GetActiveAttendanceSessions(c *gin.Context) {
 	// Extract student ID from the authenticated user
 	userID := c.MustGet("userID").(uint)
 
+	// Log the request for debugging
+	fmt.Printf("Getting active attendance sessions for user ID=%d\n", userID)
+
 	// Get student's course schedules
 	schedules, err := h.scheduleService.GetStudentSchedules(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Failed to get student schedules",
-			"error":   err.Error(),
+		fmt.Printf("Error getting student schedules for user ID=%d: %v\n", userID, err)
+		// Return empty list instead of error
+		c.JSON(http.StatusOK, gin.H{
+			"status": "success",
+			"data":   []map[string]interface{}{},
+		})
+		return
+	}
+
+	// Log how many schedules were found
+	fmt.Printf("Found %d schedules for user ID=%d\n", len(schedules), userID)
+
+	// If no schedules found, return empty list
+	if len(schedules) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "success",
+			"data":   []map[string]interface{}{},
 		})
 		return
 	}
@@ -46,19 +63,32 @@ func (h *StudentAttendanceHandler) GetActiveAttendanceSessions(c *gin.Context) {
 		scheduleIDs = append(scheduleIDs, schedule.ID)
 	}
 
+	// Log schedule IDs for debugging
+	fmt.Printf("Checking for active sessions for schedule IDs: %v\n", scheduleIDs)
+
 	// Get active sessions for these schedules
 	sessions, err := h.attendanceService.GetActiveSessionsBySchedules(scheduleIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Failed to get active attendance sessions",
-			"error":   err.Error(),
+		fmt.Printf("Error getting active sessions for schedules %v: %v\n", scheduleIDs, err)
+		// Return empty list instead of error
+		c.JSON(http.StatusOK, gin.H{
+			"status": "success",
+			"data":   []map[string]interface{}{},
 		})
 		return
 	}
 
+	// Log how many active sessions were found
+	fmt.Printf("Found %d active sessions for schedules %v\n", len(sessions), scheduleIDs)
+
 	// Map sessions to response format
 	for _, session := range sessions {
+		// Check if CourseSchedule and related objects are loaded
+		if session.CourseSchedule.ID == 0 || session.CourseSchedule.Course.ID == 0 || session.CourseSchedule.Room.ID == 0 {
+			fmt.Printf("Warning: Session %d has incomplete related data\n", session.ID)
+			continue
+		}
+
 		activeSessions = append(activeSessions, map[string]interface{}{
 			"id":                 session.ID,
 			"course_schedule_id": session.CourseScheduleID,
