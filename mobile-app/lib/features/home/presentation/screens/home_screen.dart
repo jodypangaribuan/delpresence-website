@@ -2242,7 +2242,7 @@ class _HomePageState extends State<_HomePage> {
                                         ),
                                         const Spacer(),
                                         // Add refresh button to sync with server
-                                        !homeState?._isLoadingSchedules 
+                                        !(homeState?._isLoadingSchedules ?? true)
                                             ? IconButton(
                                                 icon: Icon(
                                                   Icons.refresh, 
