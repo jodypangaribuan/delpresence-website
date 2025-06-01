@@ -204,6 +204,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   // Halaman yang akan ditampilkan berdasarkan index bottom navbar
   late final List<Widget> _pages;
 
+  // Store the last refresh time to prevent excessive API calls
+  DateTime? _lastRefreshTime;
+
   void _onNavTap(int index) {
     print('Bottom navbar tapped with index: $index');
     
@@ -215,9 +218,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       _currentIndex = index;
     });
     
-    // If navigating back to home screen, refresh data
+    // If navigating back to home screen, refresh data with a delay
     if (navigatingToHome) {
-      _fetchTodaySchedules();
+      // Add a small delay to prevent gesture conflicts
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _fetchTodaySchedules();
+        }
+      });
     }
   }
   
@@ -591,11 +599,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
 
   // Fungsi untuk mengambil jadwal hari ini
   Future<void> _fetchTodaySchedules() async {
+    // Throttle API calls - don't refresh more than once every 3 seconds
+    final now = DateTime.now();
+    if (_lastRefreshTime != null && 
+        now.difference(_lastRefreshTime!).inSeconds < 3) {
+      debugPrint('🔄 Throttling API call - too soon since last refresh');
+      setState(() {
+        _isLoadingSchedules = false; // Hide loading state
+      });
+      return;
+    }
+    
+    // Update last refresh time
+    _lastRefreshTime = now;
+    
     setState(() {
       _isLoadingSchedules = true;
       _scheduleError = null;
-      // Clear the active sessions map to avoid stale data
-      _activeSessionsMap.clear();
     });
     
     try {
@@ -626,15 +646,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       final todaySchedules = ScheduleModel.getSchedulesByDay(schedules, dayName);
       
       // Update state with schedule results first
-      setState(() {
-        _todaySchedules = todaySchedules;
-        _isLoadingSchedules = false;
-      });
+      if (mounted) {
+        setState(() {
+          _todaySchedules = todaySchedules;
+          _isLoadingSchedules = false;
+        });
+      }
       
       // After loading schedules, immediately check for active sessions
-      if (todaySchedules.isNotEmpty) {
+      if (todaySchedules.isNotEmpty && mounted) {
         await _checkActiveSessionsForSchedules(todaySchedules);
-      } else {
+      } else if (mounted) {
         // If no schedules, ensure active sessions map is empty
         setState(() {
           _activeSessionsMap = {};
@@ -642,12 +664,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       }
     } catch (e) {
       debugPrint('🔍 Error refreshing home screen data: $e');
-      setState(() {
-        _scheduleError = e.toString();
-        _isLoadingSchedules = false;
-        // Clear active sessions on error to avoid inconsistent state
-        _activeSessionsMap = {};
-      });
+      if (mounted) {
+        setState(() {
+          _scheduleError = e.toString();
+          _isLoadingSchedules = false;
+          // Clear active sessions on error to avoid inconsistent state
+          _activeSessionsMap = {};
+        });
+      }
     }
   }
 
@@ -1537,20 +1561,21 @@ class _HomePageState extends State<_HomePage> {
   @override
   void initState() {
     super.initState();
-    // Delay the refresh to avoid build phase issues
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshData();
+    // Use a post-frame callback with a small delay to avoid the mouse tracker error
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _refreshData();
+      }
     });
   }
 
   void _refreshData() {
-    if (!_initialRefreshDone) {
+    if (mounted && !_initialRefreshDone) {
       final homeState = context.findAncestorStateOfType<_HomeScreenState>();
       if (homeState != null) {
+        // Use this flag to avoid duplicate refreshes
+        _initialRefreshDone = true;
         homeState._fetchTodaySchedules();
-        setState(() {
-          _initialRefreshDone = true;
-        });
       }
     }
   }
@@ -1626,9 +1651,9 @@ class _HomePageState extends State<_HomePage> {
                       onRefresh: () async {
                         // Properly refresh data and wait for completion
                         if (homeState != null) {
+                          // Add a small delay to prevent Flutter gesture conflict
+                          await Future.delayed(const Duration(milliseconds: 100));
                           await homeState._fetchTodaySchedules();
-                          // This forces the UI to update properly
-                          homeState.setState(() {});
                         }
                         // Return a completed future to satisfy the RefreshIndicator
                         return Future<void>.value();
