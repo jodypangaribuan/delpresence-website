@@ -1731,19 +1731,18 @@ class _HomePageState extends State<_HomePage> {
                                                   'assets/images/menu-absensi.png',
                                               iconSize: iconSize,
                                               onTap: () {
-                                                // The `_showAbsensiBottomSheet` will now handle the toast if no specific session type is actionable.
-                                                // We find the first active session to pass its type. If no active session, type will be null.
-                                                Map<String, dynamic>? firstActiveSessionData;
-                                                String? sessionTypeForAbsensiMenu;
-
-                                                if (homeState != null && homeState._activeSessionsMap.isNotEmpty) {
-                                                  var activeEntry = homeState._activeSessionsMap.entries.firstWhere((entry) => entry.value != null, orElse: () => const MapEntry(0, null));
-                                                  firstActiveSessionData = activeEntry.value;
-                                                  if (firstActiveSessionData != null) {
-                                                      sessionTypeForAbsensiMenu = firstActiveSessionData['type'] as String?;
+                                                if (homeState != null) {
+                                                  // Check if any session is active in the map
+                                                  bool anySessionInMapIsActive = homeState._activeSessionsMap.values.contains(true);
+                                                  
+                                                  if (anySessionInMapIsActive) {
+                                                    // Call _showAbsensiBottomSheet without a specific type.
+                                                    // The bottom sheet itself will handle showing generic options or a toast if needed.
+                                                    homeState._showAbsensiBottomSheet(context);
+                                                  } else {
+                                                    ToastUtils.showInfoToast(context, 'Tidak ada sesi absensi yang aktif saat ini');
                                                   }
                                                 }
-                                                homeState?._showAbsensiBottomSheet(context);
                                               },
                                             ),
                                           ),
