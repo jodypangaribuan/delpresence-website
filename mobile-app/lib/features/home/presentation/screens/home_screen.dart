@@ -371,20 +371,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 children: [
                   // Main Button
                   FloatingActionButton(
-                    onPressed: () {
+                    onPressed: () async {
                       HapticFeedback.mediumImpact();
 
-                      if (_isFaceRecognition) {
-                        // Navigate to face recognition screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CourseSelectionScreen(),
+                      // Check if there are any active sessions
+                      try {
+                        // First, get today's schedules
+                        final schedules = await _scheduleService.getStudentSchedules();
+                        
+                        // Then check if any schedule has an active session
+                        bool hasAnyActiveSession = false;
+                        for (final schedule in schedules) {
+                          final isActive = await _scheduleService.isAttendanceSessionActive(schedule.id);
+                          if (isActive) {
+                            hasAnyActiveSession = true;
+                            break;
+                          }
+                        }
+                        
+                        if (hasAnyActiveSession) {
+                          // If there's at least one active session, proceed to attendance screen
+                          if (_isFaceRecognition) {
+                            // Navigate to face recognition screen
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const CourseSelectionScreen(),
+                              ),
+                            );
+                          } else {
+                            // Navigate to QR code scanner
+                            _showQRScannerBottomSheet(context);
+                          }
+                        } else {
+                          // If no active sessions, show a message
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Tidak ada sesi absensi yang aktif. Tunggu dosen memulai presensi.'),
+                              duration: Duration(seconds: 3),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        // Show error message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Gagal memeriksa sesi absensi: $e'),
+                            duration: const Duration(seconds: 3),
+                            behavior: SnackBarBehavior.floating,
                           ),
                         );
-                      } else {
-                        // Navigate to QR code scanner
-                        _showQRScannerBottomSheet(context);
                       }
                     },
                     backgroundColor: AppColors.primary,
@@ -468,7 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.3,
+        height: MediaQuery.of(context).size.height * 0.5, // Make it taller
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,35 +542,79 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ],
             ),
-
+            
+            const SizedBox(height: 10),
+            
+            // Instruction text
+            const Text(
+              'Arahkan kamera ke QR Code yang ditampilkan oleh dosen untuk melakukan presensi',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            
             const SizedBox(height: 20),
-
-            // Scan QR button
+            
+            // Camera preview placeholder (in a real app, this would be replaced with actual camera view)
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                ),
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.qr_code_scanner,
+                        size: 60,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Fitur QR Scanner',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Hanya tersedia saat ada sesi presensi aktif',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Cancel button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  // Navigate to QR code scanner (simulated for now)
-                  ToastUtils.showInfoToast(
-                      context, 'QR Scanner akan segera hadir');
-                },
+                onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
                   backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text(
-                  'Mulai Scan',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: const Text('Tutup'),
               ),
             ),
           ],
