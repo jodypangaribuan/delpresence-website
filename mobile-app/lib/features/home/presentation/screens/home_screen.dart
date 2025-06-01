@@ -320,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
 
     // Initialize pages list
     _pages = [
-      const _HomePage(),
+      _HomePage(),
       const TodaySchedulePage(),
       const CourseSelectionScreen(),
       const TodayAttendanceHistoryPage(),
@@ -371,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   Widget _getPageForIndex(int index) {
     switch (index) {
       case 0:
-        return const _HomePage();
+        return _HomePage();
       case 1:
         return const TodaySchedulePage();
       case 2:
@@ -381,7 +381,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       case 4:
         return const ProfileScreen();
       default:
-        return const _HomePage();
+        return _HomePage();
     }
   }
 
