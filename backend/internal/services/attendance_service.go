@@ -633,8 +633,8 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 	}
 
 	// Calculate if the student is late based on session settings
-	now := GetIndonesiaTime()
-	checkInTime := now
+	now := GetIndonesiaTime() // Ensure Indonesian time
+	checkInTime := now        // Use Indonesian time for check-in
 
 	// Check if the student is late based on session settings
 	if session.AllowLate && time.Since(session.StartTime).Minutes() > float64(session.LateThreshold) {
@@ -689,7 +689,18 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 
 // GetIndonesiaTime returns current time in Indonesia Western Time (WIB/UTC+7)
 func GetIndonesiaTime() time.Time {
-	return time.Now().In(getIndonesiaLocation())
+	loc := getIndonesiaLocation()
+	now := time.Now().In(loc)
+
+	// Verify that we're getting the correct timezone
+	_, offset := now.Zone()
+	if offset != 7*60*60 {
+		fmt.Printf("WARNING: Indonesia timezone offset is not +7 hours, got: %d hours\n", offset/3600)
+		// Force WIB timezone if somehow the timezone data is incorrect
+		return time.Now().In(time.FixedZone("WIB", 7*60*60))
+	}
+
+	return now
 }
 
 // MarkStudentAttendanceByExternalID marks a student's attendance using their external user ID
@@ -748,8 +759,8 @@ func (s *AttendanceService) MarkStudentAttendanceByExternalID(sessionID uint, ex
 	}
 
 	// Calculate if the student is late based on session settings
-	now := GetIndonesiaTime()
-	checkInTime := now
+	now := GetIndonesiaTime() // Ensure Indonesian time
+	checkInTime := now        // Use Indonesian time for check-in
 
 	// Check if the student is late based on session settings
 	if session.AllowLate && time.Since(session.StartTime).Minutes() > float64(session.LateThreshold) {
@@ -1103,6 +1114,7 @@ func parseExternalUserIDFromNotes(notes string) uint {
 func getIndonesiaLocation() *time.Location {
 	location, err := time.LoadLocation("Asia/Jakarta")
 	if err != nil {
+		fmt.Printf("WARNING: Failed to load Asia/Jakarta timezone: %v\n", err)
 		// Fallback: Manually create WIB (UTC+7) if timezone data isn't available
 		location = time.FixedZone("WIB", 7*60*60)
 	}

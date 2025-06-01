@@ -344,9 +344,12 @@ class _FaceRecognitionAttendanceScreenState
                     width: double.infinity,
                     height: double.infinity,
                     color: Colors.black,
-                    child: Image.network(
-                      _capturedImage!.path,
-                      fit: BoxFit.contain,
+                    child: Transform.scale(
+                      scaleX: -1.0, // Mirror the image horizontally for consistency with camera preview
+                      child: Image.network(
+                        _capturedImage!.path,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   )
                 else
