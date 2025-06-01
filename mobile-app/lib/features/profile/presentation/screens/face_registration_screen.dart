@@ -20,7 +20,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
   bool _isFaceRegistered = false;
-  bool _isFaceDetected = false;
+  bool _isFaceDetected = false; // This should only be set manually by the user
   bool _isTakingPicture = false;
   final FaceRecognitionService _faceService = FaceRecognitionService();
   final UserService _userService = UserService();
@@ -167,10 +167,11 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
 
       setState(() {
         _isCameraInitialized = true;
+        // Initialize all detection flags to false
+        _isFaceDetected = false;
+        _faceAligned = false;
+        _hasGoodLighting = true; // We'll assume good lighting is available
       });
-      
-      // Start face quality check simulation
-      _startFaceQualityChecks();
       
     } catch (e) {
       print('Error initializing camera: $e');
@@ -188,16 +189,8 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
   }
 
   void _startFaceQualityChecks() {
-    // Instead of simulating face detection with timers, 
-    // we'll use a more manual approach where the user confirms when they're ready
-    setState(() {
-      // Only check for good lighting, but don't automatically detect faces
-      _hasGoodLighting = true;
-      _faceAligned = false;
-      _isFaceDetected = false;
-    });
-    
-    // We won't start countdown automatically anymore
+    // We're removing this method as we don't want automatic detection
+    // Do nothing - this is now fully manual
   }
   
   void _startCountdown() {
@@ -265,8 +258,8 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
       _isFaceDetected = true;
     });
     
-    // Start countdown for capturing photo
-    _startCountdown();
+    // We no longer automatically start countdown
+    // The user will need to press the "Take Photo" button
   }
 
   Future<void> _registerFace() async {
@@ -340,13 +333,10 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
     setState(() {
       _capturedImage = null;
       _isFaceDetected = false;
-      _hasGoodLighting = false;
+      _hasGoodLighting = true; // Keep lighting check as true
       _faceAligned = false;
       _isCountingDown = false;
     });
-    
-    // Restart face quality checks
-    _startFaceQualityChecks();
   }
 
   @override
@@ -405,9 +395,8 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
                           width: MediaQuery.of(context).size.width,
                           height: MediaQuery.of(context).size.width *
                               _cameraController!.value.aspectRatio,
-                          child: Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.rotationY(math.pi), // Properly mirror the camera horizontally
+                          child: Transform.scale(
+                            scaleX: -1.0, // Simple horizontal mirroring
                             child: CameraPreview(_cameraController!),
                           ),
                         ),

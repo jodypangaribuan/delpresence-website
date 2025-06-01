@@ -1,97 +1,64 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:toastification/toastification.dart';
 import '../../../../core/constants/colors.dart';
-import '../../../../features/face/data/services/face_service.dart';
-import '../../../../core/services/network_service.dart';
-import '../../../../core/config/api_config.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/face_recognition_service.dart';
+import '../../../../core/services/user_service.dart';
 
 class FaceRegistrationScreen extends StatefulWidget {
-  const FaceRegistrationScreen({super.key});
+  const FaceRegistrationScreen({Key? key}) : super(key: key);
 
   @override
   State<FaceRegistrationScreen> createState() => _FaceRegistrationScreenState();
 }
 
-class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with WidgetsBindingObserver {
+class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with TickerProviderStateMixin {
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
-  bool _isFaceDetected = false;
-  bool _isRegistering = false;
   bool _isProcessing = false;
-  Timer? _registrationTimer;
-  int _countdownSeconds = 5;
-  Timer? _faceDetectionTimer;
-  FaceService? _faceService;
+  bool _isFaceRegistered = false;
+  bool _isFaceDetected = false; // This should only be set manually by the user
+  bool _isTakingPicture = false;
+  final FaceRecognitionService _faceService = FaceRecognitionService();
+  final UserService _userService = UserService();
   int? _studentId;
   XFile? _capturedImage;
   
-  // Track if we've already shown an error
-  bool _hasShownError = false;
+  // Animation controllers
+  late AnimationController _pulseAnimationController;
+  late Animation<double> _pulseAnimation;
+  
+  // Face quality checks
+  bool _hasGoodLighting = false;
+  bool _faceAligned = false;
+  int _countdownSeconds = 3;
+  bool _isCountingDown = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _initializeDependencies();
+    _getCurrentUser();
     _requestCameraPermission();
-  }
-  
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Handle app lifecycle changes
-    if (state == AppLifecycleState.inactive) {
-      // App is inactive: pause camera
-      _cameraController?.pausePreview();
-    } else if (state == AppLifecycleState.resumed) {
-      // App is resumed: resume camera if it was initialized before
-      if (_cameraController != null && _cameraController!.value.isInitialized) {
-        _cameraController?.resumePreview();
-      }
-    }
-  }
-
-  Future<void> _initializeDependencies() async {
-    // Setup network service with API config
-    final networkService = NetworkService(
-      baseUrl: ApiConfig.instance.apiUrl,
-      defaultHeaders: ApiConfig.instance.defaultHeaders,
-      timeout: ApiConfig.instance.timeout,
+    
+    // Setup animations
+    _pulseAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseAnimationController, curve: Curves.easeInOut),
     );
-
-    // Initialize face service
-    _faceService = FaceService(networkService: networkService);
-
-    // Get student ID from shared preferences
-    await _getStudentId();
   }
 
-  Future<void> _getStudentId() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final studentIdStr = prefs.getString('student_id');
-      if (studentIdStr != null) {
-        setState(() {
-          _studentId = int.parse(studentIdStr);
-        });
-        debugPrint('Student ID loaded: $_studentId');
-      } else {
-        debugPrint('No student_id found in SharedPreferences');
-        // For demo, set a default student ID
-        setState(() {
-          _studentId = 12345; // Demo ID
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading student ID: $e');
-      // Set demo ID as fallback
+  Future<void> _getCurrentUser() async {
+    final user = await _userService.getCurrentUser();
+    if (user != null && user['student_id'] != null) {
       setState(() {
-        _studentId = 12345; // Demo ID
+        _studentId = user['student_id'];
       });
     }
   }
@@ -114,8 +81,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
           style: ToastificationStyle.fillColored,
           autoCloseDuration: const Duration(seconds: 3),
           title: const Text('Izin Dibutuhkan'),
-          description:
-              const Text('Izin kamera diperlukan untuk pendaftaran wajah'),
+          description: const Text('Izin kamera diperlukan untuk mendaftarkan wajah'),
           showProgressBar: true,
           primaryColor: AppColors.warning,
           closeOnClick: true,
@@ -133,14 +99,14 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
         return AlertDialog(
           title: const Text('Izin Kamera Diperlukan'),
           content: const Text(
-            'Izin kamera diperlukan untuk pendaftaran wajah. '
+            'Izin kamera diperlukan untuk mendaftarkan wajah. '
             'Silakan buka pengaturan aplikasi untuk mengaktifkan izin kamera.',
           ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Go back to settings screen
+                Navigator.pop(context); // Go back to previous screen
               },
               child: const Text('Batal'),
             ),
@@ -148,7 +114,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
               onPressed: () {
                 openAppSettings();
                 Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Go back to settings screen
+                Navigator.pop(context); // Go back to previous screen
               },
               child: const Text('Buka Pengaturan'),
             ),
@@ -160,9 +126,6 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
 
   Future<void> _initializeCamera() async {
     try {
-      // Safely dispose of any previous camera controller
-      await _cameraController?.dispose();
-      
       final cameras = await availableCameras();
 
       if (!mounted) return;
@@ -172,7 +135,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
         return;
       }
 
-      // Use front camera for face registration
+      // Use front camera
       final frontCamera = cameras.firstWhere(
         (camera) => camera.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
@@ -180,244 +143,205 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
 
       print('Using camera: ${frontCamera.name}, ${frontCamera.lensDirection}');
 
-      // Use a more compatible resolution preset
       _cameraController = CameraController(
         frontCamera,
-        ResolutionPreset.low, // Lower resolution for better compatibility
+        ResolutionPreset.high, // Use higher resolution for better face detection
         enableAudio: false,
-        imageFormatGroup: Platform.isAndroid 
-            ? ImageFormatGroup.jpeg  // Use JPEG for Android
-            : ImageFormatGroup.yuv420,
+        imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
-      // Initialize with error handling
-      await _cameraController!.initialize().catchError((e) {
-        debugPrint('Camera initialization error: $e');
-        _showCameraError(e.toString());
-        return null;
-      });
+      await _cameraController!.initialize();
+      
+      // Set auto focus mode for better face detection
+      if (_cameraController!.value.isInitialized) {
+        try {
+          await _cameraController!.setFocusMode(FocusMode.auto);
+          await _cameraController!.setExposureMode(ExposureMode.auto);
+        } catch (e) {
+          // Some devices may not support these features
+          print('Could not set focus/exposure mode: $e');
+        }
+      }
 
       if (!mounted) return;
 
       setState(() {
-        _isCameraInitialized = _cameraController!.value.isInitialized;
+        _isCameraInitialized = true;
+        // Initialize all detection flags to false
+        _isFaceDetected = false;
+        _faceAligned = false;
+        _hasGoodLighting = true; // We'll assume good lighting is available
       });
-
-      if (_isCameraInitialized) {
-        // Start face detection simulation
-        _startDemoFaceDetection();
-      }
+      
     } catch (e) {
-      debugPrint('Error initializing camera: $e');
-      _showCameraError(e.toString());
-    }
-  }
-
-  void _showCameraError(String error) {
-    if (!mounted || _hasShownError) return;
-    
-    setState(() {
-      _hasShownError = true; 
-    });
-    
-    // Show error notification
-    toastification.show(
-      context: context,
-      type: ToastificationType.error,
-      style: ToastificationStyle.fillColored,
-      title: const Text('Error Kamera'),
-      description: Text('Gagal menginisialisasi kamera. Coba lagi nanti.'),
-      autoCloseDuration: const Duration(seconds: 3),
-      primaryColor: AppColors.error,
-    );
-    
-    // Go back to previous screen after a short delay
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    });
-  }
-
-  void _startDemoFaceDetection() {
-    // For demo purposes, simulate face detection after a short delay
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted && _isCameraInitialized) {
-        setState(() {
-          _isFaceDetected = true;
-        });
-
-        // Start registration countdown
-        _startRegistrationCountdown();
-      }
-    });
-  }
-
-  void _startRegistrationCountdown() {
-    setState(() {
-      _isRegistering = true;
-      _countdownSeconds = 5;
-    });
-
-    _registrationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_countdownSeconds > 0) {
-        setState(() {
-          _countdownSeconds--;
-        });
-      } else {
-        _captureAndRegisterFace();
-      }
-    });
-  }
-
-  void _cancelRegistration() {
-    _registrationTimer?.cancel();
-    if (mounted && _isRegistering) {
-      setState(() {
-        _isRegistering = false;
-      });
-    }
-  }
-
-  Future<void> _captureAndRegisterFace() async {
-    _registrationTimer?.cancel();
-    
-    try {
-      setState(() {
-        _isProcessing = true;
-      });
-      
-      // Take picture
-      if (_cameraController == null || !_cameraController!.value.isInitialized) {
-        throw Exception('Camera controller not initialized');
-      }
-      
-      // Capture the image with additional error handling
-      XFile? image;
-      try {
-        image = await _cameraController!.takePicture();
-      } catch (e) {
-        debugPrint('Error taking picture: $e');
-        // Use a simulated image for demo if camera fails
-        final fallbackResponse = await _simulateFaceRegistration();
-        
-        if (fallbackResponse['success'] == true) {
-          if (mounted) {
-            Navigator.pop(context);
-            toastification.show(
-              context: context,
-              type: ToastificationType.success,
-              style: ToastificationStyle.fillColored,
-              autoCloseDuration: const Duration(seconds: 3),
-              title: const Text('Berhasil'),
-              description: const Text('Wajah berhasil didaftarkan'),
-              showProgressBar: true,
-              primaryColor: AppColors.success,
-              closeOnClick: true,
-              dragToClose: true,
-            );
-          }
-        }
-        return;
-      }
-      
-      setState(() {
-        _capturedImage = image;
-      });
-      
-      if (_studentId == null) {
-        throw Exception('Student ID not available');
-      }
-      
-      // Convert image to base64
-      final imageBytes = await File(image.path).readAsBytes();
-      final base64Image = base64Encode(imageBytes);
-      
-      // Send to backend
-      if (_faceService == null) {
-        throw Exception('Face service not initialized');
-      }
-      
-      final result = await _faceService!.registerFace(_studentId!, base64Image);
-      
-      if (result['success'] == true) {
-        // Registration successful
-        if (mounted) {
-          Navigator.pop(context);
-          toastification.show(
-            context: context,
-            type: ToastificationType.success,
-            style: ToastificationStyle.fillColored,
-            autoCloseDuration: const Duration(seconds: 3),
-            title: const Text('Berhasil'),
-            description: const Text('Wajah berhasil didaftarkan'),
-            showProgressBar: true,
-            primaryColor: AppColors.success,
-            closeOnClick: true,
-            dragToClose: true,
-          );
-        }
-      } else {
-        // Registration failed
-        throw Exception(result['message'] ?? 'Gagal mendaftarkan wajah');
-      }
-    } catch (e) {
-      debugPrint('Error during face registration: $e');
+      print('Error initializing camera: $e');
       if (mounted) {
         toastification.show(
           context: context,
           type: ToastificationType.error,
           style: ToastificationStyle.fillColored,
+          title: const Text('Error'),
+          description: Text('Camera initialization failed: $e'),
           autoCloseDuration: const Duration(seconds: 3),
-          title: const Text('Gagal'),
-          description: Text('Pendaftaran wajah gagal: $e'),
-          showProgressBar: true,
-          primaryColor: AppColors.error,
-          closeOnClick: true,
-          dragToClose: true,
         );
-      }
-    } finally {
-      // Clean up
-      if (_capturedImage != null) {
-        try {
-          await File(_capturedImage!.path).delete();
-        } catch (e) {
-          debugPrint('Error deleting temporary image: $e');
-        }
-      }
-      
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-          _isRegistering = false;
-        });
       }
     }
   }
+
+  void _startFaceQualityChecks() {
+    // We're removing this method as we don't want automatic detection
+    // Do nothing - this is now fully manual
+  }
   
-  // Fallback method for demo if camera fails
-  Future<Map<String, dynamic>> _simulateFaceRegistration() async {
-    // Wait for a short time to simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+  void _startCountdown() {
+    // Only start countdown if user manually presses the button
+    setState(() {
+      _isCountingDown = true;
+      _countdownSeconds = 3;
+    });
     
-    // Return a successful response
-    return {
-      'success': true,
-      'message': 'Face registered successfully (demo)',
-      'data': {
-        'student_id': _studentId,
-        'embedding_id': 'demo_embedding_${DateTime.now().millisecondsSinceEpoch}',
-        'timestamp': DateTime.now().toIso8601String(),
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted && _isCountingDown) {
+        setState(() {
+          _countdownSeconds--;
+        });
+        
+        if (_countdownSeconds > 0) {
+          _startCountdown();
+        } else {
+          // Auto capture
+          _captureImage();
+        }
       }
-    };
+    });
+  }
+
+  Future<void> _captureImage() async {
+    if (!_isCameraInitialized || _cameraController == null || !mounted || _isTakingPicture) return;
+    
+    try {
+      setState(() {
+        _isTakingPicture = true;
+        _isCountingDown = false;
+      });
+      
+      // Capture the image
+      final XFile imageFile = await _cameraController!.takePicture();
+      
+      setState(() {
+        _capturedImage = imageFile;
+        _isTakingPicture = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isTakingPicture = false;
+      });
+      
+      print('Error capturing image: $e');
+      if (mounted) {
+        toastification.show(
+          context: context,
+          type: ToastificationType.error,
+          style: ToastificationStyle.fillColored,
+          title: const Text('Error'),
+          description: Text('Gagal mengambil gambar: $e'),
+          autoCloseDuration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  // Add this method to manually indicate face is positioned correctly
+  void _manuallyStartCapture() {
+    setState(() {
+      _faceAligned = true;
+      _isFaceDetected = true;
+    });
+    
+    // We no longer automatically start countdown
+    // The user will need to press the "Take Photo" button
+  }
+
+  Future<void> _registerFace() async {
+    if (_capturedImage == null || _studentId == null) return;
+    
+    setState(() {
+      _isProcessing = true;
+    });
+    
+    try {
+      // Convert the image to bytes
+      final File file = File(_capturedImage!.path);
+      final imageBytes = await file.readAsBytes();
+      
+      // Send the image for face registration
+      final result = await _faceService.registerFace(_studentId!, imageBytes);
+      
+      if (result['success']) {
+        // Face registration succeeded
+        setState(() {
+          _isFaceRegistered = true;
+          _isProcessing = false;
+        });
+        
+        if (mounted) {
+          toastification.show(
+            context: context,
+            type: ToastificationType.success,
+            style: ToastificationStyle.fillColored,
+            title: const Text('Berhasil'),
+            description: const Text('Wajah berhasil didaftarkan'),
+            autoCloseDuration: const Duration(seconds: 3),
+          );
+        }
+      } else {
+        // Face registration failed
+        setState(() {
+          _isProcessing = false;
+        });
+        
+        if (mounted) {
+          toastification.show(
+            context: context,
+            type: ToastificationType.error,
+            style: ToastificationStyle.fillColored,
+            title: const Text('Gagal'),
+            description: Text('Pendaftaran wajah gagal: ${result['message']}'),
+            autoCloseDuration: const Duration(seconds: 3),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isProcessing = false;
+      });
+      
+      if (mounted) {
+        toastification.show(
+          context: context,
+          type: ToastificationType.error,
+          style: ToastificationStyle.fillColored,
+          title: const Text('Error'),
+          description: Text('Terjadi kesalahan: $e'),
+          autoCloseDuration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  void _retakePhoto() {
+    setState(() {
+      _capturedImage = null;
+      _isFaceDetected = false;
+      _hasGoodLighting = true; // Keep lighting check as true
+      _faceAligned = false;
+      _isCountingDown = false;
+    });
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _registrationTimer?.cancel();
-    _faceDetectionTimer?.cancel();
+    _pulseAnimationController.dispose();
     _cameraController?.dispose();
     super.dispose();
   }
@@ -431,7 +355,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          'Pendaftaran Wajah',
+          'Daftarkan Wajah',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -443,174 +367,490 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                // Camera preview
-                if (_isCameraInitialized)
-                  SizedBox(
-                    width: MediaQuery.of(context).size.width,
-                    height: MediaQuery.of(context).size.height,
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.center,
-                        child: FittedBox(
-                          fit: BoxFit.cover,
-                          child: SizedBox(
-                            width: MediaQuery.of(context).size.width,
-                            height: MediaQuery.of(context).size.width *
-                                _cameraController!.value.aspectRatio,
+      body: _isFaceRegistered
+          ? _buildSuccessView()
+          : _capturedImage != null
+              ? _buildReviewScreen()
+              : _buildCameraScreen(),
+    );
+  }
+
+  Widget _buildCameraScreen() {
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              // Camera preview
+              if (_isCameraInitialized)
+                SizedBox(
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height,
+                  child: ClipRect(
+                    child: OverflowBox(
+                      alignment: Alignment.center,
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: MediaQuery.of(context).size.width,
+                          height: MediaQuery.of(context).size.width *
+                              _cameraController!.value.aspectRatio,
+                          child: Transform.scale(
+                            scaleX: -1.0, // Simple horizontal mirroring
                             child: CameraPreview(_cameraController!),
                           ),
                         ),
                       ),
                     ),
-                  )
-                else
-                  const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                    ),
                   ),
-
-                // Face detection overlay
-                if (_isFaceDetected)
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: FaceOverlayPainter(
-                        isRegistering: _isRegistering,
-                        countdownSeconds: _countdownSeconds,
-                      ),
-                    ),
+                )
+              else
+                const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
                   ),
-
-                // Processing overlay
-                if (_isProcessing)
-                  Positioned.fill(
-                    child: Container(
-                      color: Colors.black.withOpacity(0.7),
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                ),
+              
+              // Face overlay with animated guidance
+              if (_isCameraInitialized)
+                Center(
+                  child: AnimatedBuilder(
+                    animation: _pulseAnimationController,
+                    builder: (context, child) {
+                      return Container(
+                        width: 220,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _isFaceDetected
+                                ? Colors.green
+                                : Colors.white.withOpacity(0.7),
+                            width: 2.0,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
                           children: [
-                            CircularProgressIndicator(
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(height: 20),
-                            Text(
-                              'Mendaftarkan wajah...',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                            // Pulsing circle
+                            if (!_isFaceDetected)
+                              Transform.scale(
+                                scale: _pulseAnimation.value,
+                                child: Container(
+                                  width: 210,
+                                  height: 210,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.2),
+                                      width: 1.5,
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
                               ),
-                            ),
+                              
+                            // Face outline when detected
+                            if (_isFaceDetected)
+                              CustomPaint(
+                                size: const Size(180, 220),
+                                painter: FaceOutlinePainter(
+                                  color: Colors.green.withOpacity(0.7),
+                                ),
+                              ),
+                              
+                            // Countdown text
+                            if (_isCountingDown)
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '$_countdownSeconds',
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
-
-                // Countdown text overlay
-                if (_isFaceDetected && _isRegistering && !_isProcessing)
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 40, vertical: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Wajah Terdeteksi',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 15),
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              SizedBox(
-                                width: 100,
-                                height: 100,
-                                child: CircularProgressIndicator(
-                                  value: (5 - _countdownSeconds) / 5,
-                                  strokeWidth: 8,
-                                  backgroundColor:
-                                      Colors.white.withOpacity(0.2),
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              Text(
-                                '$_countdownSeconds',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 60,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 15),
-                          const Text(
-                            'Tetap diam...',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // Instructions overlay
+                ),
+              
+              // Face quality indicators
+              if (_isCameraInitialized)
                 Positioned(
-                  bottom: 30,
-                  left: 20,
-                  right: 20,
+                  top: 20,
+                  left: 0,
+                  right: 0,
                   child: Container(
-                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.symmetric(horizontal: 40),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(178),
+                      color: Colors.black.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _isFaceDetected
-                              ? 'Wajah terdeteksi! Tetap diam...'
-                              : 'Posisikan wajah Anda di dalam bingkai',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        _buildQualityIndicator(
+                          'Pencahayaan',
+                          _hasGoodLighting,
                         ),
                         const SizedBox(height: 8),
+                        _buildQualityIndicator(
+                          'Posisi Wajah',
+                          _faceAligned,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              
+              // Processing indicator
+              if (_isProcessing || _isTakingPicture)
+                Container(
+                  color: Colors.black.withOpacity(0.5),
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          color: Colors.white,
+                        ),
+                        SizedBox(height: 20),
                         Text(
-                          _isRegistering
-                              ? 'Pendaftaran akan selesai dalam $_countdownSeconds detik'
-                              : 'Pastikan pencahayaan cukup dan wajah terlihat jelas',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
+                          'Memproses...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
+            ],
+          ),
+        ),
+        
+        // Instructions
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          color: Colors.black,
+          child: Column(
+            children: [
+              Text(
+                _isFaceDetected
+                    ? 'Wajah terdeteksi, jangan bergerak'
+                    : 'Posisikan wajah Anda di dalam lingkaran',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _isFaceDetected ? Colors.green : Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Pastikan pencahayaan cukup dan wajah terlihat jelas',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Two-step process for capturing:
+              // 1. Position face button
+              // 2. Start capture button (appears after positioning)
+              if (_isCameraInitialized && !_isProcessing && !_isTakingPicture && !_isCountingDown) 
+                !_isFaceDetected
+                  ? ElevatedButton(
+                      onPressed: _manuallyStartCapture,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Wajah Saya Sudah Siap',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  : ElevatedButton(
+                      onPressed: _startCountdown,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Ambil Foto Sekarang',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+              
+              // Countdown indicator  
+              if (_isCountingDown)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  width: double.infinity,
+                  child: Text(
+                    'Mengambil foto dalam $_countdownSeconds detik...',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQualityIndicator(String label, bool isChecked) {
+    return Row(
+      children: [
+        Icon(
+          isChecked ? Icons.check_circle : Icons.radio_button_unchecked,
+          color: isChecked ? Colors.green : Colors.white70,
+          size: 18,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: isChecked ? Colors.green : Colors.white70,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewScreen() {
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              // Display captured image (without mirroring - show the actual image)
+              SizedBox(
+                width: MediaQuery.of(context).size.width,
+                height: MediaQuery.of(context).size.height,
+                child: Image.file(
+                  File(_capturedImage!.path),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              
+              // Overlay with face indicator
+              Center(
+                child: CustomPaint(
+                  size: const Size(180, 220),
+                  painter: FaceOutlinePainter(
+                    color: Colors.green.withOpacity(0.6),
+                  ),
+                ),
+              ),
+              
+              // Processing indicator
+              if (_isProcessing)
+                Container(
+                  color: Colors.black.withOpacity(0.5),
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          color: Colors.white,
+                        ),
+                        SizedBox(height: 20),
+                        Text(
+                          'Mendaftarkan wajah...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        
+        // Action buttons
+        if (!_isProcessing)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            color: Colors.black,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Verifikasi Foto',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Pastikan foto wajah Anda terlihat jelas dan tidak blur',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    // Retake button
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _retakePhoto,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.white),
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Ambil Ulang',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    
+                    // Register button
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _registerFace,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Daftarkan',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSuccessView() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 80,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Wajah Berhasil Didaftarkan',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Anda sekarang dapat menggunakan fitur\nFace Recognition untuk absensi',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 48),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Kembali ke Pengaturan',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -619,58 +859,58 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Wi
   }
 }
 
-class FaceOverlayPainter extends CustomPainter {
-  final bool isRegistering;
-  final int countdownSeconds;
-
-  FaceOverlayPainter({
-    required this.isRegistering,
-    required this.countdownSeconds,
-  });
-
+// Custom painter for face outline
+class FaceOutlinePainter extends CustomPainter {
+  final Color color;
+  
+  FaceOutlinePainter({required this.color});
+  
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.4;
-
-    // Draw face oval guide
-    final ovalPaint = Paint()
-      ..color = isRegistering ? AppColors.primary : Colors.white
+    final paint = Paint()
+      ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    // Draw oval for face positioning
+      ..strokeWidth = 2.0;
+    
+    // Draw face oval
     canvas.drawOval(
       Rect.fromCenter(
-        center: center,
-        width: radius * 1.3,
-        height: radius * 1.8,
+        center: Offset(size.width / 2, size.height / 2),
+        width: size.width * 0.9,
+        height: size.height * 0.9,
       ),
-      ovalPaint,
+      paint,
     );
-
-    // Add a subtle glow effect when registering
-    if (isRegistering) {
-      final glowPaint = Paint()
-        ..color = AppColors.primary.withOpacity(0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 8.0
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
-
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: center,
-          width: radius * 1.3,
-          height: radius * 1.8,
-        ),
-        glowPaint,
-      );
-    }
+    
+    // Draw eyes
+    final eyeRadius = size.width * 0.12;
+    final eyeY = size.height * 0.38;
+    final leftEyeX = size.width * 0.3;
+    final rightEyeX = size.width * 0.7;
+    
+    canvas.drawCircle(Offset(leftEyeX, eyeY), eyeRadius, paint);
+    canvas.drawCircle(Offset(rightEyeX, eyeY), eyeRadius, paint);
+    
+    // Draw mouth
+    final mouthWidth = size.width * 0.45;
+    final mouthHeight = size.height * 0.08;
+    final mouthY = size.height * 0.7;
+    
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, mouthY),
+        width: mouthWidth,
+        height: mouthHeight,
+      ),
+      0.2, // Start angle
+      2.7, // Sweep angle
+      false,
+      paint,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant FaceOverlayPainter oldDelegate) {
-    return oldDelegate.isRegistering != isRegistering ||
-        oldDelegate.countdownSeconds != countdownSeconds;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
   }
 }
