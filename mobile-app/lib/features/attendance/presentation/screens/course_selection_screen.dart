@@ -7,6 +7,7 @@ import '../../../../core/config/api_config.dart'; // For ApiConfig
 import 'face_recognition_attendance_screen.dart';
 import '../../../../core/utils/toast_utils.dart'; // Added for ToastUtils
 import 'package:delpresence/features/qr_scanner/qr_scanner_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CourseSelectionScreen extends StatefulWidget {
   const CourseSelectionScreen({super.key});
@@ -118,122 +119,135 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
 
   // Adapted from home_screen.dart
   void _showAbsensiBottomSheet(BuildContext context, ScheduleModel schedule) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.42, // Adjusted height for two options
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 20),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Icon(
-                  Icons.how_to_reg,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Pilih Metode Absensi',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF333333),
+    // Check if attendance has already been submitted for this schedule
+    SharedPreferences.getInstance().then((prefs) {
+      bool isAlreadyCompleted = prefs.getBool('attendance_completed_${schedule.id}') ?? false;
+      
+      if (isAlreadyCompleted) {
+        // If attendance is already completed, show a message and refresh data
+        ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
+        _fetchTodaySchedules(); // Refresh data
+        return;
+      }
+      
+      // Continue with showing the bottom sheet
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.42, // Adjusted height for two options
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Column(
-              children: [
-                // QR Code Option (Re-added)
-                _buildMinimalistAbsensiOption(
-                  context,
-                  icon: Icons.qr_code_scanner_rounded,
-                  title: 'Scan QR',
-                  description: 'Pindai kode QR untuk melakukan absensi',
-                  onTap: () {
-                    Navigator.pop(context); // Close bottom sheet
-                    
-                    // Callback for when scan is successful
-                    void onQrScanSuccessCallback(int successScheduleId) {
-                      // Update the status for this schedule
-                      setState(() {
-                        // Update active sessions map
-                        _activeSessionsMap[successScheduleId] = false;
-                        
-                        // Find and update the schedule in the list
-                        for (var i = 0; i < _todaySchedules.length; i++) {
-                          if (_todaySchedules[i].id == successScheduleId) {
-                            _todaySchedules[i] = _todaySchedules[i].copyWith(
-                              status: "Selesai"
-                            );
-                            break;
-                          }
-                        }
-                      });
+              ),
+              Row(
+                children: [
+                  Icon(
+                    Icons.how_to_reg,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Pilih Metode Absensi',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Column(
+                children: [
+                  // QR Code Option (Re-added)
+                  _buildMinimalistAbsensiOption(
+                    context,
+                    icon: Icons.qr_code_scanner_rounded,
+                    title: 'Scan QR',
+                    description: 'Pindai kode QR untuk melakukan absensi',
+                    onTap: () {
+                      Navigator.pop(context); // Close bottom sheet
                       
-                      // Refresh the data after a short delay
-                      Future.delayed(const Duration(milliseconds: 500), () {
-                        if (mounted) {
-                          _fetchTodaySchedules();
-                        }
-                      });
-                    }
-                    
-                    // Use the enhanced QR scanner service method with original schedule ID and callback
-                    QRScannerService.scanAndSubmitAttendance(
-                      context, 
-                      scheduleId: schedule.id,
-                      onSuccessCallback: onQrScanSuccessCallback,
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-                // Face Recognition Option
-                _buildMinimalistAbsensiOption(
-                  context,
-                  icon: Icons.face_rounded,
-                  title: 'Face Recognition',
-                  description: 'Gunakan pengenalan wajah untuk absensi',
-                  onTap: () {
-                    Navigator.pop(context); // Close bottom sheet
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            FaceRecognitionAttendanceScreen(
-                          courseName: schedule.courseName,
+                      // Callback for when scan is successful
+                      void onQrScanSuccessCallback(int successScheduleId) {
+                        // Update the status for this schedule
+                        setState(() {
+                          // Update active sessions map
+                          _activeSessionsMap[successScheduleId] = false;
+                          
+                          // Find and update the schedule in the list
+                          for (var i = 0; i < _todaySchedules.length; i++) {
+                            if (_todaySchedules[i].id == successScheduleId) {
+                              _todaySchedules[i] = _todaySchedules[i].copyWith(
+                                status: "Selesai"
+                              );
+                              break;
+                            }
+                          }
+                        });
+                        
+                        // Refresh the data after a short delay
+                        Future.delayed(const Duration(milliseconds: 500), () {
+                          if (mounted) {
+                            _fetchTodaySchedules();
+                          }
+                        });
+                      }
+                      
+                      // Use the enhanced QR scanner service method with original schedule ID and callback
+                      QRScannerService.scanAndSubmitAttendance(
+                        context, 
+                        scheduleId: schedule.id,
+                        onSuccessCallback: onQrScanSuccessCallback,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+                  // Face Recognition Option
+                  _buildMinimalistAbsensiOption(
+                    context,
+                    icon: Icons.face_rounded,
+                    title: 'Face Recognition',
+                    description: 'Gunakan pengenalan wajah untuk absensi',
+                    onTap: () {
+                      Navigator.pop(context); // Close bottom sheet
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              FaceRecognitionAttendanceScreen(
+                            courseName: schedule.courseName,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   // Adapted from home_screen.dart
@@ -440,149 +454,185 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                               final bool statusBasedActive = schedule.status?.toLowerCase() == 'sedang berlangsung';
                               final bool isCurrentlyActiveClass = timeBasedActive || statusBasedActive;
 
+                              return FutureBuilder<SharedPreferences>(
+                                future: SharedPreferences.getInstance(),
+                                builder: (context, snapshot) {
+                                  // Default values if prefs not yet loaded
+                                  bool isAttendanceCompleted = false;
+                                  
+                                  // Update values if prefs are loaded
+                                  if (snapshot.hasData) {
+                                    isAttendanceCompleted = snapshot.data!.getBool('attendance_completed_${schedule.id}') ?? false;
+                                  }
+                                  
+                                  // Determine if the schedule is active and can be selected
+                                  final bool canSelectForAttendance = 
+                                      isCurrentlyActiveClass && 
+                                      hasActiveSession && 
+                                      !isAttendanceCompleted;
+                                  
+                                  // Set the status text based on various conditions
+                                  String statusText;
+                                  if (isAttendanceCompleted) {
+                                    statusText = 'Sudah Absen';
+                                  } else if (hasActiveSession) {
+                                    statusText = 'Bisa Absen';
+                                  } else if (schedule.status?.toLowerCase() == 'selesai') {
+                                    statusText = 'Selesai';
+                                  } else {
+                                    statusText = schedule.status ?? 'Tidak Aktif';
+                                  }
 
-                              return GestureDetector(
-                                onTap: (isCurrentlyActiveClass && hasActiveSession)
-                                    ? () {
-                                        // Show bottom sheet instead of direct navigation
-                                        _showAbsensiBottomSheet(context, schedule);
-                                      }
-                                    : null, 
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  decoration: BoxDecoration(
-                                    color: (isCurrentlyActiveClass && hasActiveSession)
-                                        ? Colors.white
-                                        : Colors.white.withOpacity(0.8),
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.05),
-                                        offset: const Offset(0, 1),
-                                        blurRadius: 3,
-                                        spreadRadius: 0,
+                                  return GestureDetector(
+                                    onTap: canSelectForAttendance
+                                        ? () {
+                                            // Show bottom sheet instead of direct navigation
+                                            _showAbsensiBottomSheet(context, schedule);
+                                          }
+                                        : null,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
+                                        color: canSelectForAttendance
+                                            ? Colors.white
+                                            : Colors.white.withOpacity(0.8),
+                                        borderRadius: BorderRadius.circular(8),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.05),
+                                            offset: const Offset(0, 1),
+                                            blurRadius: 3,
+                                            spreadRadius: 0,
+                                          ),
+                                        ],
+                                        border: Border.all(
+                                          color: canSelectForAttendance
+                                              ? AppColors.primary.withOpacity(0.3)
+                                              : isAttendanceCompleted
+                                                ? AppColors.success.withOpacity(0.3)
+                                                : Colors.grey.withOpacity(0.1),
+                                          width: canSelectForAttendance || isAttendanceCompleted ? 1.5 : 1,
+                                        ),
                                       ),
-                                    ],
-                                    border: Border.all(
-                                      color: (isCurrentlyActiveClass && hasActiveSession)
-                                          ? AppColors.primary.withOpacity(0.3)
-                                          : Colors.grey.withOpacity(0.1),
-                                      width: (isCurrentlyActiveClass && hasActiveSession) ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Expanded(
-                                              child: Text(
-                                                schedule.courseName,
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: (isCurrentlyActiveClass && hasActiveSession)
-                                                      ? AppColors.textPrimary
-                                                      : AppColors.textSecondary,
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    schedule.courseName,
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: isAttendanceCompleted
+                                                          ? AppColors.success
+                                                          : canSelectForAttendance
+                                                            ? AppColors.textPrimary
+                                                            : AppColors.textSecondary,
+                                                    ),
+                                                  ),
                                                 ),
-                                              ),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: (isCurrentlyActiveClass && hasActiveSession)
-                                                    ? AppColors.success.withOpacity(0.08)
-                                                    : Colors.grey.withOpacity(0.08),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                (isCurrentlyActiveClass && hasActiveSession)
-                                                    ? 'Bisa Absen'
-                                                    : schedule.status ?? 'Tidak Aktif', // Show actual status or 'Tidak Aktif'
-                                                style: TextStyle(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: (isCurrentlyActiveClass && hasActiveSession)
-                                                      ? AppColors.success
-                                                      : AppColors.textSecondary,
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                      horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: isAttendanceCompleted
+                                                        ? AppColors.success.withOpacity(0.08)
+                                                        : canSelectForAttendance
+                                                          ? AppColors.primary.withOpacity(0.08)
+                                                          : Colors.grey.withOpacity(0.08),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    statusText,
+                                                    style: TextStyle(
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: isAttendanceCompleted
+                                                          ? AppColors.success
+                                                          : canSelectForAttendance
+                                                            ? AppColors.primary
+                                                            : AppColors.textSecondary,
+                                                    ),
+                                                  ),
                                                 ),
-                                              ),
+                                              ],
                                             ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.access_time_rounded,
-                                              size: 12,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                            const SizedBox(width: 3),
-                                            Text(
-                                              '${schedule.startTime} - ${schedule.endTime}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: AppColors.textSecondary,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Icon(
-                                              Icons.location_on_outlined,
-                                              size: 12,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                            const SizedBox(width: 3),
-                                            Text(
-                                              schedule.roomName,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: AppColors.textSecondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.person_outline,
-                                              size: 12,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                            const SizedBox(width: 3),
-                                            Expanded(
-                                              child: Text(
-                                                schedule.lecturerName,
-                                                style: TextStyle(
-                                                  fontSize: 11,
+                                            const SizedBox(height: 6),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time_rounded,
+                                                  size: 12,
                                                   color: AppColors.textSecondary,
                                                 ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  '${schedule.startTime} - ${schedule.endTime}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: AppColors.textSecondary,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Icon(
+                                                  Icons.location_on_outlined,
+                                                  size: 12,
+                                                  color: AppColors.textSecondary,
+                                                ),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  schedule.roomName,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: AppColors.textSecondary,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
+                                            const SizedBox(height: 3),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.person_outline,
+                                                  size: 12,
+                                                  color: AppColors.textSecondary,
+                                                ),
+                                                const SizedBox(width: 3),
+                                                Expanded(
+                                                  child: Text(
+                                                    schedule.lecturerName,
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: AppColors.textSecondary,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            if (!(canSelectForAttendance || isAttendanceCompleted))
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 8.0),
+                                                child: Text(
+                                                  isCurrentlyActiveClass ? 'Sesi absensi belum dibuka dosen.' : 'Jadwal tidak aktif atau sudah selesai.',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontStyle: FontStyle.italic,
+                                                    color: AppColors.warning,
+                                                  ),
+                                                ),
+                                              ),
                                           ],
                                         ),
-                                        if (!(isCurrentlyActiveClass && hasActiveSession))
-                                          Padding(
-                                            padding: const EdgeInsets.only(top: 8.0),
-                                            child: Text(
-                                              isCurrentlyActiveClass ? 'Sesi absensi belum dibuka dosen.' : 'Jadwal tidak aktif atau sudah selesai.',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontStyle: FontStyle.italic,
-                                                color: AppColors.warning,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                ),
+                                  );
+                                },
                               );
                             },
                           ),

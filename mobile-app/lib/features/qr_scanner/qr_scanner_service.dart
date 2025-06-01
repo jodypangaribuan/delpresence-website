@@ -198,6 +198,12 @@ class QRScannerService {
         
         // Consider 2xx responses as success
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          // Save attendance status in SharedPreferences to prevent duplicate submissions
+          if (scheduleId != null) {
+            await prefs.setBool('attendance_completed_$scheduleId', true);
+            debugPrint('✅ Marked attendance as completed for schedule $scheduleId');
+          }
+          
           ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
           return true;
         }

@@ -26,6 +26,7 @@ import '../../../../core/config/api_config.dart';
 import '../../../schedule/data/services/schedule_service.dart';
 import '../../../schedule/data/models/schedule_model.dart';
 import '../../../../features/qr_scanner/qr_scanner_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Custom refresh indicator controller class
 class IndicatorController extends ChangeNotifier {
@@ -1008,7 +1009,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: hasActiveSession ? () {
-                      _showAbsensiBottomSheet(context);
+                      _showAbsensiOptionsBottomSheet(context, scheduleId!);
                     } : null,
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
@@ -1473,127 +1474,140 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   
   // New method to show attendance options for a specific schedule
   void _showAbsensiOptionsBottomSheet(BuildContext context, int scheduleId) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.42, // Adjusted height
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 20),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-
-            // Title
-            Row(
-              children: [
-                Icon(
-                  Icons.how_to_reg,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Pilih Metode Absensi',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF333333),
+    // Check if attendance has already been submitted for this schedule
+    SharedPreferences.getInstance().then((prefs) {
+      bool isAlreadyCompleted = prefs.getBool('attendance_completed_$scheduleId') ?? false;
+      
+      if (isAlreadyCompleted) {
+        // If attendance is already completed, show a message and refresh data
+        ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
+        _fetchTodaySchedules(); // Refresh data
+        return;
+      }
+      
+      // Continue with showing the bottom sheet
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.42, // Adjusted height
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-              ],
-            ),
+              ),
 
-            const SizedBox(height: 20),
+              // Title
+              Row(
+                children: [
+                  Icon(
+                    Icons.how_to_reg,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Pilih Metode Absensi',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                ],
+              ),
 
-            // Content - with schedule validation
-            Column(
-              children: [
-                // QR Code Option
-                _buildMinimalistAbsensiOption(
-                  context,
-                  icon: Icons.qr_code_scanner_rounded,
-                  title: 'Scan QR',
-                  description: 'Pindai kode QR untuk melakukan absensi',
-                  onTap: () {
-                    Navigator.pop(context);
-                    
-                    // Define a callback function to update the schedule status when QR scan is successful
-                    void onQrScanSuccessCallback(int successScheduleId) {
-                      // Update the status of this schedule in both maps
-                      setState(() {
-                        // Mark this schedule as not active in the sessions map
-                        _activeSessionsMap[successScheduleId] = false;
-                        
-                        // Find and update the schedule status to "Selesai" in _todaySchedules
-                        for (var i = 0; i < _todaySchedules.length; i++) {
-                          if (_todaySchedules[i].id == successScheduleId) {
-                            _todaySchedules[i] = _todaySchedules[i].copyWith(
-                              status: "Selesai"
-                            );
-                            break;
-                          }
-                        }
-                      });
+              const SizedBox(height: 20),
+
+              // Content - with schedule validation
+              Column(
+                children: [
+                  // QR Code Option
+                  _buildMinimalistAbsensiOption(
+                    context,
+                    icon: Icons.qr_code_scanner_rounded,
+                    title: 'Scan QR',
+                    description: 'Pindai kode QR untuk melakukan absensi',
+                    onTap: () {
+                      Navigator.pop(context);
                       
-                      // Refresh the UI by fetching updated data after a short delay
-                      Future.delayed(const Duration(milliseconds: 500), () {
-                        if (mounted) {
-                          _fetchTodaySchedules();
-                        }
-                      });
-                    }
-                    
-                    // Pass scheduleId and onSuccessCallback to QR scanner
-                    QRScannerService.scanAndSubmitAttendance(
-                      context, 
-                      scheduleId: scheduleId,
-                      onSuccessCallback: onQrScanSuccessCallback,
-                    );
-                  },
-                ),
+                      // Define a callback function to update the schedule status when QR scan is successful
+                      void onQrScanSuccessCallback(int successScheduleId) {
+                        // Update the status of this schedule in both maps
+                        setState(() {
+                          // Mark this schedule as not active in the sessions map
+                          _activeSessionsMap[successScheduleId] = false;
+                          
+                          // Find and update the schedule status to "Selesai" in _todaySchedules
+                          for (var i = 0; i < _todaySchedules.length; i++) {
+                            if (_todaySchedules[i].id == successScheduleId) {
+                              _todaySchedules[i] = _todaySchedules[i].copyWith(
+                                status: "Selesai"
+                              );
+                              break;
+                            }
+                          }
+                        });
+                        
+                        // Refresh the UI by fetching updated data after a short delay
+                        Future.delayed(const Duration(milliseconds: 500), () {
+                          if (mounted) {
+                            _fetchTodaySchedules();
+                          }
+                        });
+                      }
+                      
+                      // Pass scheduleId and onSuccessCallback to QR scanner
+                      QRScannerService.scanAndSubmitAttendance(
+                        context, 
+                        scheduleId: scheduleId,
+                        onSuccessCallback: onQrScanSuccessCallback,
+                      );
+                    },
+                  ),
 
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
 
-                // Face Recognition Option
-                _buildMinimalistAbsensiOption(
-                  context,
-                  icon: Icons.face_rounded,
-                  title: 'Face Recognition',
-                  description: 'Gunakan pengenalan wajah untuk absensi',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CourseSelectionScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
+                  // Face Recognition Option
+                  _buildMinimalistAbsensiOption(
+                    context,
+                    icon: Icons.face_rounded,
+                    title: 'Face Recognition',
+                    description: 'Gunakan pengenalan wajah untuk absensi',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CourseSelectionScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   // Helper to build minimalist absensi option items (Restored)
