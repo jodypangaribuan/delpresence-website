@@ -54,9 +54,17 @@ type AttendanceSession struct {
 	LateThreshold    int              `json:"late_threshold" gorm:"default:10"` // in minutes
 	Notes            string           `json:"notes" gorm:"type:text"`
 	QRCodeData       string           `json:"qr_code_data,omitempty" gorm:"type:text"`
-	CreatedAt        time.Time        `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt        time.Time        `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt        gorm.DeletedAt   `json:"deleted_at,omitempty" gorm:"index"`
+
+	// Counts - These should be updated by the application logic
+	TotalStudents int `json:"total_students" gorm:"default:0"` // Number of students expected for this session (snapshot)
+	AttendedCount int `json:"attended_count" gorm:"default:0"`
+	LateCount     int `json:"late_count" gorm:"default:0"`
+	AbsentCount   int `json:"absent_count" gorm:"default:0"` // May need to be calculated or explicitly set
+	ExcusedCount  int `json:"excused_count" gorm:"default:0"`
+
+	CreatedAt time.Time      `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
 }
 
 // StudentAttendance represents a student's attendance record for a session

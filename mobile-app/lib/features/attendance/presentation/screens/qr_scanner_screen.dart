@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../repositories/attendance_repository.dart'; // Import the repository
+import 'package:permission_handler/permission_handler.dart';
+import '../../../core/utils/toast_utils.dart';
+import '../../data/repositories/attendance_repository.dart';
 // TODO: Import a BLoC/Provider if you use state management for this
 
 class QrScannerScreen extends StatefulWidget {
@@ -17,15 +19,37 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
   bool _isProcessing = false;
-  final AttendanceRepository _attendanceRepository = AttendanceRepositoryImpl(); // Instantiate the repository
+  bool _hasCameraPermission = false;
+  bool _isCheckingPermission = true;
+  final AttendanceRepository _attendanceRepository = AttendanceRepositoryImpl();
 
   @override
   void initState() {
     super.initState();
-    // You might want to request camera permission here if not handled globally
+    _checkCameraPermission();
   }
 
-  void _handleQrCode(BarcodeCapture capture) async { // Make async
+  Future<void> _checkCameraPermission() async {
+    setState(() {
+      _isCheckingPermission = true;
+    });
+
+    final status = await Permission.camera.status;
+    if (status.isGranted) {
+      setState(() {
+        _hasCameraPermission = true;
+        _isCheckingPermission = false;
+      });
+    } else {
+      final result = await Permission.camera.request();
+      setState(() {
+        _hasCameraPermission = result.isGranted;
+        _isCheckingPermission = false;
+      });
+    }
+  }
+
+  void _handleQrCode(BarcodeCapture capture) async {
     if (_isProcessing) return;
     setState(() {
       _isProcessing = true;
@@ -35,7 +59,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     if (barcodes.isNotEmpty) {
       final String? rawValue = barcodes.first.rawValue;
       if (rawValue != null) {
-        print('Scanned QR Code: \$rawValue');
+        print('Scanned QR Code: $rawValue');
         if (rawValue.startsWith('delpresence:attendance:')) {
           final sessionId = rawValue.split(':').last;
           if (sessionId.isNotEmpty) {
@@ -71,8 +95,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     
     // Only reset if not successful, to avoid dismissing success message too quickly
     // If successful, screen is popped anyway.
-    if (mounted && _isProcessing) { // Check _isProcessing as it might have been set to false by _showErrorSnackBar
-       Future.delayed(const Duration(seconds: 1), () { // Shorter delay as processing is done
+    if (mounted && _isProcessing) {
+       Future.delayed(const Duration(seconds: 1), () {
         if (mounted) {
           setState(() {
             _isProcessing = false;
@@ -98,38 +122,72 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Scan Attendance QR')),
-      body: Stack(
-        children: [
-          MobileScanner(
-            controller: controller,
-            onDetect: _handleQrCode,
-          ),
-          // Simple overlay example
-          Center(
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.green, width: 4),
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          if (_isProcessing)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+      body: _isCheckingPermission
+          ? const Center(child: CircularProgressIndicator())
+          : !_hasCameraPermission
+              ? _buildPermissionDeniedView()
+              : Stack(
                   children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Processing...', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    MobileScanner(
+                      controller: controller,
+                      onDetect: _handleQrCode,
+                    ),
+                    // Simple overlay example
+                    Center(
+                      child: Container(
+                        width: 250,
+                        height: 250,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.green, width: 4),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    if (_isProcessing)
+                      Container(
+                        color: Colors.black.withOpacity(0.5),
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('Processing...', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ),
+    );
+  }
+
+  Widget _buildPermissionDeniedView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.camera_alt_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              'Camera permission is required to scan QR codes',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
             ),
-        ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                await _checkCameraPermission();
+                if (!_hasCameraPermission && mounted) {
+                  await openAppSettings();
+                }
+              },
+              child: const Text('Grant Permission'),
+            ),
+          ],
+        ),
       ),
     );
   }
