@@ -329,10 +329,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _activeSessionsRefreshTimer?.cancel();
     
     // Create new timer to check every 30 seconds
-    _activeSessionsRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    _activeSessionsRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
       // Only check if not already checking and we have schedules to check
       if (!_isCheckingActiveSessions && _todaySchedules.isNotEmpty) {
-        _checkActiveSessionsForSchedules(_todaySchedules);
+        debugPrint('🔄 Periodic check for active attendance sessions');
+        // Use await to ensure the check completes before moving on
+        await _checkActiveSessionsForSchedules(_todaySchedules);
+        
+        // Force UI update after check completes
+        if (mounted) {
+          setState(() {});
+        }
       }
     });
   }
@@ -572,6 +579,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     setState(() {
       _isLoadingSchedules = true;
       _scheduleError = null;
+      // Clear the active sessions map to avoid stale data
+      _activeSessionsMap.clear();
     });
     
     try {
@@ -601,21 +610,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Filter schedules for today
       final todaySchedules = ScheduleModel.getSchedulesByDay(schedules, dayName);
       
-      // Update state with results
+      // Update state with schedule results first
       setState(() {
         _todaySchedules = todaySchedules;
         _isLoadingSchedules = false;
       });
       
-      // After loading schedules, check for active sessions
+      // After loading schedules, immediately check for active sessions
       if (todaySchedules.isNotEmpty) {
-        _checkActiveSessionsForSchedules(todaySchedules);
+        await _checkActiveSessionsForSchedules(todaySchedules);
+      } else {
+        // If no schedules, ensure active sessions map is empty
+        setState(() {
+          _activeSessionsMap = {};
+        });
       }
     } catch (e) {
       debugPrint('🔍 Error refreshing home screen data: $e');
       setState(() {
         _scheduleError = e.toString();
         _isLoadingSchedules = false;
+        // Clear active sessions on error to avoid inconsistent state
+        _activeSessionsMap = {};
       });
     }
   }
@@ -634,19 +650,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Create a temporary map to store results
       Map<int, bool> tempMap = {};
       
-      // Check each schedule for active sessions
+      // Check each schedule for active sessions with parallel requests
+      List<Future> futures = [];
       for (var schedule in schedules) {
         if (schedule.id != null && schedule.id > 0) {
-          try {
-            final hasActiveSession = await _scheduleService.isAttendanceSessionActive(schedule.id);
-            tempMap[schedule.id] = hasActiveSession;
-          } catch (e) {
-            debugPrint('🔍 Error checking schedule ${schedule.id}: $e');
-            // Default to false on error
-            tempMap[schedule.id] = false;
-          }
+          futures.add(
+            _scheduleService.isAttendanceSessionActive(schedule.id).then((isActive) {
+              tempMap[schedule.id] = isActive;
+              debugPrint('🔍 Schedule ${schedule.id} active: $isActive');
+            }).catchError((e) {
+              debugPrint('🔍 Error checking schedule ${schedule.id}: $e');
+              // Default to false on error
+              tempMap[schedule.id] = false;
+            })
+          );
         }
       }
+      
+      // Wait for all checks to complete
+      await Future.wait(futures);
+      
+      // Debug output to help troubleshoot
+      debugPrint('🔍 Active sessions map: $tempMap');
       
       // Update state with results if the component is still mounted
       if (mounted) {
@@ -1557,7 +1582,16 @@ class _HomePage extends StatelessWidget {
                         // Only refresh home screen components directly from API
                         // instead of refreshing all bloc data
                         if (homeState != null) {
+                          // Clear active sessions first to ensure UI updates
+                          homeState.setState(() {
+                            homeState._activeSessionsMap.clear();
+                          });
+                          
+                          // Force a full refresh of schedule data and active sessions
                           await homeState._fetchTodaySchedules();
+                          
+                          // Force additional UI refresh
+                          homeState.setState(() {});
                         }
                         // Return a completed future to satisfy the RefreshIndicator
                         return Future<void>.value();
