@@ -105,7 +105,8 @@ class QRScannerService {
         
         final expectedSessionId = sessionData['id'];
         
-        if (expectedSessionId != null && scannedSessionId != expectedSessionId) {
+        // Safer comparison - check if both values exist and are not equal
+        if (expectedSessionId != null && scannedSessionId != null && scannedSessionId != expectedSessionId) {
           // QR code doesn't match the selected schedule
           ToastUtils.showErrorToast(context, 'QR Code tidak sesuai dengan jadwal yang dipilih');
           return false;
@@ -130,31 +131,67 @@ class QRScannerService {
   /// Extract session ID from QR code data
   static int? extractSessionIdFromQR(String qrData) {
     try {
+      // Ensure qrData is not empty
+      if (qrData.isEmpty) {
+        debugPrint('QR data is empty');
+        return null;
+      }
+      
+      debugPrint('Attempting to extract session ID from QR data: $qrData');
+      
       // Format 1: delpresence:attendance:sessionId
       if (qrData.startsWith('delpresence:attendance:')) {
         final parts = qrData.split(':');
         if (parts.length == 3) {
-          return int.tryParse(parts[2]);
+          final idStr = parts[2];
+          final id = int.tryParse(idStr);
+          debugPrint('Format 1 extraction result: $id');
+          return id;
         }
       }
       
       // Format 2: Just the session ID
       final sessionId = int.tryParse(qrData);
       if (sessionId != null) {
+        debugPrint('Format 2 extraction result: $sessionId');
         return sessionId;
       }
       
       // Format 3: Try to decode base64 for more complex formats
       try {
         final decoded = utf8.decode(base64Decode(qrData));
-        final json = jsonDecode(decoded);
-        return json['sessionId'] ?? json['session_id'];
-      } catch (_) {
+        if (decoded.isNotEmpty) {
+          try {
+            final json = jsonDecode(decoded);
+            final id = json['sessionId'] ?? json['session_id'];
+            if (id != null) {
+              final sessionId = id is int ? id : int.tryParse(id.toString());
+              debugPrint('Format 3 extraction result: $sessionId');
+              return sessionId;
+            }
+          } catch (e) {
+            debugPrint('JSON parse error in Format 3: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('Base64 decoding error in Format 3: $e');
         // Ignore base64 decoding errors
       }
 
-      // Assume the QR code is just the session ID string
-      return int.tryParse(qrData);
+      // Last attempt: Try to extract a number from the string
+      final RegExp regex = RegExp(r'\d+');
+      final match = regex.firstMatch(qrData);
+      if (match != null) {
+        final extracted = match.group(0);
+        if (extracted != null) {
+          final id = int.tryParse(extracted);
+          debugPrint('Regex extraction result: $id');
+          return id;
+        }
+      }
+      
+      debugPrint('Could not extract session ID from QR data');
+      return null;
     } catch (e) {
       debugPrint('Error extracting session ID: $e');
       return null;
