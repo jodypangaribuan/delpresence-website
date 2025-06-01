@@ -626,17 +626,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
     
     try {
+      debugPrint('🔍 Starting check for active sessions...');
+      debugPrint('🔍 Number of schedules to check: ${schedules.length}');
+      
       // Create a temporary map to store results
       Map<int, bool> tempMap = {};
       
+      // First, get all active sessions at once to see what's available
+      try {
+        final allActiveSessions = await _scheduleService.getAllActiveAttendanceSessions();
+        debugPrint('🔍 Got ${allActiveSessions.length} total active sessions from API');
+      } catch (e) {
+        debugPrint('🔍 Error getting all active sessions (informational only): $e');
+      }
+      
       // Check each schedule for active sessions
       for (var schedule in schedules) {
-        if (schedule.id != null) {
-          final hasActiveSession = await _scheduleService.isAttendanceSessionActive(schedule.id!);
-          tempMap[schedule.id!] = hasActiveSession;
-          debugPrint('🔍 Schedule ${schedule.id} has active session: $hasActiveSession');
+        if (schedule.id != null && schedule.id > 0) {
+          debugPrint('🔍 Checking schedule ${schedule.id} - ${schedule.courseName}');
+          try {
+            final hasActiveSession = await _scheduleService.isAttendanceSessionActive(schedule.id);
+            tempMap[schedule.id] = hasActiveSession;
+            debugPrint('🔍 Schedule ${schedule.id} has active session: $hasActiveSession');
+          } catch (e) {
+            debugPrint('🔍 Error checking schedule ${schedule.id}: $e');
+            // Default to false on error
+            tempMap[schedule.id] = false;
+          }
+        } else {
+          debugPrint('🔍 Schedule has invalid ID: ${schedule.id}');
         }
       }
+      
+      // Debug output for all results
+      debugPrint('🔍 Active session check results: $tempMap');
+      
+      // Check if any active sessions were found
+      final hasAnyActive = tempMap.values.contains(true);
+      debugPrint('🔍 Has any active sessions: $hasAnyActive');
       
       // Update state with results
       if (mounted) {
@@ -783,10 +810,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ],
           border: Border.all(
-            color: classData['isActive'] as bool
+            color: (isActive && hasActiveSession)
                 ? AppColors.primary.withOpacity(0.3)
                 : Colors.grey.withOpacity(0.1),
-            width: classData['isActive'] as bool ? 1.5 : 1,
+            width: (isActive && hasActiveSession) ? 1.5 : 1,
           ),
         ),
         child: Padding(
@@ -811,7 +838,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: classData['isActive'] as bool
+                      color: (isActive && hasActiveSession)
                           ? AppColors.primary.withOpacity(0.08)
                           : Colors.grey.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(4),
@@ -821,7 +848,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w500,
-                        color: classData['isActive'] as bool
+                        color: (isActive && hasActiveSession)
                             ? AppColors.primary
                             : AppColors.textSecondary,
                       ),

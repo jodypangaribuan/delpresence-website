@@ -178,6 +178,78 @@ class ScheduleService {
       // Log the API request for debugging
       final endpoint = '/api/student/attendance/active-sessions';
       debugPrint('🔍 Checking active attendance sessions for schedule: $scheduleId');
+      debugPrint('🔍 Using endpoint: ${_networkService.baseUrl}$endpoint');
+
+      final response = await _networkService.get<Map<String, dynamic>>(
+        endpoint,
+        headers: headers,
+      );
+
+      debugPrint('🔍 Active sessions API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
+      
+      if (response.success && response.data != null) {
+        final data = response.data!;
+        debugPrint('🔍 Response data: ${data.toString()}');
+        
+        if (data.containsKey('status') && 
+            data['status'] == 'success' && 
+            data.containsKey('data')) {
+          
+          // Parse the active sessions list
+          final List<dynamic> sessionsJson = data['data'];
+          debugPrint('🔍 Found ${sessionsJson.length} active sessions');
+          
+          if (sessionsJson.isEmpty) {
+            debugPrint('🔍 No active sessions available from API');
+            return false;
+          }
+          
+          // Log all session IDs for debugging
+          for (final session in sessionsJson) {
+            final sessionScheduleId = session['course_schedule_id'] ?? session['courseScheduleId'];
+            debugPrint('🔍 Active session found for schedule ID: $sessionScheduleId (checking against $scheduleId)');
+            
+            // Try both string and int comparison
+            if (sessionScheduleId.toString() == scheduleId.toString()) {
+              debugPrint('🔍 ✅ Match found! Active session exists for schedule $scheduleId');
+              return true;
+            }
+          }
+          
+          debugPrint('🔍 ❌ No matching active session for schedule $scheduleId');
+        } else {
+          debugPrint('🔍 Unexpected API response format: ${data.toString()}');
+        }
+      } else {
+        debugPrint('🔍 API error or no data: ${response.errorMessage}');
+      }
+      
+      // No active session found for this schedule
+      return false;
+    } catch (e) {
+      debugPrint('🔍 Error checking active sessions: $e');
+      return false;
+    }
+  }
+
+  /// Get all active attendance sessions to help with debugging
+  Future<List<Map<String, dynamic>>> getAllActiveAttendanceSessions() async {
+    try {
+      // Get auth token
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('Tidak ada token autentikasi. Silahkan login kembali.');
+      }
+
+      // Prepare auth headers
+      final headers = {
+        'Authorization': 'Bearer $token',
+      };
+
+      // Log the API request for debugging
+      final endpoint = '/api/student/attendance/active-sessions';
+      debugPrint('🔍 Getting all active attendance sessions');
+      debugPrint('🔍 Using endpoint: ${_networkService.baseUrl}$endpoint');
 
       final response = await _networkService.get<Map<String, dynamic>>(
         endpoint,
@@ -193,28 +265,29 @@ class ScheduleService {
             data['status'] == 'success' && 
             data.containsKey('data')) {
           
-          // Parse the active sessions list
           final List<dynamic> sessionsJson = data['data'];
-          debugPrint('🔍 Found ${sessionsJson.length} active sessions');
+          debugPrint('🔍 Successfully parsed ${sessionsJson.length} active sessions');
           
-          // Check if any of the active sessions match our schedule ID
-          for (final session in sessionsJson) {
-            // Handle both snake_case and camelCase response formats
-            final sessionScheduleId = session['course_schedule_id'] ?? session['courseScheduleId'];
-            
-            if (sessionScheduleId == scheduleId) {
-              debugPrint('🔍 Found active session for schedule $scheduleId');
-              return true;
-            }
+          // Log each session for debugging
+          for (int i = 0; i < sessionsJson.length; i++) {
+            final session = sessionsJson[i];
+            final scheduleId = session['course_schedule_id'] ?? session['courseScheduleId'];
+            final courseName = session['course_name'] ?? session['courseName'];
+            debugPrint('🔍 Session $i: Schedule ID=$scheduleId, Course=$courseName');
           }
+          
+          return List<Map<String, dynamic>>.from(sessionsJson);
+        } else {
+          debugPrint('🔍 Unexpected response format for active sessions');
+          return [];
         }
+      } else {
+        debugPrint('🔍 Error fetching active sessions: ${response.errorMessage}');
+        return [];
       }
-      
-      // No active session found for this schedule
-      return false;
     } catch (e) {
-      debugPrint('🔍 Error checking active sessions: $e');
-      return false;
+      debugPrint('🔍 Error getting all active sessions: $e');
+      return [];
     }
   }
 } 
