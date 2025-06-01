@@ -41,16 +41,20 @@ class AttendanceService {
       );
       
       // Parse response
-      final responseData = json.decode(response.body);
-      if (responseData['status'] == 'success' && responseData['data'] != null) {
-        final List<dynamic> attendanceData = responseData['data'];
-        final List<AttendanceHistoryModel> attendanceHistory = attendanceData
-            .map((data) => AttendanceHistoryModel.fromJson(data))
-            .toList();
-        
-        return attendanceHistory;
+      if (response.success && response.data != null) {
+        final responseData = response.data;
+        if (responseData != null && responseData['status'] == 'success' && responseData['data'] != null) {
+          final List<dynamic> attendanceData = responseData['data'];
+          final List<AttendanceHistoryModel> attendanceHistory = attendanceData
+              .map((data) => AttendanceHistoryModel.fromJson(data))
+              .toList();
+          
+          return attendanceHistory;
+        }
       }
       
+      // If something went wrong or data format doesn't match
+      debugPrint('Error fetching attendance history: ${response.errorMessage}');
       return [];
     } on SocketException {
       debugPrint('No internet connection');
@@ -73,16 +77,20 @@ class AttendanceService {
       );
       
       // Parse response
-      final responseData = json.decode(response.body);
-      if (responseData['status'] == 'success' && responseData['data'] != null) {
-        final List<dynamic> attendanceData = responseData['data'];
-        final List<AttendanceHistoryModel> todayAttendanceHistory = attendanceData
-            .map((data) => AttendanceHistoryModel.fromJson(data))
-            .toList();
-        
-        return todayAttendanceHistory;
+      if (response.success && response.data != null) {
+        final responseData = response.data;
+        if (responseData != null && responseData['status'] == 'success' && responseData['data'] != null) {
+          final List<dynamic> attendanceData = responseData['data'];
+          final List<AttendanceHistoryModel> todayAttendanceHistory = attendanceData
+              .map((data) => AttendanceHistoryModel.fromJson(data))
+              .toList();
+          
+          return todayAttendanceHistory;
+        }
       }
       
+      // If something went wrong or data format doesn't match
+      debugPrint('Error fetching today\'s attendance history: ${response.errorMessage}');
       return [];
     } on SocketException {
       debugPrint('No internet connection');
@@ -112,9 +120,11 @@ class AttendanceService {
       );
       
       // Parse response
-      final responseData = json.decode(response.body);
-      if (responseData['status'] == 'success' && responseData['data'] != null) {
-        return responseData['data'];
+      if (response.success && response.data != null) {
+        final responseData = response.data;
+        if (responseData != null && responseData['status'] == 'success' && responseData['data'] != null) {
+          return responseData['data'];
+        }
       }
       
       return {
