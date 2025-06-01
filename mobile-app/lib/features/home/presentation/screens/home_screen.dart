@@ -198,8 +198,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   late ScheduleService _scheduleService;
   
   // Map to track active attendance sessions for each schedule
-  // Stores the active session data (Map<String, dynamic>) or null
-  Map<int, Map<String, dynamic>?> _activeSessionsMap = {};
+  // Reverted to bool for now to fix immediate errors
+  Map<int, bool> _activeSessionsMap = {};
   bool _isCheckingActiveSessions = false;
 
   // Halaman yang akan ditampilkan berdasarkan index bottom navbar
@@ -688,24 +688,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       debugPrint('🔍 Checking for active attendance sessions...');
       
       // Create a temporary map to store results
-      Map<int, Map<String, dynamic>?> tempMap = {}; // Changed type to store session data or null
+      Map<int, bool> tempMap = {}; // Reverted to bool
       
       // Check each schedule for active sessions with parallel requests
       List<Future> futures = [];
       for (var schedule in schedules) {
         if (schedule.id != null && schedule.id > 0) {
           futures.add(
-            _scheduleService.isAttendanceSessionActive(schedule.id).then((activeSessionData) { // Assume this returns Map<String, dynamic>? 
-              tempMap[schedule.id] = activeSessionData; // Store the session data itself, or null
-              if (activeSessionData != null) {
-                debugPrint('🔍 Schedule ${schedule.id} active session found: ${activeSessionData["type"]}');
-              } else {
-                debugPrint('🔍 Schedule ${schedule.id} no active session.');
-              }
+            _scheduleService.isAttendanceSessionActive(schedule.id).then((isActive) { // isActive is bool
+              tempMap[schedule.id] = isActive; // Store the boolean
+              debugPrint('🔍 Schedule ${schedule.id} active: $isActive');
             }).catchError((e) {
               debugPrint('🔍 Error checking schedule ${schedule.id}: $e');
-              // Default to null on error
-              tempMap[schedule.id] = null;
+              // Default to false on error
+              tempMap[schedule.id] = false;
             })
           );
         }
@@ -769,9 +765,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       final bool isFactuallyCompleted = timeBasedCompleted || statusBasedCompleted;
       
       // Check if this schedule has an active attendance session
-      final Map<String, dynamic>? currentSessionData = schedule.id != null ? _activeSessionsMap[schedule.id!] : null;
-      final bool hasActiveSession = currentSessionData != null;
-      final String? activeSessionType = hasActiveSession ? currentSessionData['type'] as String? : null;
+      final bool hasActiveSession = schedule.id != null ? (_activeSessionsMap[schedule.id!] ?? false) : false;
       
       return {
         'title': schedule.courseName,
@@ -782,7 +776,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
         'isActive': uiIsActive, // Used by _buildClassCard for UI elements like 'Absen Sekarang' button
         'scheduleId': schedule.id,
         'hasActiveSession': hasActiveSession,
-        'activeSessionType': activeSessionType, // New field
         // Fields for sorting logic
         'isFactuallyCompleted': isFactuallyCompleted,
         'startTimeMinutes': startTimeMinutes,
@@ -1016,8 +1009,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: hasActiveSession ? () {
-                      _showAbsensiBottomSheet(context, classData['activeSessionType'] as String?);
-                    } : null, // Button is disabled when no active session
+                      _showAbsensiBottomSheet(context);
+                    } : null,
                     style: ElevatedButton.styleFrom(
                       foregroundColor: Colors.white,
                       backgroundColor: hasActiveSession ? AppColors.primary : Colors.grey.shade400,
@@ -1311,54 +1304,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
   }
 
   // Improved bottom sheet method
-  void _showAbsensiBottomSheet(BuildContext context, String? activeSessionType) {
-    // Check if there are any active sessions - this outer check might still be useful
-    // or rely on the button's enabled state based on hasActiveSession.
-    // bool hasAnyActiveSession = _activeSessionsMap.values.any((session) => session != null);
+  void _showAbsensiBottomSheet(BuildContext context) {
+    // Check if there are any active sessions
+    bool hasAnyActiveSession = _activeSessionsMap.values.contains(true);
     
-    // if (!hasAnyActiveSession) {
-    //   ToastUtils.showInfoToast(context, 'Tidak ada sesi absensi yang aktif saat ini');
-    //   return;
-    // }
-
-    List<Widget> attendanceOptions = [];
-    if (activeSessionType == 'QR_CODE') {
-      attendanceOptions.add(
-        _buildMinimalistAbsensiOption(
-          context,
-          icon: Icons.qr_code_scanner_rounded,
-          title: 'Scan QR',
-          description: 'Pindai kode QR untuk melakukan absensi',
-          onTap: () {
-            Navigator.pop(context);
-            ToastUtils.showInfoToast(context, 'Scan QR dipilih'); // Placeholder for actual navigation
-            // Potentially call _showQRScannerBottomSheet(context) if that's still relevant
-          },
-        ),
-      );
-    } else if (activeSessionType == 'FACE_RECOGNITION') {
-      attendanceOptions.add(
-        _buildMinimalistAbsensiOption(
-          context,
-          icon: Icons.face_rounded,
-          title: 'Face Recognition',
-          description: 'Gunakan pengenalan wajah untuk absensi',
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const CourseSelectionScreen(), // Navigate to course selection for face recognition
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    if (attendanceOptions.isEmpty) {
-      // Handle case where session type is unknown or no options are available
-      ToastUtils.showErrorToast(context, 'Metode absensi untuk sesi ini tidak diketahui atau tidak tersedia.');
+    if (!hasAnyActiveSession) {
+      // Show toast if no active sessions
+      ToastUtils.showInfoToast(context, 'Tidak ada sesi absensi yang aktif saat ini');
       return;
     }
     
@@ -1410,16 +1362,106 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
 
             const SizedBox(height: 20),
 
-            // Content - options based on activeSessionType
+            // Content - two options (reverted to show both)
             Column(
-              children: attendanceOptions.length == 1
-                  ? attendanceOptions // If only one option, show it directly
-                  : List<Widget>.generate(attendanceOptions.length * 2 - 1, (index) {
-                      if (index.isEven) {
-                        return attendanceOptions[index ~/ 2];
-                      }
-                      return const SizedBox(height: 16); // Spacer for multiple options
-                    }), // Dynamically build options with dividers if multiple
+              children: [
+                // QR Code Option
+                _buildMinimalistAbsensiOption(
+                  context,
+                  icon: Icons.qr_code_scanner_rounded,
+                  title: 'Scan QR',
+                  description: 'Pindai kode QR untuk melakukan absensi',
+                  onTap: () {
+                    Navigator.pop(context);
+                    ToastUtils.showInfoToast(context, 'Scan QR dipilih');
+                  },
+                ),
+
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+
+                // Face Recognition Option
+                _buildMinimalistAbsensiOption(
+                  context,
+                  icon: Icons.face_rounded,
+                  title: 'Face Recognition',
+                  description: 'Gunakan pengenalan wajah untuk absensi',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Navigate to course selection screen for face recognition
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CourseSelectionScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper to build minimalist absensi option items (Restored)
+  Widget _buildMinimalistAbsensiOption(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String description,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: AppColors.textLight,
+              size: 16,
             ),
           ],
         ),
@@ -1706,7 +1748,7 @@ class _HomePageState extends State<_HomePage> {
                                               onTap: () {
                                                 // Only show bottom sheet if there are active sessions
                                                 if (hasAnyActiveSession) {
-                                                  homeState?._showAbsensiBottomSheet(context, null);
+                                                  homeState?._showAbsensiBottomSheet(context);
                                                 } else {
                                                   // Show toast if no active sessions
                                                   ToastUtils.showInfoToast(context, 'Tidak ada sesi absensi yang aktif saat ini');
