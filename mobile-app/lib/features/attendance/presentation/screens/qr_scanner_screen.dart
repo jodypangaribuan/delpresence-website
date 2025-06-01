@@ -1,11 +1,10 @@
-import 'dart:typed_data';
+import 'dart:io'; // Needed for Platform.isAndroid || Platform.isIOS
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_code_scanner/qr_code_scanner.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../schedule/data/models/schedule_model.dart';
 import '../../../../core/utils/toast_utils.dart';
-// You will need to create/define an attendance service for API calls
-// import '../../data/services/attendance_service.dart'; 
+// import '../../data/services/attendance_service.dart'; // Keep for future API calls
 
 class QrScannerScreen extends StatefulWidget {
   final ScheduleModel schedule;
@@ -17,8 +16,10 @@ class QrScannerScreen extends StatefulWidget {
 }
 
 class _QrScannerScreenState extends State<QrScannerScreen> {
-  MobileScannerController cameraController = MobileScannerController();
+  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  QRViewController? controller;
   bool _isProcessing = false;
+  Barcode? result;
   // late AttendanceService _attendanceService; // Initialize in initState
 
   @override
@@ -29,61 +30,101 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     // _attendanceService = AttendanceService(networkService: networkService);
   }
 
-  Future<void> _handleQrCode(BarcodeCapture capture) async {
-    if (_isProcessing) return;
-    setState(() {
-      _isProcessing = true;
-    });
-
-    final List<Barcode> barcodes = capture.barcodes;
-    // final Uint8List? image = capture.image; // If you need the image frame
-
-    if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-      final String qrData = barcodes.first.rawValue!;
-      debugPrint('QR Code Detected: $qrData');
-      debugPrint('Attempting attendance for schedule ID: ${widget.schedule.id}, Course: ${widget.schedule.courseName}');
-
-      // TODO: Implement API call to backend to validate QR and record attendance
-      // For example:
-      // try {
-      //   final response = await _attendanceService.recordQrAttendance(
-      //     scheduleId: widget.schedule.id,
-      //     qrToken: qrData, // Assuming qrData is the token from the lecturer's QR
-      //   );
-      //   if (response.success) { // Assuming your service returns a success flag
-      //     ToastUtils.showSuccessToast(context, 'Absensi berhasil untuk ${widget.schedule.courseName}');
-      //     Navigator.pop(context); // Go back to CourseSelectionScreen
-      //     Navigator.pop(context); // Go back to HomeScreen (or wherever appropriate)
-      //   } else {
-      //     ToastUtils.showErrorToast(context, response.message ?? 'Gagal melakukan absensi via QR');
-      //   }
-      // } catch (e) {
-      //   ToastUtils.showErrorToast(context, 'Error: ${e.toString()}');
-      // }
-
-      // ---- DEMO: Remove this section when backend is integrated ----
-      await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
-      if (qrData == "VALID_QR_FOR_${widget.schedule.id}") { // Replace with actual validation
-          ToastUtils.showSuccessToast(context, 'Absensi (DEMO) berhasil untuk ${widget.schedule.courseName}');
-          if (mounted) {
-            Navigator.pop(context); // Pop scanner screen
-            Navigator.pop(context); // Pop CourseSelectionScreen's bottom sheet
-          }
-      } else {
-          ToastUtils.showErrorToast(context, 'QR Code tidak valid untuk jadwal ini (DEMO).');
-      }
-      // ---- END DEMO ----
-
-    } else {
-      ToastUtils.showErrorToast(context, 'Gagal membaca data QR Code.');
+  // In order to get hot reload to work we need to pause the camera if the platform
+  // is android, or resume the camera if the platform is iOS.
+  @override
+  void reassemble() {
+    super.reassemble();
+    if (Platform.isAndroid) {
+      controller?.pauseCamera();
     }
+    controller?.resumeCamera();
+  }
 
-    // Add a small delay before allowing another scan to prevent rapid multiple submissions
-    await Future.delayed(const Duration(seconds: 2));
-    if(mounted){
-        setState(() {
-            _isProcessing = false;
-        });
+  void _onQRViewCreated(QRViewController controller) {
+    setState(() {
+      this.controller = controller;
+    });
+    controller.scannedDataStream.listen((scanData) async {
+      if (_isProcessing) return;
+      setState(() {
+        _isProcessing = true;
+        result = scanData; // Store the Barcode object
+      });
+
+      if (result != null && result!.code != null) {
+        final String qrData = result!.code!;
+        debugPrint('QR Code Detected: $qrData');
+        debugPrint('Attempting attendance for schedule ID: ${widget.schedule.id}, Course: ${widget.schedule.courseName}');
+
+        // TODO: Implement API call to backend to validate QR and record attendance
+        // try {
+        //   final response = await _attendanceService.recordQrAttendance(
+        //     scheduleId: widget.schedule.id,
+        //     qrToken: qrData,
+        //   );
+        //   if (response.success) {
+        //     ToastUtils.showSuccessToast(context, 'Absensi berhasil untuk ${widget.schedule.courseName}');
+        //     if(mounted) Navigator.of(context).popUntil((route) => route.isFirst); // Go back to home
+        //   } else {
+        //     ToastUtils.showErrorToast(context, response.message ?? 'Gagal melakukan absensi via QR');
+        //   }
+        // } catch (e) {
+        //   ToastUtils.showErrorToast(context, 'Error: ${e.toString()}');
+        // }
+
+        // ---- DEMO: Remove this section when backend is integrated ----
+        await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
+        if (qrData == "VALID_QR_FOR_${widget.schedule.id}") { // Replace with actual validation
+            ToastUtils.showSuccessToast(context, 'Absensi (DEMO) berhasil untuk ${widget.schedule.courseName}');
+            if (mounted) {
+              // Pop scanner screen and then the bottom sheet from CourseSelectionScreen
+              Navigator.pop(context); 
+              Navigator.pop(context); 
+            }
+        } else {
+            ToastUtils.showErrorToast(context, 'QR Code tidak valid untuk jadwal ini (DEMO).');
+        }
+        // ---- END DEMO ----
+      } else {
+        ToastUtils.showErrorToast(context, 'Gagal membaca data QR Code.');
+      }
+      // Add a small delay before allowing another scan to prevent rapid multiple submissions
+      await Future.delayed(const Duration(seconds: 2));
+      if(mounted){
+          setState(() {
+              _isProcessing = false;
+          });
+      }
+    });
+  }
+
+  Widget _buildQrView(BuildContext context) {
+    // For this example we check how width or tall the device is and change the scanArea and overlay accordingly.
+    var scanArea = (MediaQuery.of(context).size.width < 400 ||
+            MediaQuery.of(context).size.height < 400)
+        ? 200.0
+        : 300.0;
+    // To ensure the Scanner view is properly sizes after rotation
+    // we need to listen for Flutter SizeChanged notification and update controller
+    return QRView(
+      key: qrKey,
+      onQRViewCreated: _onQRViewCreated,
+      overlay: QrScannerOverlayShape(
+        borderColor: AppColors.primary,
+        borderRadius: 10,
+        borderLength: 30,
+        borderWidth: 10,
+        cutOutSize: scanArea,
+      ),
+      onPermissionSet: (ctrl, p) => _onPermissionSet(context, ctrl, p),
+    );
+  }
+
+  void _onPermissionSet(BuildContext context, QRViewController ctrl, bool p) {
+    debugPrint('${DateTime.now().toIso8601String()}_onPermissionSet $p');
+    if (!p) {
+      ToastUtils.showErrorToast(context, 'Tidak ada izin kamera!');
     }
   }
 
@@ -91,7 +132,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Scan QR Code - ${widget.schedule.courseName}'),
+        title: Text('Scan QR - ${widget.schedule.courseName}'),
         backgroundColor: AppColors.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -99,71 +140,38 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         ),
         actions: [
           IconButton(
-            color: Colors.white,
-            icon: ValueListenableBuilder<TorchState>(
-              valueListenable: cameraController.torchState,
-              builder: (context, state, child) {
-                switch (state) {
-                  case TorchState.off:
-                    return const Icon(Icons.flash_off, color: Colors.grey);
-                  case TorchState.on:
-                    return const Icon(Icons.flash_on, color: Colors.yellow);
-                  case TorchState.auto:
-                    return const Icon(Icons.flash_auto, color: Colors.blueAccent);
-                  case TorchState.unavailable:
-                     return const Icon(Icons.no_flash, color: Colors.grey);
-                }
-                return const Icon(Icons.no_flash, color: Colors.grey);
+            icon: FutureBuilder(
+              future: controller?.getFlashStatus(),
+              builder: (context, snapshot) {
+                bool isFlashOn = snapshot.data ?? false;
+                return Icon(isFlashOn ? Icons.flash_on : Icons.flash_off, 
+                                color: isFlashOn ? Colors.yellow : Colors.white);
               },
             ),
-            iconSize: 32.0,
-            onPressed: () => cameraController.toggleTorch(),
+            onPressed: () async {
+              await controller?.toggleFlash();
+              setState(() {}); // Rebuild to update flash icon
+            },
           ),
           IconButton(
-            color: Colors.white,
-            icon: ValueListenableBuilder<CameraFacing>(
-              valueListenable: cameraController.cameraFacingState,
-              builder: (context, state, child) {
-                switch (state) {
-                  case CameraFacing.front:
-                    return const Icon(Icons.camera_front, color: Colors.grey);
-                  case CameraFacing.back:
-                    return const Icon(Icons.camera_rear, color: Colors.yellow);
-                }
-                return const Icon(Icons.camera_alt, color: Colors.grey);
+            icon: FutureBuilder(
+              future: controller?.getCameraInfo(),
+              builder: (context, snapshot) {
+                var cameraFacing = snapshot.data;
+                return Icon(cameraFacing == CameraFacing.front ? Icons.camera_front : Icons.camera_rear, 
+                                color: Colors.white);
               },
             ),
-            iconSize: 32.0,
-            onPressed: () => cameraController.switchCamera(),
+            onPressed: () async {
+              await controller?.flipCamera();
+              setState(() {}); // Rebuild to update camera icon
+            },
           ),
         ],
       ),
       body: Stack(
         children: [
-          MobileScanner(
-            controller: cameraController,
-            onDetect: _handleQrCode,
-            // You can use the scanWindow property to define a specific area for scanning
-            // scanWindow: Rect.fromCenter(
-            //   center: MediaQuery.of(context).size.center(Offset.zero),
-            //   width: 250,
-            //   height: 250,
-            // ),
-          ),
-          // Overlay UI (e.g., a square viewfinder)
-          Center(
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: AppColors.primary.withOpacity(0.7),
-                  width: 4,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
+          _buildQrView(context),
           if (_isProcessing)
             Container(
               color: Colors.black.withOpacity(0.5),
@@ -185,7 +193,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   @override
   void dispose() {
-    cameraController.dispose();
+    controller?.dispose();
     super.dispose();
   }
 } 
