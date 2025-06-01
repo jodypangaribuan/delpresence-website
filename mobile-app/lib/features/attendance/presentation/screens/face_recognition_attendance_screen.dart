@@ -1,16 +1,21 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:toastification/toastification.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/services/face_recognition_service.dart';
+import '../../../../core/services/user_service.dart';
 
 class FaceRecognitionAttendanceScreen extends StatefulWidget {
   final String courseName;
+  final int attendanceId;
 
   const FaceRecognitionAttendanceScreen({
     super.key,
     required this.courseName,
+    required this.attendanceId,
   });
 
   @override
@@ -24,12 +29,26 @@ class _FaceRecognitionAttendanceScreenState
   bool _isCameraInitialized = false;
   bool _isFaceDetected = false;
   bool _isProcessing = false;
+  bool _isCapturing = false;
   Timer? _faceDetectionTimer;
+  final FaceRecognitionService _faceService = FaceRecognitionService();
+  final UserService _userService = UserService();
+  int? _studentId;
 
   @override
   void initState() {
     super.initState();
+    _getCurrentUser();
     _requestCameraPermission();
+  }
+
+  Future<void> _getCurrentUser() async {
+    final user = await _userService.getCurrentUser();
+    if (user != null && user['student_id'] != null) {
+      setState(() {
+        _studentId = user['student_id'];
+      });
+    }
   }
 
   Future<void> _requestCameraPermission() async {
@@ -116,7 +135,7 @@ class _FaceRecognitionAttendanceScreenState
         frontCamera,
         ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.yuv420,
+        imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
       await _cameraController!.initialize();
@@ -127,8 +146,12 @@ class _FaceRecognitionAttendanceScreenState
         _isCameraInitialized = true;
       });
 
-      // Start demo face detection
-      _startDemoFaceDetection();
+      // Start face detection with a 2-second delay to let the camera stabilize
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          _startRealFaceDetection();
+        }
+      });
     } catch (e) {
       print('Error initializing camera: $e');
       if (mounted) {
@@ -144,26 +167,137 @@ class _FaceRecognitionAttendanceScreenState
     }
   }
 
-  void _startDemoFaceDetection() {
-    // For demo purposes, simulate face detection after a short delay
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted && _isCameraInitialized) {
+  void _startRealFaceDetection() {
+    if (_isCapturing || !mounted) return;
+    
+    setState(() {
+      _isCapturing = true;
+    });
+    
+    _captureImageAndVerify();
+  }
+  
+  Future<void> _captureImageAndVerify() async {
+    if (!_isCameraInitialized || _cameraController == null || !mounted) return;
+    
+    try {
+      // Capture the image
+      final XFile imageFile = await _cameraController!.takePicture();
+      
+      // Check if we have a student ID
+      if (_studentId == null) {
+        if (mounted) {
+          toastification.show(
+            context: context,
+            type: ToastificationType.error,
+            style: ToastificationStyle.fillColored,
+            title: const Text('Error'),
+            description: const Text('Profil mahasiswa tidak ditemukan'),
+            autoCloseDuration: const Duration(seconds: 3),
+          );
+          Navigator.pop(context);
+        }
+        return;
+      }
+      
+      setState(() {
+        _isFaceDetected = true;
+        _isProcessing = true;
+      });
+      
+      // Convert the image to bytes
+      final File file = File(imageFile.path);
+      final imageBytes = await file.readAsBytes();
+      
+      // Send the image for face verification
+      final result = await _faceService.verifyFace(imageBytes);
+      
+      if (result['success'] && result['match']) {
+        // Face verification succeeded and matched
+        _markAttendanceSuccess(result['student_id']);
+      } else if (result['success'] && !result['match']) {
+        // Face verification succeeded but no match found
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+            _isFaceDetected = false;
+            _isCapturing = false;
+          });
+          
+          toastification.show(
+            context: context,
+            type: ToastificationType.warning,
+            style: ToastificationStyle.fillColored,
+            title: const Text('Tidak Dikenali'),
+            description: const Text('Wajah tidak dikenali. Pastikan Anda telah mendaftarkan wajah atau coba lagi dengan pencahayaan yang lebih baik.'),
+            autoCloseDuration: const Duration(seconds: 3),
+          );
+          
+          // Try again after a short delay
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              _startRealFaceDetection();
+            }
+          });
+        }
+      } else {
+        // Error in face verification
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+            _isFaceDetected = false;
+            _isCapturing = false;
+          });
+          
+          toastification.show(
+            context: context,
+            type: ToastificationType.error,
+            style: ToastificationStyle.fillColored,
+            title: const Text('Gagal'),
+            description: Text('Verifikasi wajah gagal: ${result['message']}'),
+            autoCloseDuration: const Duration(seconds: 3),
+          );
+          
+          // Try again after a short delay
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              _startRealFaceDetection();
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('Error capturing image: $e');
+      if (mounted) {
         setState(() {
-          _isFaceDetected = true;
-          _isProcessing = true;
+          _isProcessing = false;
+          _isFaceDetected = false;
+          _isCapturing = false;
         });
-
-        // Simulate processing and mark attendance
-        Future.delayed(const Duration(seconds: 1), () {
+        
+        toastification.show(
+          context: context,
+          type: ToastificationType.error,
+          style: ToastificationStyle.fillColored,
+          title: const Text('Error'),
+          description: Text('Gagal mengambil gambar: $e'),
+          autoCloseDuration: const Duration(seconds: 3),
+        );
+        
+        // Try again after a short delay
+        Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
-            _markAttendance();
+            _startRealFaceDetection();
           }
         });
       }
-    });
+    }
   }
 
-  void _markAttendance() {
+  void _markAttendanceSuccess(int studentId) {
+    // Here you would call your attendance API to mark attendance
+    // For now, we're just simulating a successful attendance
+    
     // Navigate back to previous screen with a slight delay to ensure UI updates
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
@@ -249,92 +383,101 @@ class _FaceRecognitionAttendanceScreenState
                       color: Colors.white,
                     ),
                   ),
-
-                // Face detection overlay
-                if (_isFaceDetected)
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: FaceOverlayPainter(),
-                    ),
-                  ),
-
-                // Processing indicator
-                if (_isProcessing)
+                
+                // Face overlay
+                if (_isCameraInitialized)
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 40, vertical: 20),
+                      width: 220,
+                      height: 220,
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _isFaceDetected
+                              ? Colors.green
+                              : Colors.white.withOpacity(0.5),
+                          width: 2.0,
+                        ),
+                        shape: BoxShape.circle,
                       ),
+                    ),
+                  ),
+                
+                // Processing indicator
+                if (_isProcessing)
+                  Container(
+                    color: Colors.black.withOpacity(0.5),
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: const Center(
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
-                            'Wajah Terdeteksi',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 15),
-                          const CircularProgressIndicator(
+                          CircularProgressIndicator(
                             color: Colors.white,
                           ),
-                          const SizedBox(height: 15),
+                          SizedBox(height: 20),
                           Text(
-                            'Memproses absensi untuk\n${widget.courseName}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white70,
+                            'Memverifikasi...',
+                            style: TextStyle(
+                              color: Colors.white,
                               fontSize: 16,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-
-                // Instructions overlay
-                Positioned(
-                  bottom: 30,
-                  left: 20,
-                  right: 20,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(178),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _isFaceDetected
-                              ? 'Wajah terdeteksi! Memproses...'
-                              : 'Posisikan wajah Anda di dalam bingkai',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _isProcessing
-                              ? 'Absensi sedang diproses'
-                              : 'Pastikan pencahayaan cukup dan wajah terlihat jelas',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
+              ],
+            ),
+          ),
+          
+          // Instructions
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            color: Colors.black,
+            child: Column(
+              children: [
+                const Text(
+                  'Posisikan wajah Anda di dalam lingkaran',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Pastikan pencahayaan cukup dan wajah terlihat jelas',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Manual capture button
+                if (_isCameraInitialized && !_isProcessing && !_isCapturing)
+                  ElevatedButton(
+                    onPressed: _startRealFaceDetection,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Ambil Foto',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

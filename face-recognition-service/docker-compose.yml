@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  face-recognition:
+    build: .
+    container_name: delpresence-face-recognition
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=delpresence
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - FLASK_DEBUG=false
+    networks:
+      - delpresence-network
+
+networks:
+  delpresence-network:
+    external: true 

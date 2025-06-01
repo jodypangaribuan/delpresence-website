@@ -192,6 +192,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                         builder: (context) =>
                             FaceRecognitionAttendanceScreen(
                           courseName: schedule.courseName,
+                          attendanceId: schedule.id,
                         ),
                       ),
                     );

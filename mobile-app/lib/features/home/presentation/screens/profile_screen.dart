@@ -5,6 +5,7 @@ import '../../../../core/utils/toast_utils.dart';
 import '../../data/models/student_model.dart';
 import '../bloc/student_bloc.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../../features/profile/presentation/screens/face_registration_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -111,10 +112,64 @@ class ProfileScreen extends StatelessWidget {
           _buildInfoItem('Fakultas', student.basicInfo.fakultas),
           _buildInfoItem('Status', student.basicInfo.status),
           _buildInfoItem('Asrama', student.basicInfo.asrama),
+          
+          // Face Recognition Section
+          _buildSectionTitle('Fitur Biometrik'),
+          _buildFaceRecognitionSection(context),
 
           // Add extra padding at the bottom
           SizedBox(height: MediaQuery.of(context).padding.bottom + 80),
         ],
+      ),
+    );
+  }
+  
+  Widget _buildFaceRecognitionSection(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.face,
+            color: AppColors.primary,
+          ),
+        ),
+        title: const Text(
+          'Face Recognition',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: const Text(
+          'Daftarkan wajah Anda untuk fitur absensi',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey,
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const FaceRegistrationScreen(),
+            ),
+          );
+        },
       ),
     );
   }
