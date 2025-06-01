@@ -5,6 +5,7 @@ import '../../../schedule/data/services/schedule_service.dart';
 import '../../../../core/services/network_service.dart'; // For NetworkService
 import '../../../../core/config/api_config.dart'; // For ApiConfig
 import 'face_recognition_attendance_screen.dart';
+import '../../../../core/utils/toast_utils.dart'; // Added for ToastUtils
 
 class CourseSelectionScreen extends StatefulWidget {
   const CourseSelectionScreen({super.key});
@@ -114,6 +115,143 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     }
   }
 
+  // Adapted from home_screen.dart
+  void _showAbsensiBottomSheet(BuildContext context, ScheduleModel schedule) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.30, // Adjusted height
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Icon(
+                  Icons.how_to_reg,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Pilih Metode Absensi',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Column(
+              children: [
+                _buildMinimalistAbsensiOption(
+                  context,
+                  icon: Icons.face_rounded,
+                  title: 'Face Recognition',
+                  description: 'Gunakan pengenalan wajah untuk absensi',
+                  onTap: () {
+                    Navigator.pop(context); // Close bottom sheet
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            FaceRecognitionAttendanceScreen(
+                          courseName: schedule.courseName,
+                          // scheduleId: schedule.id, // Keep commented if not used
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // QR Code option removed for this screen's context
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Adapted from home_screen.dart
+  Widget _buildMinimalistAbsensiOption(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String description,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: AppColors.textLight,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -260,16 +398,8 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                               return GestureDetector(
                                 onTap: (isCurrentlyActiveClass && hasActiveSession)
                                     ? () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                FaceRecognitionAttendanceScreen(
-                                              courseName: schedule.courseName,
-                                              // scheduleId: schedule.id, // Removed for now
-                                            ),
-                                          ),
-                                        );
+                                        // Show bottom sheet instead of direct navigation
+                                        _showAbsensiBottomSheet(context, schedule);
                                       }
                                     : null, 
                                 child: Container(
