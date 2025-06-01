@@ -188,31 +188,20 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
   }
 
   void _startFaceQualityChecks() {
-    // In a real implementation, you would use ML models to check face quality
-    // Here we're simulating the checks with a timer
-    
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _hasGoodLighting = true;
-        });
-        
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            setState(() {
-              _faceAligned = true;
-              _isFaceDetected = true;
-            });
-            
-            // Start countdown for auto-capture
-            _startCountdown();
-          }
-        });
-      }
+    // Instead of simulating face detection with timers, 
+    // we'll use a more manual approach where the user confirms when they're ready
+    setState(() {
+      // Only check for good lighting, but don't automatically detect faces
+      _hasGoodLighting = true;
+      _faceAligned = false;
+      _isFaceDetected = false;
     });
+    
+    // We won't start countdown automatically anymore
   }
   
   void _startCountdown() {
+    // Only start countdown if user manually presses the button
     setState(() {
       _isCountingDown = true;
       _countdownSeconds = 3;
@@ -267,6 +256,17 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
         );
       }
     }
+  }
+
+  // Add this method to manually indicate face is positioned correctly
+  void _manuallyStartCapture() {
+    setState(() {
+      _faceAligned = true;
+      _isFaceDetected = true;
+    });
+    
+    // Start countdown for capturing photo
+    _startCountdown();
   }
 
   Future<void> _registerFace() async {
@@ -405,8 +405,9 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
                           width: MediaQuery.of(context).size.width,
                           height: MediaQuery.of(context).size.width *
                               _cameraController!.value.aspectRatio,
-                          child: Transform.scale(
-                            scaleX: -1.0, // Mirror the camera horizontally for selfie view
+                          child: Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.rotationY(math.pi), // Properly mirror the camera horizontally
                             child: CameraPreview(_cameraController!),
                           ),
                         ),
@@ -582,26 +583,47 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
               ),
               const SizedBox(height: 24),
               
-              // Capture button
-              if (_isCameraInitialized && !_isProcessing && !_isTakingPicture && !_isCountingDown)
-                ElevatedButton(
-                  onPressed: _captureImage,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isFaceDetected ? Colors.green : Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              // Two-step process for capturing:
+              // 1. Position face button
+              // 2. Start capture button (appears after positioning)
+              if (_isCameraInitialized && !_isProcessing && !_isTakingPicture && !_isCountingDown) 
+                !_isFaceDetected
+                  ? ElevatedButton(
+                      onPressed: _manuallyStartCapture,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Wajah Saya Sudah Siap',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  : ElevatedButton(
+                      onPressed: _startCountdown,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Ambil Foto Sekarang',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    'Ambil Foto',
-                    style: TextStyle(
-                      color: _isFaceDetected ? Colors.white : Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
               
               // Countdown indicator  
               if (_isCountingDown)
@@ -652,17 +674,13 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
         Expanded(
           child: Stack(
             children: [
-              // Display captured image (mirrored to match what user saw during capture)
+              // Display captured image (without mirroring - show the actual image)
               SizedBox(
                 width: MediaQuery.of(context).size.width,
                 height: MediaQuery.of(context).size.height,
-                child: Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.rotationY(math.pi), // Mirror horizontally
-                  child: Image.file(
-                    File(_capturedImage!.path),
-                    fit: BoxFit.cover,
-                  ),
+                child: Image.file(
+                  File(_capturedImage!.path),
+                  fit: BoxFit.cover,
                 ),
               ),
               
