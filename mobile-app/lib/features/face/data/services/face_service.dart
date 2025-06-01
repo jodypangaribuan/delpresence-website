@@ -103,8 +103,8 @@ class FaceService {
     }
   }
 
-  /// Register face for a student with embedding instead of sending raw image
-  Future<Map<String, dynamic>> registerFace(int studentId, String base64Image, List<double>? embedding) async {
+  /// Register face for a student
+  Future<Map<String, dynamic>> registerFace(int studentId, String base64Image) async {
     try {
       // Get auth token
       final token = await _getAuthToken();
@@ -118,18 +118,11 @@ class FaceService {
         'Content-Type': 'application/json',
       };
 
-      // Prepare request body with embedding if available
-      final Map<String, dynamic> requestData = {
+      // Prepare request body
+      final body = jsonEncode({
         'student_id': studentId,
         'image': base64Image,
-      };
-      
-      // If embedding is provided, add it to the request
-      if (embedding != null) {
-        requestData['embedding'] = embedding;
-      }
-      
-      final body = jsonEncode(requestData);
+      });
 
       // Make a direct API call to the face service - match Go backend
       final result = await _makeDirectRequest(
@@ -151,8 +144,8 @@ class FaceService {
     }
   }
 
-  /// Verify face for attendance with embedding
-  Future<Map<String, dynamic>> verifyFace(int studentId, String base64Image, List<double>? embedding) async {
+  /// Verify face for attendance
+  Future<Map<String, dynamic>> verifyFace(int studentId, String base64Image) async {
     try {
       // Get auth token
       final token = await _getAuthToken();
@@ -166,18 +159,11 @@ class FaceService {
         'Content-Type': 'application/json',
       };
 
-      // Prepare request body with embedding if available
-      final Map<String, dynamic> requestData = {
+      // Prepare request body
+      final body = jsonEncode({
         'student_id': studentId,
         'image': base64Image,
-      };
-      
-      // If embedding is provided, add it to the request
-      if (embedding != null) {
-        requestData['embedding'] = embedding;
-      }
-      
-      final body = jsonEncode(requestData);
+      });
 
       // Make a direct API call to the face service - match Go backend
       final result = await _makeDirectRequest(
