@@ -434,18 +434,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                     onPressed: () {
                       HapticFeedback.mediumImpact();
 
-                      if (_isFaceRecognition) {
-                        // Navigate to face recognition screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CourseSelectionScreen(),
-                          ),
-                        );
-                      } else {
-                        // Navigate to QR code scanner
-                        _showQRScannerBottomSheet(context);
-                      }
+                      // Always navigate to course selection screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CourseSelectionScreen(),
+                        ),
+                      );
                     },
                     backgroundColor: AppColors.primary,
                     elevation: 4,
