@@ -573,6 +573,21 @@ func (s *AttendanceService) GetAttendanceStatistics(courseScheduleID uint, lectu
 	return s.attendanceRepo.GetAttendanceStats(courseScheduleID)
 }
 
+// GetActiveSessionsBySchedules gets all active attendance sessions for specific schedules
+func (s *AttendanceService) GetActiveSessionsBySchedules(scheduleIDs []uint) ([]models.AttendanceSession, error) {
+	if len(scheduleIDs) == 0 {
+		return []models.AttendanceSession{}, nil
+	}
+
+	// Use the repository to get active sessions for the provided schedules
+	sessions, err := s.attendanceRepo.ListActiveSessionsBySchedules(scheduleIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return sessions, nil
+}
+
 // Helper functions
 
 // initializeStudentAttendances creates initial "absent" records for all students

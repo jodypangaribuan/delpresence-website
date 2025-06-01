@@ -525,3 +525,36 @@ func (s *CourseScheduleService) CheckLecturerScheduleConflict(userID uint, day s
 func (s *CourseScheduleService) CheckStudentGroupScheduleConflict(studentGroupID uint, day string, startTime string, endTime string, scheduleID *uint) (bool, error) {
 	return s.repo.CheckStudentGroupScheduleConflict(studentGroupID, day, startTime, endTime, scheduleID)
 }
+
+// GetStudentSchedules gets all course schedules for a student by their user ID
+func (s *CourseScheduleService) GetStudentSchedules(studentUserID uint) ([]models.CourseSchedule, error) {
+	// First find the student
+	studentRepo := repositories.NewStudentRepository()
+	student, err := studentRepo.FindByUserID(int(studentUserID))
+	if err != nil || student == nil {
+		return nil, fmt.Errorf("failed to find student: %v", err)
+	}
+
+	// Get student groups for this student directly from the database
+	var groupIDs []uint
+	if err := s.repo.DB().Table("student_group_members").
+		Where("student_id = ?", student.ID).
+		Pluck("student_group_id", &groupIDs).Error; err != nil {
+		return nil, fmt.Errorf("failed to get student groups: %w", err)
+	}
+
+	// Get schedules for these groups
+	var allSchedules []models.CourseSchedule
+	for _, groupID := range groupIDs {
+		schedules, err := s.repo.GetByStudentGroup(groupID)
+		if err != nil {
+			// Log the error but continue with other groups
+			fmt.Printf("Error getting schedules for group %d: %v\n", groupID, err)
+			continue
+		}
+
+		allSchedules = append(allSchedules, schedules...)
+	}
+
+	return allSchedules, nil
+}

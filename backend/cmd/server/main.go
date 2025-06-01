@@ -270,6 +270,10 @@ func main() {
 			// Add new endpoint for student courses
 			studentCourseHandler := handlers.NewStudentCourseHandler()
 			studentRoutes.GET("/courses", studentCourseHandler.GetStudentCourses)
+
+			// Add new endpoint for students to check active attendance sessions
+			studentAttendanceHandler := handlers.NewStudentAttendanceHandler()
+			studentRoutes.GET("/attendance/active-sessions", studentAttendanceHandler.GetActiveAttendanceSessions)
 		}
 	}
 

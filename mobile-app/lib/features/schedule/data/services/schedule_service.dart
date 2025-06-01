@@ -199,7 +199,10 @@ class ScheduleService {
           
           // Check if any of the active sessions match our schedule ID
           for (final session in sessionsJson) {
-            if (session['course_schedule_id'] == scheduleId) {
+            // Handle both snake_case and camelCase response formats
+            final sessionScheduleId = session['course_schedule_id'] ?? session['courseScheduleId'];
+            
+            if (sessionScheduleId == scheduleId) {
               debugPrint('🔍 Found active session for schedule $scheduleId');
               return true;
             }
