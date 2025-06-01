@@ -6,6 +6,7 @@ import '../../../../core/services/network_service.dart'; // For NetworkService
 import '../../../../core/config/api_config.dart'; // For ApiConfig
 import 'face_recognition_attendance_screen.dart';
 import '../../../../core/utils/toast_utils.dart'; // Added for ToastUtils
+import 'package:delpresence/features/qr_scanner/qr_scanner_service.dart';
 
 class CourseSelectionScreen extends StatefulWidget {
   const CourseSelectionScreen({super.key});
@@ -170,8 +171,14 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context); // Close bottom sheet
-                    // For now, shows a toast. Replace with actual QR scanner navigation later.
-                    ToastUtils.showInfoToast(context, 'QR Scanner akan segera hadir');
+                    // Replace toast with QR scanner
+                    QRScannerService.scanQRCode(context).then((qrResult) {
+                      if (qrResult != null) {
+                        // Process QR code result for attendance
+                        ToastUtils.showSuccessToast(context, 'QR Code berhasil dipindai: $qrResult');
+                        // Here you would process the attendance with the QR code data
+                      }
+                    });
                   },
                 ),
                 const SizedBox(height: 16),

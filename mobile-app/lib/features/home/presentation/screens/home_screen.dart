@@ -25,6 +25,7 @@ import '../../../../core/services/network_service.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../schedule/data/services/schedule_service.dart';
 import '../../../schedule/data/models/schedule_model.dart';
+import '../../../../features/qr_scanner/qr_scanner_service.dart';
 
 // Custom refresh indicator controller class
 class IndicatorController extends ChangeNotifier {
@@ -1371,7 +1372,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context);
-                    ToastUtils.showInfoToast(context, 'Scan QR dipilih');
+                    // Import and use the QR Scanner Service
+                    QRScannerService.scanQRCode(context).then((qrResult) {
+                      if (qrResult != null) {
+                        // Process QR code result
+                        ToastUtils.showSuccessToast(context, 'QR Code berhasil dipindai: $qrResult');
+                      }
+                    });
                   },
                 ),
 
