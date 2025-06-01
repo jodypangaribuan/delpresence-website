@@ -870,6 +870,69 @@ func (s *AttendanceService) GetStudentAttendancesByExternalID(externalUserID uin
 	return responses, nil
 }
 
+// GetStudentAttendancesByExternalIDAndDateRange gets attendance records for a student by external user ID within a date range
+func (s *AttendanceService) GetStudentAttendancesByExternalIDAndDateRange(externalUserID uint, startDate, endDate time.Time) ([]models.StudentAttendanceResponse, error) {
+	// First find the student from their external user ID
+	var student *models.Student
+	result := s.db.Where("user_id = ?", externalUserID).First(&student)
+	if result.Error != nil {
+		return nil, errors.New("student record not found")
+	}
+
+	// Now get all attendances for this student within the date range
+	var attendances []models.StudentAttendance
+	err := s.db.Preload("AttendanceSession").Preload("AttendanceSession.CourseSchedule").
+		Joins("JOIN attendance_sessions ON attendance_sessions.id = student_attendances.attendance_session_id").
+		Where("student_attendances.student_id = ? AND attendance_sessions.date BETWEEN ? AND ?",
+			student.ID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+		Find(&attendances).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Transform to response objects
+	var responses []models.StudentAttendanceResponse
+	for _, attendance := range attendances {
+		// Skip if the attendance session or course schedule is not loaded
+		if attendance.AttendanceSession.ID == 0 || attendance.AttendanceSession.CourseSchedule.ID == 0 {
+			continue
+		}
+
+		checkInTime := ""
+		if attendance.CheckInTime != nil {
+			// Convert to Indonesia time first
+			indonesiaTime := attendance.CheckInTime.In(getIndonesiaLocation())
+			checkInTime = indonesiaTime.Format("15:04:05")
+		}
+
+		// Add course and room information
+		courseName := attendance.AttendanceSession.CourseSchedule.Course.Name
+		courseCode := attendance.AttendanceSession.CourseSchedule.Course.Code
+		roomName := attendance.AttendanceSession.CourseSchedule.Room.Name
+		buildingName := attendance.AttendanceSession.CourseSchedule.Room.Building.Name
+
+		responses = append(responses, models.StudentAttendanceResponse{
+			ID:                  attendance.ID,
+			AttendanceSessionID: attendance.AttendanceSessionID,
+			StudentID:           uint(student.UserID), // Convert int to uint
+			StudentName:         student.FullName,
+			StudentNIM:          student.NIM,
+			Status:              string(attendance.Status),
+			CheckInTime:         checkInTime,
+			Notes:               attendance.Notes,
+			VerificationMethod:  attendance.VerificationMethod,
+			Date:                attendance.AttendanceSession.Date.Format("2006-01-02"),
+			CourseName:          courseName,
+			CourseCode:          courseCode,
+			RoomName:            roomName,
+			BuildingName:        buildingName,
+		})
+	}
+
+	return responses, nil
+}
+
 // Helper functions
 
 // initializeStudentAttendances creates initial "absent" records for all students

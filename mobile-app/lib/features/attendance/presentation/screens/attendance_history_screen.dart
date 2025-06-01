@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/toast_utils.dart';
 import '../../data/models/attendance_history_model.dart';
+import '../../data/repositories/attendance_repository.dart';
+import '../../../../core/services/service_locator.dart';
 
 class AttendanceHistoryScreen extends StatefulWidget {
   const AttendanceHistoryScreen({super.key});
@@ -16,30 +18,54 @@ class AttendanceHistoryScreen extends StatefulWidget {
 class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   late List<AttendanceHistoryModel> _attendanceRecords;
   late Map<String, List<AttendanceHistoryModel>> _groupedRecords;
+  bool _isLoading = true;
+  bool _hasError = false;
+  late AttendanceRepository _repository;
 
   @override
   void initState() {
     super.initState();
+    _attendanceRecords = [];
+    _groupedRecords = {};
+    
+    // Get repository from service locator
+    _repository = serviceLocator<AttendanceRepository>();
+    
     _loadAttendanceData();
   }
 
-  void _loadAttendanceData() {
-    // Load sample data for now, this would be replaced with an API call in production
-    _attendanceRecords = AttendanceHistoryModel.getSampleData();
-    _groupedRecords = AttendanceHistoryModel.groupByDate(_attendanceRecords);
+  Future<void> _loadAttendanceData() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
+    try {
+      // Get attendance history from repository
+      final records = await _repository.getAttendanceHistory();
+      
+      setState(() {
+        _attendanceRecords = records;
+        _groupedRecords = AttendanceHistoryModel.groupByDate(records);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+      ToastUtils.showErrorToast(context, 'Gagal memuat data riwayat absensi');
+    }
   }
 
   void _fetchAttendanceHistory() {
     // Show loading indicator
     ToastUtils.showInfoToast(context, 'Mengambil data absensi terbaru...');
     
-    // This would be replaced with an actual API call in production
-    // For now, just reload the sample data with a slight delay to simulate network request
-    Future.delayed(const Duration(milliseconds: 800), () {
-      setState(() {
-        _loadAttendanceData();
-      });
+    _loadAttendanceData().then((_) {
       ToastUtils.showSuccessToast(context, 'Data absensi berhasil diperbarui');
+    }).catchError((error) {
+      ToastUtils.showErrorToast(context, 'Gagal memperbarui data absensi');
     });
   }
 
@@ -79,8 +105,47 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
           ),
         ),
       ),
-      body: _buildAttendanceList(),
+      body: _buildContent(),
     );
+  }
+
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              size: 80,
+              color: Colors.grey[300],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Gagal memuat data',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadAttendanceData,
+              child: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _buildAttendanceList();
   }
 
   Widget _buildAttendanceList() {

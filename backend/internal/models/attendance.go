@@ -126,6 +126,11 @@ type StudentAttendanceResponse struct {
 	CheckInTime         string `json:"check_in_time,omitempty"`
 	Notes               string `json:"notes"`
 	VerificationMethod  string `json:"verification_method"`
+	Date                string `json:"date"`
+	CourseName          string `json:"course_name"`
+	CourseCode          string `json:"course_code"`
+	RoomName            string `json:"room_name"`
+	BuildingName        string `json:"building_name"`
 }
 
 // AttendanceStatistics represents statistics for attendance sessions

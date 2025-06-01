@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/delpresence/backend/internal/database"
 	"github.com/delpresence/backend/internal/models"
@@ -25,6 +26,67 @@ func NewStudentAttendanceHandler() *StudentAttendanceHandler {
 		scheduleService:   services.NewCourseScheduleService(),
 		db:                database.GetDB(),
 	}
+}
+
+// GetStudentAttendanceHistory gets attendance history for the authenticated student
+func (h *StudentAttendanceHandler) GetStudentAttendanceHistory(c *gin.Context) {
+	// Extract student ID from the authenticated user
+	userID := c.MustGet("userID").(uint)
+
+	// Parse query parameters for date filtering
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	var startDate, endDate time.Time
+	var err error
+
+	// If start_date is provided, parse it
+	if startDateStr != "" {
+		startDate, err = time.Parse("2006-01-02", startDateStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status": "error",
+				"error":  "Invalid start_date format, use YYYY-MM-DD",
+			})
+			return
+		}
+	} else {
+		// Default to 30 days ago if not provided
+		startDate = time.Now().AddDate(0, 0, -30)
+	}
+
+	// If end_date is provided, parse it
+	if endDateStr != "" {
+		endDate, err = time.Parse("2006-01-02", endDateStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status": "error",
+				"error":  "Invalid end_date format, use YYYY-MM-DD",
+			})
+			return
+		}
+		// Set end time to end of day
+		endDate = endDate.Add(24*time.Hour - time.Second)
+	} else {
+		// Default to today if not provided
+		endDate = time.Now()
+	}
+
+	// Get attendance records for this student
+	attendances, err := h.attendanceService.GetStudentAttendancesByExternalIDAndDateRange(userID, startDate, endDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status": "error",
+			"error":  "Failed to retrieve attendance history: " + err.Error(),
+		})
+		return
+	}
+
+	// Return the attendance history
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   attendances,
+	})
 }
 
 // GetActiveAttendanceSessions gets all active attendance sessions for a student's schedule
