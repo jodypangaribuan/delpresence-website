@@ -171,8 +171,39 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context); // Close bottom sheet
-                    // Use the enhanced QR scanner service method with original schedule ID
-                    QRScannerService.scanAndSubmitAttendance(context, scheduleId: schedule.id);
+                    
+                    // Callback for when scan is successful
+                    void onQrScanSuccessCallback(int successScheduleId) {
+                      // Update the status for this schedule
+                      setState(() {
+                        // Update active sessions map
+                        _activeSessionsMap[successScheduleId] = false;
+                        
+                        // Find and update the schedule in the list
+                        for (var i = 0; i < _todaySchedules.length; i++) {
+                          if (_todaySchedules[i].id == successScheduleId) {
+                            _todaySchedules[i] = _todaySchedules[i].copyWith(
+                              status: "Selesai"
+                            );
+                            break;
+                          }
+                        }
+                      });
+                      
+                      // Refresh the data after a short delay
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        if (mounted) {
+                          _fetchTodaySchedules();
+                        }
+                      });
+                    }
+                    
+                    // Use the enhanced QR scanner service method with original schedule ID and callback
+                    QRScannerService.scanAndSubmitAttendance(
+                      context, 
+                      scheduleId: schedule.id,
+                      onSuccessCallback: onQrScanSuccessCallback,
+                    );
                   },
                 ),
                 const SizedBox(height: 16),

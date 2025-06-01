@@ -951,6 +951,16 @@ func (s *AttendanceService) mapSessionToResponse(session *models.AttendanceSessi
 		qrCodeURL = fmt.Sprintf("/api/attendance/qrcode/%d", session.ID)
 	}
 
+	// Calculate total students directly from database if CourseSchedule.Enrolled is 0
+	totalStudents := session.CourseSchedule.Enrolled
+	if totalStudents == 0 && session.CourseSchedule.StudentGroupID > 0 {
+		var count int64
+		s.db.Model(&models.StudentToGroup{}).
+			Where("student_group_id = ?", session.CourseSchedule.StudentGroupID).
+			Count(&count)
+		totalStudents = int(count)
+	}
+
 	return &models.AttendanceSessionResponse{
 		ID:                session.ID,
 		CourseScheduleID:  session.CourseScheduleID,
@@ -971,7 +981,7 @@ func (s *AttendanceService) mapSessionToResponse(session *models.AttendanceSessi
 		LateThreshold:     session.LateThreshold,
 		Notes:             session.Notes,
 		QRCodeURL:         qrCodeURL,
-		TotalStudents:     session.CourseSchedule.Enrolled,
+		TotalStudents:     totalStudents,
 		AttendedCount:     attendedCount,
 		LateCount:         lateCount,
 		AbsentCount:       absentCount,

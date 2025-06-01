@@ -1312,6 +1312,167 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       return;
     }
     
+    // Find active schedule IDs (schedules that are active and have attendance sessions)
+    List<int> activeScheduleIds = [];
+    for (var todayClass in _getTodayClasses()) {
+      int? scheduleId = todayClass['scheduleId'] as int?;
+      bool isActive = todayClass['isActive'] as bool;
+      bool hasActiveSession = todayClass['hasActiveSession'] as bool;
+      
+      if (scheduleId != null && isActive && hasActiveSession) {
+        activeScheduleIds.add(scheduleId);
+      }
+    }
+    
+    // If there's only one active schedule, use it directly
+    if (activeScheduleIds.length == 1) {
+      final activeScheduleId = activeScheduleIds.first;
+      _showAbsensiOptionsBottomSheet(context, activeScheduleId);
+    } else if (activeScheduleIds.length > 1) {
+      // If there are multiple active schedules, let the user choose
+      _showScheduleSelectionBottomSheet(context, activeScheduleIds);
+    } else {
+      // Shouldn't happen, but as a fallback
+      ToastUtils.showInfoToast(context, 'Tidak ada jadwal aktif yang ditemukan');
+    }
+  }
+  
+  // New method to show schedule selection when multiple schedules are active
+  void _showScheduleSelectionBottomSheet(BuildContext context, List<int> scheduleIds) {
+    // Filter the classes to only include those with active schedules
+    List<Map<String, dynamic>> activeClasses = _getTodayClasses().where((classData) {
+      int? scheduleId = classData['scheduleId'] as int?;
+      return scheduleId != null && scheduleIds.contains(scheduleId);
+    }).toList();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.5, // Slightly larger for multiple items
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+
+            // Title
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Pilih Jadwal',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 8),
+            const Text(
+              'Ada beberapa jadwal aktif saat ini. Pilih jadwal untuk absensi:',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // List of active classes
+            Expanded(
+              child: ListView.builder(
+                itemCount: activeClasses.length,
+                itemBuilder: (context, index) {
+                  final classData = activeClasses[index];
+                  final scheduleId = classData['scheduleId'] as int;
+                  
+                  return InkWell(
+                    onTap: () {
+                      Navigator.pop(context); // Close the schedule selection
+                      _showAbsensiOptionsBottomSheet(context, scheduleId);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.book_outlined,
+                            color: AppColors.primary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  classData['title'] as String,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 15,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${classData['time']} - ${classData['room']}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward_ios,
+                            color: Colors.grey,
+                            size: 14,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // New method to show attendance options for a specific schedule
+  void _showAbsensiOptionsBottomSheet(BuildContext context, int scheduleId) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1360,7 +1521,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
 
             const SizedBox(height: 20),
 
-            // Content - reverted to show both options
+            // Content - with schedule validation
             Column(
               children: [
                 // QR Code Option
@@ -1371,8 +1532,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
                   description: 'Pindai kode QR untuk melakukan absensi',
                   onTap: () {
                     Navigator.pop(context);
-                    // Use the enhanced QR scanner service method
-                    QRScannerService.scanAndSubmitAttendance(context);
+                    
+                    // Define a callback function to update the schedule status when QR scan is successful
+                    void onQrScanSuccessCallback(int successScheduleId) {
+                      // Update the status of this schedule in both maps
+                      setState(() {
+                        // Mark this schedule as not active in the sessions map
+                        _activeSessionsMap[successScheduleId] = false;
+                        
+                        // Find and update the schedule status to "Selesai" in _todaySchedules
+                        for (var i = 0; i < _todaySchedules.length; i++) {
+                          if (_todaySchedules[i].id == successScheduleId) {
+                            _todaySchedules[i] = _todaySchedules[i].copyWith(
+                              status: "Selesai"
+                            );
+                            break;
+                          }
+                        }
+                      });
+                      
+                      // Refresh the UI by fetching updated data after a short delay
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        if (mounted) {
+                          _fetchTodaySchedules();
+                        }
+                      });
+                    }
+                    
+                    // Pass scheduleId and onSuccessCallback to QR scanner
+                    QRScannerService.scanAndSubmitAttendance(
+                      context, 
+                      scheduleId: scheduleId,
+                      onSuccessCallback: onQrScanSuccessCallback,
+                    );
                   },
                 ),
 

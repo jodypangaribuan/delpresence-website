@@ -144,4 +144,49 @@ class ScheduleModel {
   static List<ScheduleModel> getSchedulesByDay(List<ScheduleModel> schedules, String day) {
     return schedules.where((schedule) => schedule.day.toLowerCase() == day.toLowerCase()).toList();
   }
+
+  // Method to create a copy of this ScheduleModel with updated fields
+  ScheduleModel copyWith({
+    int? id,
+    int? courseId,
+    String? courseCode,
+    String? courseName,
+    String? day,
+    String? startTime,
+    String? endTime,
+    String? roomName,
+    String? buildingName,
+    int? lecturerId,
+    String? lecturerName,
+    int? studentGroupId,
+    String? studentGroupName,
+    int? academicYearId,
+    String? academicYearName,
+    int? capacity,
+    int? enrolled,
+    String? semester,
+    String? status,
+  }) {
+    return ScheduleModel(
+      id: id ?? this.id,
+      courseId: courseId ?? this.courseId,
+      courseCode: courseCode ?? this.courseCode,
+      courseName: courseName ?? this.courseName,
+      day: day ?? this.day,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      roomName: roomName ?? this.roomName,
+      buildingName: buildingName ?? this.buildingName,
+      lecturerId: lecturerId ?? this.lecturerId,
+      lecturerName: lecturerName ?? this.lecturerName,
+      studentGroupId: studentGroupId ?? this.studentGroupId,
+      studentGroupName: studentGroupName ?? this.studentGroupName,
+      academicYearId: academicYearId ?? this.academicYearId,
+      academicYearName: academicYearName ?? this.academicYearName,
+      capacity: capacity ?? this.capacity,
+      enrolled: enrolled ?? this.enrolled,
+      semester: semester ?? this.semester,
+      status: status ?? this.status,
+    );
+  }
 }

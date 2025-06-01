@@ -27,7 +27,10 @@ class QRScannerService {
   }
 
   /// Scan QR code and process attendance submission
-  static Future<bool> scanAndSubmitAttendance(BuildContext context, {int? scheduleId}) async {
+  static Future<bool> scanAndSubmitAttendance(
+    BuildContext context, 
+    {int? scheduleId, Function(int)? onSuccessCallback}
+  ) async {
     try {
       // Scan QR code without showing toast
       final qrResult = await scanQRCode(context);
@@ -44,6 +47,11 @@ class QRScannerService {
       
       if (success) {
         ToastUtils.showSuccessToast(context, 'Presensi berhasil tercatat');
+        
+        // Call the success callback if provided and scheduleId exists
+        if (onSuccessCallback != null && scheduleId != null) {
+          onSuccessCallback(scheduleId);
+        }
       }
       
       return success;
