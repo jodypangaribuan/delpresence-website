@@ -36,7 +36,7 @@ dependencies:
   camera: ^0.11.1
   flutter_face_api: ^6.4.875
   qr_flutter: ^4.1.0
-  mobile_scanner: ^5.1.0
+  mobile_scanner: ^6.0.0
   webview_flutter: ^4.13.0
   url_launcher: ^6.2.4
 
