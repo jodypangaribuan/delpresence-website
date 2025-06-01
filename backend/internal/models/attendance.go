@@ -54,6 +54,7 @@ type AttendanceSession struct {
 	LateThreshold    int              `json:"late_threshold" gorm:"default:10"` // in minutes
 	Notes            string           `json:"notes" gorm:"type:text"`
 	QRCodeData       string           `json:"qr_code_data,omitempty" gorm:"type:text"`
+	AlreadyAttended  bool             `json:"already_attended,omitempty" gorm:"-"` // Track attendance status for current student, not stored in DB
 	CreatedAt        time.Time        `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt        time.Time        `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt        gorm.DeletedAt   `json:"deleted_at,omitempty" gorm:"index"`
