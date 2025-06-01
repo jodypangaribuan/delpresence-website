@@ -254,16 +254,13 @@ class ScheduleService {
 
       // Log the API request for debugging
       final endpoint = '/api/student/attendance/active-sessions';
-      debugPrint('🔍 Getting all active attendance sessions');
-      debugPrint('🔍 Using endpoint: ${_networkService.baseUrl}$endpoint');
+      debugPrint('🔍 Fetching all active attendance sessions');
 
       final response = await _networkService.get<Map<String, dynamic>>(
         endpoint,
         headers: headers,
       );
 
-      debugPrint('🔍 Active sessions API response status: ${response.success ? 'Success' : 'Failed'} (${response.statusCode})');
-      
       if (response.success && response.data != null) {
         final data = response.data!;
         
@@ -271,35 +268,60 @@ class ScheduleService {
             data['status'] == 'success' && 
             data.containsKey('data')) {
           
-          // Handle null data properly
-          if (data['data'] == null) {
-            debugPrint('🔍 No active sessions data (null) from API');
-            return [];
-          }
-          
           final List<dynamic> sessionsJson = data['data'] as List<dynamic>;
-          debugPrint('🔍 Successfully parsed ${sessionsJson.length} active sessions');
+          debugPrint('🔍 Found ${sessionsJson.length} active sessions');
           
-          // Log each session for debugging
-          for (int i = 0; i < sessionsJson.length; i++) {
-            final session = sessionsJson[i];
-            final scheduleId = session['course_schedule_id'] ?? session['courseScheduleId'];
-            final courseName = session['course_name'] ?? session['courseName'];
-            debugPrint('🔍 Session $i: Schedule ID=$scheduleId, Course=$courseName');
-          }
-          
-          return List<Map<String, dynamic>>.from(sessionsJson);
-        } else {
-          debugPrint('🔍 Unexpected response format for active sessions');
-          return [];
+          return sessionsJson.cast<Map<String, dynamic>>();
         }
-      } else {
-        debugPrint('🔍 Error fetching active sessions: ${response.errorMessage}');
-        return [];
       }
-    } catch (e) {
-      debugPrint('🔍 Error getting all active sessions: $e');
+      
+      // Return empty list if something went wrong
       return [];
+    } catch (e) {
+      debugPrint('🔍 Error fetching all active sessions: $e');
+      return [];
+    }
+  }
+  
+  /// Get today's schedules for the current student
+  Future<List<ScheduleModel>> getTodaySchedules() async {
+    try {
+      // Get all schedules first to get the active one
+      final academicYears = await getAcademicYears();
+      int? academicYearId;
+      if (academicYears.isNotEmpty) {
+        final activeYear = academicYears.firstWhere(
+          (year) => year['is_active'] == true,
+          orElse: () => academicYears.first,
+        );
+        academicYearId = activeYear['id'];
+      }
+      
+      // Get all schedules
+      final schedules = await getStudentSchedules(
+        academicYearId: academicYearId,
+      );
+      
+      // Filter schedules for today
+      final today = DateTime.now();
+      final dayName = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'][today.weekday - 1];
+      final todaySchedules = ScheduleModel.getSchedulesByDay(schedules, dayName);
+      
+      debugPrint('🔍 Found ${todaySchedules.length} schedules for today ($dayName)');
+      return todaySchedules;
+    } catch (e) {
+      debugPrint('🔍 Error getting today schedules: $e');
+      throw Exception('Terjadi kesalahan saat mengambil jadwal hari ini: $e');
+    }
+  }
+  
+  /// Check if a schedule has an active attendance session
+  Future<bool> hasActiveSession(int scheduleId) async {
+    try {
+      return await isAttendanceSessionActive(scheduleId);
+    } catch (e) {
+      debugPrint('🔍 Error checking if schedule has active session: $e');
+      return false;
     }
   }
 } 

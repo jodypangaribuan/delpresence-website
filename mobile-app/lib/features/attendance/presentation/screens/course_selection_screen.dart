@@ -9,7 +9,6 @@ import '../../../../core/utils/toast_utils.dart'; // Added for ToastUtils
 import 'package:delpresence/features/qr_scanner/qr_scanner_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../data/models/course_schedule_model.dart';
 import '../../data/services/attendance_service.dart';
 
 class CourseSelectionScreen extends StatefulWidget {
@@ -21,7 +20,7 @@ class CourseSelectionScreen extends StatefulWidget {
 
 class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   bool _isLoading = true;
-  List<CourseScheduleModel> _todaySchedules = [];
+  List<ScheduleModel> _todaySchedules = []; // Use ScheduleModel for now
   Map<int, bool> _activeSessionsMap = {};
   Map<int, bool> _attendanceCompletedMap = {};
   String? _scheduleError;
@@ -92,14 +91,22 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     }
   }
 
-  // Adapted from home_screen.dart
+  // Adapted from home_screen.dart - updated to use ScheduleModel
   void _showAbsensiBottomSheet(BuildContext context, ScheduleModel schedule) {
-    // Check if attendance has already been submitted for this schedule
-    SharedPreferences.getInstance().then((prefs) {
-      bool isAlreadyCompleted = prefs.getBool('attendance_completed_${schedule.id}') ?? false;
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    
+    // Check attendance status from backend
+    AttendanceService().checkAttendanceStatus(schedule.id).then((isAlreadyCompleted) {
+      // Close loading dialog
+      Navigator.pop(context);
       
       if (isAlreadyCompleted) {
-        // If attendance is already completed, show a message and refresh data
+        // If attendance is already completed according to server, show a message and refresh data
         ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
         _fetchTodaySchedules(); // Refresh data
         return;
@@ -222,6 +229,12 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
           ),
         ),
       );
+    }).catchError((error) {
+      // Close loading dialog in case of error
+      Navigator.pop(context);
+      
+      // Show error toast
+      ToastUtils.showErrorToast(context, 'Gagal memeriksa status absensi');
     });
   }
 
@@ -437,7 +450,7 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
     );
   }
 
-  Widget _buildScheduleItem(CourseScheduleModel schedule, bool hasActiveSession) {
+  Widget _buildScheduleItem(ScheduleModel schedule, bool hasActiveSession) {
     // Determine if the class is currently active based on time and status
     final now = DateTime.now();
     final currentTime = now.hour * 60 + now.minute;
