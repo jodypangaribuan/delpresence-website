@@ -747,7 +747,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
     final now = DateTime.now();
     final currentTime = now.hour * 60 + now.minute;
     
-    return _todaySchedules.map((schedule) {
+    List<Map<String, dynamic>> todayClasses = _todaySchedules.map((schedule) {
       // Parse times to determine if class is active
       final startTimeParts = schedule.startTime.split(':');
       final endTimeParts = schedule.endTime.split(':');
@@ -755,7 +755,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
       final startTimeMinutes = int.parse(startTimeParts[0]) * 60 + int.parse(startTimeParts[1]);
       final endTimeMinutes = int.parse(endTimeParts[0]) * 60 + int.parse(endTimeParts[1]);
       
-      final bool isActive = currentTime >= startTimeMinutes && currentTime <= endTimeMinutes;
+      final bool timeBasedActive = currentTime >= startTimeMinutes && currentTime <= endTimeMinutes;
+      final bool statusBasedActive = schedule.status?.toLowerCase() == 'sedang berlangsung';
+      final bool uiIsActive = timeBasedActive || statusBasedActive;
+
+      final bool timeBasedCompleted = currentTime > endTimeMinutes;
+      final bool statusBasedCompleted = schedule.status?.toLowerCase() == 'selesai';
+      final bool isFactuallyCompleted = timeBasedCompleted || statusBasedCompleted;
       
       // Check if this schedule has an active attendance session
       final bool hasActiveSession = schedule.id != null ? (_activeSessionsMap[schedule.id!] ?? false) : false;
@@ -765,12 +771,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin, 
         'time': '${schedule.startTime} - ${schedule.endTime}',
         'room': schedule.roomName,
         'lecturer': schedule.lecturerName,
-        'status': schedule.status,
-        'isActive': isActive || schedule.status == 'Sedang Berlangsung',
+        'status': schedule.status, // Original status for display
+        'isActive': uiIsActive, // Used by _buildClassCard for UI elements like 'Absen Sekarang' button
         'scheduleId': schedule.id,
         'hasActiveSession': hasActiveSession,
+        // Fields for sorting logic
+        'isFactuallyCompleted': isFactuallyCompleted,
+        'startTimeMinutes': startTimeMinutes,
       };
     }).toList();
+
+    // Sort the classes
+    todayClasses.sort((a, b) {
+      bool aIsUiActive = a['isActive'];
+      bool bIsUiActive = b['isActive'];
+      bool aIsFactuallyCompleted = a['isFactuallyCompleted'];
+      bool bIsFactuallyCompleted = b['isFactuallyCompleted'];
+      int aStartTime = a['startTimeMinutes'];
+      int bStartTime = b['startTimeMinutes'];
+
+      // Priority:
+      // 0: UI Active AND NOT Factually Completed (Truly Active)
+      // 1: NOT UI Active AND NOT FactuallyCompleted (Upcoming)
+      // 2: Factually Completed
+      int getPriority(bool uiActive, bool factuallyCompleted) {
+        if (factuallyCompleted) return 2;
+        if (uiActive) return 0; // This implies !factuallyCompleted because of the check above
+        return 1; // Not UI Active and Not Factually Completed (Upcoming)
+      }
+
+      int priorityA = getPriority(aIsUiActive, aIsFactuallyCompleted);
+      int priorityB = getPriority(bIsUiActive, bIsFactuallyCompleted);
+
+      if (priorityA != priorityB) {
+        return priorityA.compareTo(priorityB);
+      }
+      
+      // If priorities are the same (e.g., both active, or both upcoming), sort by start time
+      return aStartTime.compareTo(bStartTime);
+    });
+
+    // Limit to 3 schedules for the homepage display
+    if (todayClasses.length > 3) {
+      return todayClasses.sublist(0, 3);
+    }
+    
+    return todayClasses;
   }
 
   // Empty classes message - updated with loading indicator
