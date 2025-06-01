@@ -32,23 +32,6 @@ class QRScannerService {
     {int? scheduleId, Function(int)? onSuccessCallback}
   ) async {
     try {
-      // Verify with server if this schedule has already been attended
-      if (scheduleId != null) {
-        // Check active session and attendance status for this schedule
-        final sessionData = await verifySessionForSchedule(scheduleId);
-        
-        if (sessionData != null) {
-          // Check if student has already attended this session from server data
-          final bool isAlreadyAttended = sessionData['already_attended'] == true;
-          
-          if (isAlreadyAttended) {
-            // Show a message that attendance is already done
-            ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
-            return false;
-          }
-        }
-      }
-      
       // Scan QR code without showing toast
       final qrResult = await scanQRCode(context);
       
@@ -96,25 +79,11 @@ class QRScannerService {
       // Verify that the scanned QR belongs to the selected schedule/session
       if (scheduleId != null) {
         // Check if there is an active session for this schedule and if it matches the scanned QR
-        final sessionData = await verifySessionForSchedule(scheduleId);
+        final expectedSessionId = await verifySessionForSchedule(scheduleId);
         
-        if (sessionData == null) {
-          ToastUtils.showErrorToast(context, 'Tidak ada sesi aktif untuk jadwal ini');
-          return false;
-        }
-        
-        final expectedSessionId = sessionData['id'];
-        
-        // Safer comparison - check if both values exist and are not equal
-        if (expectedSessionId != null && scannedSessionId != null && scannedSessionId != expectedSessionId) {
+        if (expectedSessionId != null && scannedSessionId != expectedSessionId) {
           // QR code doesn't match the selected schedule
           ToastUtils.showErrorToast(context, 'QR Code tidak sesuai dengan jadwal yang dipilih');
-          return false;
-        }
-        
-        // Check if already attended based on server data
-        if (sessionData['already_attended'] == true) {
-          ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
           return false;
         }
       }
@@ -131,67 +100,31 @@ class QRScannerService {
   /// Extract session ID from QR code data
   static int? extractSessionIdFromQR(String qrData) {
     try {
-      // Ensure qrData is not empty
-      if (qrData.isEmpty) {
-        debugPrint('QR data is empty');
-        return null;
-      }
-      
-      debugPrint('Attempting to extract session ID from QR data: $qrData');
-      
       // Format 1: delpresence:attendance:sessionId
       if (qrData.startsWith('delpresence:attendance:')) {
         final parts = qrData.split(':');
         if (parts.length == 3) {
-          final idStr = parts[2];
-          final id = int.tryParse(idStr);
-          debugPrint('Format 1 extraction result: $id');
-          return id;
+          return int.tryParse(parts[2]);
         }
       }
       
       // Format 2: Just the session ID
       final sessionId = int.tryParse(qrData);
       if (sessionId != null) {
-        debugPrint('Format 2 extraction result: $sessionId');
         return sessionId;
       }
       
       // Format 3: Try to decode base64 for more complex formats
       try {
         final decoded = utf8.decode(base64Decode(qrData));
-        if (decoded.isNotEmpty) {
-          try {
-            final json = jsonDecode(decoded);
-            final id = json['sessionId'] ?? json['session_id'];
-            if (id != null) {
-              final sessionId = id is int ? id : int.tryParse(id.toString());
-              debugPrint('Format 3 extraction result: $sessionId');
-              return sessionId;
-            }
-          } catch (e) {
-            debugPrint('JSON parse error in Format 3: $e');
-          }
-        }
-      } catch (e) {
-        debugPrint('Base64 decoding error in Format 3: $e');
+        final json = jsonDecode(decoded);
+        return json['sessionId'] ?? json['session_id'];
+      } catch (_) {
         // Ignore base64 decoding errors
       }
 
-      // Last attempt: Try to extract a number from the string
-      final RegExp regex = RegExp(r'\d+');
-      final match = regex.firstMatch(qrData);
-      if (match != null) {
-        final extracted = match.group(0);
-        if (extracted != null) {
-          final id = int.tryParse(extracted);
-          debugPrint('Regex extraction result: $id');
-          return id;
-        }
-      }
-      
-      debugPrint('Could not extract session ID from QR data');
-      return null;
+      // Assume the QR code is just the session ID string
+      return int.tryParse(qrData);
     } catch (e) {
       debugPrint('Error extracting session ID: $e');
       return null;
@@ -307,8 +240,8 @@ class QRScannerService {
     }
   }
   
-  /// Verify the active session ID for a specific schedule and check attendance status
-  static Future<Map<String, dynamic>?> verifySessionForSchedule(int scheduleId) async {
+  /// Verify the active session ID for a specific schedule
+  static Future<int?> verifySessionForSchedule(int scheduleId) async {
     try {
       // Get auth token
       final prefs = await SharedPreferences.getInstance();
@@ -322,7 +255,7 @@ class QRScannerService {
       final apiConfig = ApiConfig.instance;
       final baseUrl = apiConfig.baseUrl;
       
-      // Endpoint to get active sessions for student with attendance status
+      // Endpoint to get active sessions for student
       final url = Uri.parse('$baseUrl/api/student/attendance/active-sessions');
       
       // Set up headers
@@ -343,30 +276,10 @@ class QRScannerService {
             if (responseData['status'] == 'success' && responseData['data'] is List) {
               final sessions = responseData['data'] as List;
               
-              // Clear previous attendance status for this schedule ONLY if we verify it's a new session
-              // We will NOT clear it if there's already a valid attendance record
-              
               // Find session that matches the given schedule ID
               for (var session in sessions) {
                 if (session['course_schedule_id'] == scheduleId) {
-                  // Check if this session shows already_attended status
-                  bool alreadyAttended = session['already_attended'] == true;
-                  
-                  // Only update local storage attendance status if explicit result from server
-                  if (alreadyAttended) {
-                    await prefs.setBool('attendance_completed_$scheduleId', true);
-                  } else {
-                    // If the server says not attended yet, we should clear any local record
-                    // This handles the case where the server data is reset/new session created
-                    await prefs.remove('attendance_completed_$scheduleId');
-                  }
-                  
-                  // Return complete session data including id and already_attended status
-                  return {
-                    'id': session['id'],
-                    'already_attended': alreadyAttended,
-                    'schedule_id': scheduleId
-                  };
+                  return session['id'] as int;  // Return the session ID for this schedule
                 }
               }
             }
@@ -382,122 +295,6 @@ class QRScannerService {
     } catch (e) {
       debugPrint('Error verifying schedule session: $e');
       return null;
-    }
-  }
-  
-  // Static utility methods for debugging/testing
-
-  /// Check if a schedule has been marked as attended
-  static Future<bool> isScheduleAttended(int scheduleId) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('attendance_completed_$scheduleId') ?? false;
-  }
-  
-  /// Reset attendance status for a specific schedule (for testing/debugging only)
-  static Future<void> resetAttendanceStatus(int scheduleId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('attendance_completed_$scheduleId');
-    debugPrint('Reset attendance status for schedule $scheduleId');
-  }
-  
-  /// Reset all attendance statuses (for testing/debugging only)
-  static Future<void> resetAllAttendanceStatuses() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys().where((key) => key.startsWith('attendance_completed_')).toList();
-    
-    for (String key in keys) {
-      await prefs.remove(key);
-    }
-    
-    debugPrint('Reset all attendance statuses (${keys.length} entries)');
-  }
-  
-  /// Check if a student has already attended a specific session from server
-  static Future<bool> checkAttendanceStatusFromServer(int sessionId, {int? scheduleId}) async {
-    try {
-      // Get auth token
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      
-      if (token == null) {
-        return false;
-      }
-      
-      // Use ApiConfig for proper API endpoint construction
-      final apiConfig = ApiConfig.instance;
-      final baseUrl = apiConfig.baseUrl;
-      
-      // Endpoint to check attendance status for the student
-      final url = Uri.parse('$baseUrl/api/student/attendance/check-status');
-      
-      // Set up headers with auth token
-      final headers = Map<String, String>.from(apiConfig.defaultHeaders);
-      headers['Authorization'] = 'Bearer $token';
-      
-      // Create request body
-      final reqBody = {
-        'session_id': sessionId,
-      };
-      
-      // Add schedule_id if provided
-      if (scheduleId != null) {
-        reqBody['schedule_id'] = scheduleId;
-      }
-      
-      final body = jsonEncode(reqBody);
-      
-      // Create HTTP client with proper timeout
-      final client = http.Client();
-      try {
-        // Make API request
-        final response = await client.post(
-          url,
-          headers: headers,
-          body: body,
-        ).timeout(apiConfig.timeout);
-        
-        // Log response
-        debugPrint('🌐 Check Attendance Status Response [${response.statusCode}]: ${response.body}');
-        
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          try {
-            final data = jsonDecode(response.body);
-            
-            // Check if the student has already attended this session
-            if (data['status'] == 'success') {
-              bool hasAttended = data['data']['has_attended'] ?? false;
-              
-              // If student has attended, update local storage too for consistency
-              if (hasAttended && scheduleId != null) {
-                await prefs.setBool('attendance_completed_$scheduleId', true);
-              }
-              
-              return hasAttended;
-            }
-          } catch (e) {
-            debugPrint('Error parsing attendance status check: $e');
-          }
-        }
-        
-        // Default to checking local storage as fallback
-        if (scheduleId != null) {
-          return prefs.getBool('attendance_completed_$scheduleId') ?? false;
-        }
-        
-        return false;
-      } finally {
-        client.close();
-      }
-    } catch (e) {
-      debugPrint('Error checking attendance status: $e');
-      
-      // Fall back to local storage if there's an error with the network request
-      if (scheduleId != null) {
-        final prefs = await SharedPreferences.getInstance();
-        return prefs.getBool('attendance_completed_$scheduleId') ?? false;
-      }
-      
-      return false;
     }
   }
   

@@ -197,8 +197,7 @@ func (r *AttendanceRepository) GetAttendanceStats(courseScheduleID uint) (*model
 }
 
 // ListActiveSessionsBySchedules gets all active attendance sessions for given course schedule IDs
-// and checks if student with externalUserID has already attended each session
-func (r *AttendanceRepository) ListActiveSessionsBySchedules(scheduleIDs []uint, externalUserID ...uint) ([]models.AttendanceSession, error) {
+func (r *AttendanceRepository) ListActiveSessionsBySchedules(scheduleIDs []uint) ([]models.AttendanceSession, error) {
 	// Handle empty schedule IDs
 	if len(scheduleIDs) == 0 {
 		fmt.Printf("No schedule IDs provided for active sessions query\n")
@@ -225,48 +224,11 @@ func (r *AttendanceRepository) ListActiveSessionsBySchedules(scheduleIDs []uint,
 
 	fmt.Printf("Found %d active sessions for schedule IDs: %v\n", len(sessions), scheduleIDs)
 
-	// If externalUserID is provided, check if the student has already attended each session
-	if len(externalUserID) > 0 && externalUserID[0] > 0 {
-		studentID := externalUserID[0]
-
-		// For each session, check if the student has already attended
-		for i, session := range sessions {
-			// Get the student's ID from their external user ID
-			var studentRecord models.Student
-			err := r.db.Where("user_id = ?", studentID).First(&studentRecord).Error
-
-			if err == nil {
-				// Check if student has already attended this session
-				var attendanceExists bool
-				err := r.db.Raw(`
-					SELECT EXISTS (
-						SELECT 1 FROM student_attendances
-						WHERE attendance_session_id = ? AND student_id = ? AND 
-						(status = ? OR status = ?)
-					) as attendance_exists
-				`, session.ID, studentRecord.ID, models.StudentAttendanceStatusPresent, models.StudentAttendanceStatusLate).Scan(&attendanceExists).Error
-
-				if err == nil {
-					// Store the attendance status in the session model for easy access
-					sessions[i].AlreadyAttended = attendanceExists
-
-					fmt.Printf("Session %d: User %d attendance status: %v\n",
-						session.ID, studentID, attendanceExists)
-				} else {
-					fmt.Printf("Error checking attendance for session %d, user %d: %v\n",
-						session.ID, studentID, err)
-				}
-			} else {
-				fmt.Printf("Could not find student record for user ID %d: %v\n", studentID, err)
-			}
-		}
-	}
-
 	// Log details of found sessions for debugging
 	for i, session := range sessions {
-		fmt.Printf("Session %d: ID=%d, ScheduleID=%d, CourseID=%d, Type=%s, Status=%s, AlreadyAttended=%v\n",
+		fmt.Printf("Session %d: ID=%d, ScheduleID=%d, CourseID=%d, Type=%s, Status=%s\n",
 			i+1, session.ID, session.CourseScheduleID,
-			session.CourseSchedule.CourseID, session.Type, session.Status, session.AlreadyAttended)
+			session.CourseSchedule.CourseID, session.Type, session.Status)
 	}
 
 	return sessions, nil

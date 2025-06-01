@@ -85,70 +85,33 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
   Future<void> _checkActiveSessionsForSchedules(List<ScheduleModel> schedules) async {
     if (schedules.isEmpty || !mounted) return;
     
-    Map<int, bool> activeSessionsMap = {};
-    Map<int, bool> attendanceCompletedMap = {};
-    
+    Map<int, bool> tempMap = {};
     try {
-      // Get shared preferences to update local cache
-      final prefs = await SharedPreferences.getInstance();
-      
       List<Future> futures = [];
       for (var schedule in schedules) {
         if (schedule.id > 0) { // Ensure valid schedule ID
           futures.add(
-            _scheduleService.isAttendanceSessionActive(schedule.id).then((isActive) async {
-              activeSessionsMap[schedule.id] = isActive;
-              
-              // If session is active, check attendance status from server for current student
-              if (isActive) {
-                try {
-                  // Use QRScannerService to verify session and get attendance status
-                  final sessionData = await QRScannerService.verifySessionForSchedule(schedule.id);
-                  if (sessionData != null) {
-                    bool hasAttended = sessionData['already_attended'] == true;
-                    attendanceCompletedMap[schedule.id] = hasAttended;
-                    
-                    // Update SharedPreferences with server data
-                    if (hasAttended) {
-                      prefs.setBool('attendance_completed_${schedule.id}', true);
-                      debugPrint('✅ Confirmed attendance from server for schedule ${schedule.id}');
-                    } else {
-                      // If server says not attended yet and there was a local record, clear it
-                      // This syncs with server if attendance was reset/removed on server
-                      prefs.remove('attendance_completed_${schedule.id}');
-                    }
-                  }
-                } catch (e) {
-                  debugPrint('Error checking attendance status: $e');
-                }
-              }
+            _scheduleService.isAttendanceSessionActive(schedule.id).then((isActive) {
+              tempMap[schedule.id] = isActive;
             }).catchError((e) {
-              activeSessionsMap[schedule.id] = false; // Default to false on error
+              tempMap[schedule.id] = false; // Default to false on error
             })
           );
         } else {
-           activeSessionsMap[schedule.id] = false; // Default for invalid ID
+           tempMap[schedule.id] = false; // Default for invalid ID
         }
       }
-      
       await Future.wait(futures);
-      
-      // Debug output
-      debugPrint('Active sessions map: $activeSessionsMap');
-      debugPrint('Attendance completed map: $attendanceCompletedMap');
-      
       if (mounted) {
         setState(() {
-          _activeSessionsMap = activeSessionsMap;
-          // We don't store attendanceCompletedMap directly in state because
-          // we're using SharedPreferences and checking it on demand in UI
+          _activeSessionsMap = tempMap;
         });
       }
     } catch (e) {
       // Handle or log error if needed
       if (mounted) {
         setState(() { // Ensure UI reflects that checking might have failed
-            _activeSessionsMap = activeSessionsMap; // Use whatever was gathered
+            _activeSessionsMap = tempMap; // Use whatever was gathered
         });
       }
     }
@@ -161,74 +124,9 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
       bool isAlreadyCompleted = prefs.getBool('attendance_completed_${schedule.id}') ?? false;
       
       if (isAlreadyCompleted) {
-        // If attendance is already completed, show a success message
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.white,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          builder: (context) => Container(
-            height: MediaQuery.of(context).size.height * 0.3, // Smaller height for success message
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 20),
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                
-                // Success icon
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle_outline,
-                    color: AppColors.success,
-                    size: 40,
-                  ),
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Success message
-                Text(
-                  'Absensi Sudah Tercatat',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.success,
-                  ),
-                ),
-                
-                const SizedBox(height: 8),
-                
-                Text(
-                  'Anda sudah berhasil melakukan absensi untuk kelas ini.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+        // If attendance is already completed, show a message and refresh data
+        ToastUtils.showInfoToast(context, 'Anda sudah melakukan absensi untuk kelas ini');
+        _fetchTodaySchedules(); // Refresh data
         return;
       }
       
@@ -479,31 +377,6 @@ class _CourseSelectionScreenState extends State<CourseSelectionScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          // Add refresh button to sync with server
-          IconButton(
-            icon: _isLoadingSchedules
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Icon(Icons.refresh, color: Colors.white),
-            tooltip: 'Refresh dari server',
-            onPressed: _isLoadingSchedules 
-                ? null 
-                : () {
-                    // Show loading toast
-                    ToastUtils.showInfoToast(context, 'Menyinkronkan data dengan server...');
-                    
-                    // Force refresh from server
-                    _fetchTodaySchedules();
-                  },
-          ),
-        ],
       ),
       body: Column(
         children: [

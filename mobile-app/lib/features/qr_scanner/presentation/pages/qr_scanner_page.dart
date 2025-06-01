@@ -176,50 +176,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
     controller.scannedDataStream.listen((scanData) {
       // Process the scanned data and automatically return it
       if (scanData.code != null && scanData.code!.isNotEmpty) {
-        // Prevent multiple camera pauses/pops if we're already processing
-        if (result != null) return;
-        
-        // Save the result and pause camera
-        setState(() {
-          result = scanData;
-        });
         controller.pauseCamera();
-        
-        // Validate the QR format - contains either a number or the expected prefix
-        final code = scanData.code!;
-        final isValidQR = code.contains(RegExp(r'\d+')) || 
-                          code.contains('delpresence:attendance:') ||
-                          code.contains('session_id') ||
-                          code.contains('sessionId');
-        
-        if (isValidQR) {
-          debugPrint('Valid QR code detected: $code');
-          // Return with short delay to allow camera to pause properly
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (mounted) {
-              Navigator.of(context).pop(code);
-            }
-          });
-        } else {
-          debugPrint('Invalid QR format detected: $code');
-          // Show error and resume scanning
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('QR Code tidak valid untuk presensi'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-          
-          // Resume camera after showing error
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              setState(() {
-                result = null;
-              });
-              controller.resumeCamera();
-            }
-          });
-        }
+        Navigator.of(context).pop(scanData.code);
       }
     });
   }

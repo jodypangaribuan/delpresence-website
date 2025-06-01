@@ -588,19 +588,18 @@ func (s *AttendanceService) GetAttendanceStatistics(courseScheduleID uint, lectu
 }
 
 // GetActiveSessionsBySchedules gets all active attendance sessions for specific schedules
-func (s *AttendanceService) GetActiveSessionsBySchedules(scheduleIDs []uint, userID ...uint) ([]models.AttendanceSession, error) {
+func (s *AttendanceService) GetActiveSessionsBySchedules(scheduleIDs []uint) ([]models.AttendanceSession, error) {
 	if len(scheduleIDs) == 0 {
 		return []models.AttendanceSession{}, nil
 	}
 
 	// Use the repository to get active sessions for the provided schedules
-	// Pass through the userID if it was provided
-	if len(userID) > 0 && userID[0] > 0 {
-		return s.attendanceRepo.ListActiveSessionsBySchedules(scheduleIDs, userID[0])
+	sessions, err := s.attendanceRepo.ListActiveSessionsBySchedules(scheduleIDs)
+	if err != nil {
+		return nil, err
 	}
 
-	// Otherwise, just get sessions without checking attendance
-	return s.attendanceRepo.ListActiveSessionsBySchedules(scheduleIDs)
+	return sessions, nil
 }
 
 // MarkStudentAttendanceViaQR marks a student's attendance for a session using QR code
@@ -1026,9 +1025,4 @@ func getIndonesiaLocation() *time.Location {
 		location = time.FixedZone("WIB", 7*60*60)
 	}
 	return location
-}
-
-// GetAttendanceSessionByID gets a session by its ID
-func (s *AttendanceService) GetAttendanceSessionByID(id uint) (*models.AttendanceSession, error) {
-	return s.attendanceRepo.GetAttendanceSessionByID(id)
 }
