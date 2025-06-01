@@ -608,7 +608,7 @@ func (s *AttendanceService) MarkStudentAttendanceViaQR(sessionID uint, userID ui
 
 	// Check if the student is enrolled in this course
 	var student *models.Student
-	result := s.db.Where("auth_user_id = ?", userID).First(&student)
+	result := s.db.Where("external_user_id = ?", userID).First(&student)
 	if result.Error != nil {
 		return errors.New("student record not found")
 	}

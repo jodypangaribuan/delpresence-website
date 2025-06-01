@@ -29,10 +29,7 @@ class QRScannerService {
   /// Scan QR code and process attendance submission
   static Future<bool> scanAndSubmitAttendance(BuildContext context) async {
     try {
-      // Show a simple loading toast instead of overlay
-      ToastUtils.showInfoToast(context, 'Membuka Scanner QR...');
-      
-      // Scan QR code
+      // Scan QR code without showing toast
       final qrResult = await scanQRCode(context);
       
       if (qrResult == null) {
