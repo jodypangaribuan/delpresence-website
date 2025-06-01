@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import '../../features/attendance/data/repositories/attendance_repository.dart';
 import '../../features/attendance/data/services/attendance_api_service.dart';
+import '../config/api_config.dart';
 import 'network_service.dart';
 
 final GetIt serviceLocator = GetIt.instance;
@@ -9,7 +10,7 @@ final GetIt serviceLocator = GetIt.instance;
 void setupServiceLocator() {
   // Core services
   serviceLocator.registerLazySingleton<NetworkService>(() => NetworkService(
-        baseUrl: 'https://api.delpresence.com', // Replace with actual API URL
+        baseUrl: ApiConfig.instance.baseUrl,
         timeout: const Duration(seconds: 15),
       ));
 
