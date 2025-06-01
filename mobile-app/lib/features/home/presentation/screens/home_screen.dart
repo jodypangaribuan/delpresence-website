@@ -208,10 +208,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Cache service
   final CacheService _cacheService = CacheService();
   
-  // State for lazy loading
-  bool _isHeaderLoaded = false;
-  bool _isMenuLoaded = false;
-  bool _isClassCardLoaded = false;
+  // State for lazy loading - default to true for fallback
+  bool _isHeaderLoaded = true;
+  bool _isMenuLoaded = true;
+  bool _isClassCardLoaded = true;
 
   // Halaman yang akan ditampilkan berdasarkan index bottom navbar
   late final List<Widget> _pages;
@@ -324,6 +324,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     // Start timer to periodically check for active sessions (every 30 seconds)
     _startActiveSessionsRefreshTimer();
+    
+    // Start progressive loading of UI elements
+    _simulateProgressiveLoading();
   }
 
   @override
@@ -1645,22 +1648,133 @@ class _HomePage extends StatelessWidget {
                 homeState._isMenuLoaded ? 0 : 20, 
                 0
               ),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-                child: Text(
-                  'Menu',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF333333),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Menu header
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+                    child: Text(
+                      'Menu',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
                   ),
-                ),
+                  
+                  // Menu items in horizontal scrollable row
+                  Container(
+                    height: 100, // Adjust based on your icons size
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      children: [
+                        // Absensi menu item
+                        Padding(
+                          padding: const EdgeInsets.only(right: 20),
+                          child: homeState._buildMenuItem(
+                            context,
+                            title: 'Absensi',
+                            iconPath: 'assets/images/menu-absensi.png',
+                            iconSize: 60,
+                            onTap: () {
+                              // Check for active sessions before showing bottom sheet
+                              if (homeState._activeSessionsMap.values.contains(true)) {
+                                homeState._showAbsensiBottomSheet(context);
+                              } else {
+                                ToastUtils.showInfoToast(
+                                    context, 'Tidak ada sesi absensi yang aktif saat ini');
+                              }
+                            },
+                          ),
+                        ),
+                        
+                        // Mata Kuliah menu item
+                        Padding(
+                          padding: const EdgeInsets.only(right: 20),
+                          child: homeState._buildMenuItem(
+                            context,
+                            title: 'Mata Kuliah',
+                            iconPath: 'assets/images/menu-matakuliah.png',
+                            iconSize: 60,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const CourseListScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        // Jadwal menu item
+                        Padding(
+                          padding: const EdgeInsets.only(right: 20),
+                          child: homeState._buildMenuItem(
+                            context,
+                            title: 'Jadwal',
+                            iconPath: 'assets/images/menu-riwayat.png',
+                            iconSize: 60,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ScheduleScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        // Riwayat menu item
+                        Padding(
+                          padding: const EdgeInsets.only(right: 20),
+                          child: homeState._buildMenuItem(
+                            context,
+                            title: 'Riwayat',
+                            iconPath: 'assets/images/menu-riwayat.png',
+                            iconSize: 60,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const AttendanceHistoryScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        // Pengaturan menu item
+                        Padding(
+                          padding: const EdgeInsets.only(right: 20),
+                          child: homeState._buildMenuItem(
+                            context,
+                            title: 'Pengaturan',
+                            iconPath: 'assets/images/menu-pengaturan.png',
+                            iconSize: 60,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const SettingsScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          
-          // Main menu - retain existing implementation
-          // ... existing code ...
           
           // Today's Classes heading - with animation
           AnimatedOpacity(
