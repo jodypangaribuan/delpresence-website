@@ -41,25 +41,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-      
-  face-recognition:
-    build:
-      context: ../face-recognition-service
-      dockerfile: Dockerfile
-    ports:
-      - "5000:5000"
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=delpresence
-      - FLASK_DEBUG=false
-    networks:
-      - delpresence-network
 
 networks:
   delpresence-network:

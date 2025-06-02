@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../../core/constants/colors.dart';
-import 'face_registration_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -48,17 +47,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Face Registration Section
-            _buildSectionTitle('Pendaftaran Wajah'),
-            _buildSettingsItem(
-              title: 'Daftarkan Wajah',
-              icon: Icons.face,
-              subtitle: 'Daftarkan wajah Anda untuk absensi',
-              onTap: () {
-                _showFaceRegistrationDialog(context);
-              },
-            ),
-            
             // Account Section
             _buildSectionTitle('Akun'),
             _buildSettingsItem(
@@ -158,89 +146,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showFaceRegistrationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                Icons.face,
-                color: AppColors.primary,
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              const Text('Pendaftaran Wajah'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Apakah Anda ingin mendaftarkan wajah Anda untuk sistem absensi?',
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Catatan:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '• Pastikan pencahayaan baik saat pendaftaran\n• Lepaskan masker dan aksesoris yang menutupi wajah\n• Data wajah akan disimpan dengan aman',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[700],
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Batal',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const FaceRegistrationScreen(),
-                  ),
-                );
-              },
-              child: Text(
-                'Lanjutkan',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        );
-      },
-    );
-  }
-  
   void _showLogoutConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,

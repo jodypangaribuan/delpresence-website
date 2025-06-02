@@ -9,7 +9,12 @@ import '../../../../core/services/face_recognition_service.dart';
 import '../../../../core/services/user_service.dart';
 
 class FaceRegistrationScreen extends StatefulWidget {
-  const FaceRegistrationScreen({Key? key}) : super(key: key);
+  final String returnButtonText;
+  
+  const FaceRegistrationScreen({
+    Key? key, 
+    this.returnButtonText = 'Kembali',
+  }) : super(key: key);
 
   @override
   State<FaceRegistrationScreen> createState() => _FaceRegistrationScreenState();
@@ -186,11 +191,6 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
         );
       }
     }
-  }
-
-  void _startFaceQualityChecks() {
-    // We're removing this method as we don't want automatic detection
-    // Do nothing - this is now fully manual
   }
   
   void _startCountdown() {
@@ -843,9 +843,9 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text(
-                'Kembali ke Profil',
-                style: TextStyle(
+              child: Text(
+                widget.returnButtonText,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
