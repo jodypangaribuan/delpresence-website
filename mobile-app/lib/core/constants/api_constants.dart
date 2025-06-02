@@ -1,6 +1,11 @@
 class ApiConstants {
-  // Change this to your actual API base URL
-  static const String baseUrl = 'http://10.0.2.2:5000'; // For Android emulator
+  // Base API URL for main backend services
+  static const String baseUrl = 'http://10.0.2.2:5000';
+  
+  // Face recognition service URL
+  static const String faceRecognitionUrl = 'http://10.0.2.2:5000';
+  
+  // For development
+  // static const String baseUrl = 'http://10.0.2.2:5000'; // For Android emulator
   // static const String baseUrl = 'http://localhost:5000'; // For iOS simulator
-  // static const String baseUrl = 'https://your-production-api.com'; // Production
 } 

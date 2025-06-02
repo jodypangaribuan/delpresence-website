@@ -13,7 +13,7 @@ class ApiConfig {
   static const String DEFAULT_BASE_URL =
       'https://b668-2404-c0-5610-00-ead-cdb7.ngrok-free.app';
   static const String FACE_RECOGNITION_BASE_URL =
-      'https://7c00-103-167-217-200.ngrok-free.app:5000';
+      'http://10.0.2.2:5000';
   static const String API_PATH = '/api/v1';
   static const int DEFAULT_TIMEOUT = 30;
   static const String API_VERSION = 'v1';
