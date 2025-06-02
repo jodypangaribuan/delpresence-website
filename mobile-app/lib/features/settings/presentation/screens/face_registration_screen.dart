@@ -64,12 +64,27 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
   }
 
   Future<void> _getCurrentUser() async {
+    print('FaceRegistrationScreen: _getCurrentUser called');
     final userData = await _userService.getCurrentUser();
+    print('FaceRegistrationScreen: UserData from service: $userData');
     if (userData != null && userData.containsKey('studentId')) {
       setState(() {
         _studentId = userData['studentId'];
       });
+      print('FaceRegistrationScreen: _studentId set to: $_studentId');
       _loadRegisteredFaces();
+    } else {
+      print('FaceRegistrationScreen: Failed to get studentId from userData or userData is null.');
+      if (mounted) {
+        toastification.show(
+            context: context,
+            type: ToastificationType.error,
+            style: ToastificationStyle.fillColored,
+            title: const Text('Error Pengguna'),
+            description: const Text('Tidak dapat mengambil ID mahasiswa. Harap coba lagi.'),
+            autoCloseDuration: const Duration(seconds: 5),
+        );
+      }
     }
   }
 
@@ -151,33 +166,41 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
 
   Future<void> _takePicture() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized || _isTakingPicture) {
+      print('FaceRegistrationScreen: _takePicture preconditions not met. Controller null: ${_cameraController == null}, Initialized: ${_cameraController?.value.isInitialized}, IsTakingPic: $_isTakingPicture');
       return;
     }
     
     setState(() {
       _isTakingPicture = true;
     });
+    print('FaceRegistrationScreen: Attempting to take picture.');
     
     try {
       final imageFile = await _cameraController!.takePicture();
+      print('FaceRegistrationScreen: Picture taken, path: ${imageFile.path}');
       
       // Mirror the captured image
       final Uint8List imageBytes = await File(imageFile.path).readAsBytes();
       img.Image? originalImage = img.decodeImage(imageBytes);
+      print('FaceRegistrationScreen: Original image decoded for mirroring: ${originalImage != null}');
       
       if (originalImage != null) {
         img.Image mirroredImage = img.flipHorizontal(originalImage);
         final File mirroredImageFile = await File(imageFile.path).writeAsBytes(img.encodeJpg(mirroredImage));
+        print('FaceRegistrationScreen: Image mirrored and saved to: ${mirroredImageFile.path}');
         
         setState(() {
           _capturedImage = XFile(mirroredImageFile.path); // Use the mirrored image
           _isTakingPicture = false;
         });
+        print('FaceRegistrationScreen: _capturedImage set with mirrored image. Path: ${_capturedImage?.path}');
       } else {
+        print('FaceRegistrationScreen: Mirroring failed, originalImage was null after decode.');
         setState(() {
           _capturedImage = imageFile; // Fallback to original if mirroring fails
           _isTakingPicture = false;
         });
+        print('FaceRegistrationScreen: _capturedImage set with original image due to mirroring failure. Path: ${_capturedImage?.path}');
         if (mounted) {
             toastification.show(
                 context: context,
