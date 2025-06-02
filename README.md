@@ -172,6 +172,33 @@ MIT
 
 4. Aplikasi seharusnya sekarang bisa diakses di http://[IP-VPS] tanpa port
 
+### Deployment to GitHub and VM
+
+When pushing to GitHub and deploying to your VM, follow these steps to ensure proper configuration:
+
+1. **For GitHub**: 
+   - The default configuration in docker-compose.yml uses a placeholder (`YOUR_VM_IP`).
+   - This allows others to clone and set up their own environment.
+   - DO NOT commit your actual .env file with your VM IP to GitHub.
+
+2. **For VM Deployment**:
+   - On your VM, create a .env file with your actual VM IP:
+     ```
+     NEXT_PUBLIC_API_URL=http://34.70.12.251/api
+     ```
+   - This file will be used during deployment but won't be pushed to GitHub.
+
+3. **To update your deployment**:
+   ```bash
+   # Pull the latest code
+   git pull
+   
+   # Make sure your .env file has the correct VM IP
+   
+   # Restart the containers
+   docker-compose down && docker-compose up -d --build
+   ```
+
 ### Troubleshooting
 
 Jika aplikasi tidak bisa diakses:
