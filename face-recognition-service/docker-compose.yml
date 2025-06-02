@@ -34,7 +34,7 @@ services:
 
 networks:
   delpresence-network:
-    external: true
+    driver: bridge
 
 volumes:
   face_recognition_logs: 
