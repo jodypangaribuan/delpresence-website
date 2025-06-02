@@ -4,19 +4,37 @@ services:
   face-recognition:
     build: .
     container_name: delpresence-face-recognition
-    restart: unless-stopped
+    restart: always
     ports:
       - "5000:5000"
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=delpresence
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-delpresence}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - FLASK_DEBUG=false
+      - FLASK_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-change_this_to_something_secure}
+    volumes:
+      - face_recognition_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - delpresence-network
 
 networks:
   delpresence-network:
-    external: true 
+    external: true
+
+volumes:
+  face_recognition_logs: 
