@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:toastification/toastification.dart';
+import 'package:image/image.dart' as img;
 import '../../../../core/constants/colors.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/services/user_service.dart';
@@ -157,54 +159,105 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
     });
     
     try {
-      final image = await _cameraController!.takePicture();
-      setState(() {
-        _capturedImage = image;
-        _isTakingPicture = false;
-      });
+      final imageFile = await _cameraController!.takePicture();
+      
+      // Mirror the captured image
+      final Uint8List imageBytes = await File(imageFile.path).readAsBytes();
+      img.Image? originalImage = img.decodeImage(imageBytes);
+      
+      if (originalImage != null) {
+        img.Image mirroredImage = img.flipHorizontal(originalImage);
+        final File mirroredImageFile = await File(imageFile.path).writeAsBytes(img.encodeJpg(mirroredImage));
+        
+        setState(() {
+          _capturedImage = XFile(mirroredImageFile.path); // Use the mirrored image
+          _isTakingPicture = false;
+        });
+      } else {
+        setState(() {
+          _capturedImage = imageFile; // Fallback to original if mirroring fails
+          _isTakingPicture = false;
+        });
+        if (mounted) {
+            toastification.show(
+                context: context,
+                type: ToastificationType.warning,
+                style: ToastificationStyle.fillColored,
+                title: const Text('Gagal Mirror'),
+                description: const Text('Gagal melakukan mirror pada gambar.'),
+                autoCloseDuration: const Duration(seconds: 3),
+            );
+        }
+      }
     } catch (e) {
       setState(() {
         _isTakingPicture = false;
       });
-      print('Error taking picture: $e');
+      print('Error taking or mirroring picture: $e');
+      if (mounted) {
+        toastification.show(
+            context: context,
+            type: ToastificationType.error,
+            style: ToastificationStyle.fillColored,
+            title: const Text('Gagal Ambil Foto'),
+            description: Text('Terjadi kesalahan: $e'),
+            autoCloseDuration: const Duration(seconds: 3),
+        );
+      }
     }
   }
 
   Future<void> _registerFace() async {
-    if (_capturedImage == null || _studentId == null) return;
+    if (_capturedImage == null || _studentId == null) {
+      print('Registration pre-condition failed: _capturedImage is null or _studentId is null');
+      if (mounted) {
+        toastification.show(
+            context: context,
+            type: ToastificationType.warning,
+            style: ToastificationStyle.fillColored,
+            title: const Text('Data Tidak Lengkap'),
+            description: const Text('Gambar atau ID mahasiswa tidak tersedia.'),
+            autoCloseDuration: const Duration(seconds: 3),
+        );
+      }
+      return;
+    }
     
     setState(() {
       _isProcessing = true;
     });
     
+    final String apiUrl = '${ApiConstants.baseUrl}/api/faces/register';
+    print('Attempting to register face for student ID: $_studentId to URL: $apiUrl');
+
     try {
-      // Convert the image to base64
       final File file = File(_capturedImage!.path);
       final List<int> imageBytes = await file.readAsBytes();
       final String base64Image = base64Encode(imageBytes);
+
+      print('Image bytes length: ${imageBytes.length}');
+      print('Base64 image preview (first 100 chars): ${base64Image.substring(0, base64Image.length > 100 ? 100 : base64Image.length)}');
       
-      // Send the image for face registration
       final response = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}/api/faces/register'),
+        Uri.parse(apiUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'student_id': _studentId,
           'image': base64Image,
         }),
-      );
+      ).timeout(const Duration(seconds: 30)); // Added timeout
       
+      print('Registration API response status: ${response.statusCode}');
+      print('Registration API response body: ${response.body}');
+
       final result = jsonDecode(response.body);
       
       if (response.statusCode == 201 && result['success']) {
-        // Face registration succeeded
         setState(() {
           _isFaceRegistered = true;
           _isProcessing = false;
         });
-        
-        // Reload registered faces
         _loadRegisteredFaces();
-        
         if (mounted) {
           toastification.show(
             context: context,
@@ -216,19 +269,17 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
           );
         }
       } else {
-        // Face registration failed
         setState(() {
           _isProcessing = false;
         });
-        
         if (mounted) {
           toastification.show(
             context: context,
             type: ToastificationType.error,
             style: ToastificationStyle.fillColored,
-            title: const Text('Gagal'),
-            description: Text('Pendaftaran wajah gagal: ${result['error'] ?? 'Terjadi kesalahan'}'),
-            autoCloseDuration: const Duration(seconds: 3),
+            title: const Text('Gagal Daftar'),
+            description: Text('Pendaftaran wajah gagal: ${result['error'] ?? result['message'] ?? 'Server error'}'),
+            autoCloseDuration: const Duration(seconds: 5),
           );
         }
       }
@@ -236,15 +287,15 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
       setState(() {
         _isProcessing = false;
       });
-      
+      print('Error during face registration: $e');
       if (mounted) {
         toastification.show(
           context: context,
           type: ToastificationType.error,
           style: ToastificationStyle.fillColored,
-          title: const Text('Error'),
+          title: const Text('Error Pendaftaran'),
           description: Text('Terjadi kesalahan: $e'),
-          autoCloseDuration: const Duration(seconds: 3),
+          autoCloseDuration: const Duration(seconds: 5),
         );
       }
     }
