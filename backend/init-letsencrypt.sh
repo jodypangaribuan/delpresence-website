@@ -8,7 +8,7 @@ fi
 domains=(api.delpresence.site)
 rsa_key_size=4096
 data_path="./nginx/certbot"
-email="" # Ganti dengan email Anda untuk notifikasi Let's Encrypt
+email="your-email@example.com" # Ganti dengan email Anda untuk notifikasi Let's Encrypt
 
 if [ -d "$data_path/conf/live" ]; then
   read -p "Existing data found. Continue and replace existing certificate? (y/N) " decision
