@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: always
-    expose:
-      - "8080"
+    ports:
+      - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -17,7 +17,7 @@ services:
       - DB_NAME=delpresence
       - JWT_SECRET=${JWT_SECRET:-delpresence_secret_key}
       - SERVER_PORT=8080
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://delpresence.site}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
     networks:
       - delpresence-network
     command: ./delpresence-server
@@ -32,24 +32,12 @@ services:
     restart: always
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./nginx/conf:/etc/nginx/conf.d
-      - ./nginx/certbot/conf:/etc/letsencrypt
-      - ./nginx/certbot/www:/var/www/certbot
     networks:
       - delpresence-network
     depends_on:
       - api
-    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
-
-  certbot:
-    image: certbot/certbot
-    restart: unless-stopped
-    volumes:
-      - ./nginx/certbot/conf:/etc/letsencrypt
-      - ./nginx/certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
   db:
     image: postgres:15-alpine
