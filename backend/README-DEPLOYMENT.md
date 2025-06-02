@@ -57,17 +57,17 @@ Dokumen ini berisi panduan cara melakukan deployment backend API delpresence.sit
 
 1. Setelah sertifikat SSL berhasil diperoleh, jalankan seluruh layanan:
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 2. Periksa status layanan:
    ```bash
-   docker-compose ps
+   docker compose ps
    ```
 
 3. Pastikan semua layanan berjalan dengan baik dan tidak ada error:
    ```bash
-   docker-compose logs -f
+   docker compose logs -f
    ```
 
 ### 4. Verifikasi Deployment
@@ -86,7 +86,7 @@ Jika sertifikat SSL tidak berhasil diperoleh:
 2. Pastikan port 80 dan 443 terbuka pada firewall VM
 3. Periksa log certbot:
    ```bash
-   docker-compose logs certbot
+   docker compose logs certbot
    ```
 
 ### Masalah Koneksi Database
@@ -95,7 +95,7 @@ Jika aplikasi tidak dapat terhubung ke database:
 
 1. Periksa log API:
    ```bash
-   docker-compose logs api
+   docker compose logs api
    ```
 
 2. Pastikan kredensial database di file `.env` sudah benar
@@ -107,8 +107,8 @@ Jika aplikasi tidak dapat terhubung ke database:
 Sertifikat SSL dari Let's Encrypt berlaku selama 90 hari. Renewal otomatis sudah dikonfigurasi melalui container certbot. Namun, jika Anda perlu memperbarui secara manual:
 
 ```bash
-docker-compose run --rm certbot renew
-docker-compose exec nginx nginx -s reload
+docker compose run --rm certbot renew
+docker compose exec nginx nginx -s reload
 ```
 
 ### Backup Database
@@ -116,5 +116,5 @@ docker-compose exec nginx nginx -s reload
 Lakukan backup database secara berkala:
 
 ```bash
-docker-compose exec db pg_dump -U postgres delpresence > backup_$(date +%Y%m%d).sql
+docker compose exec db pg_dump -U postgres delpresence > backup_$(date +%Y%m%d).sql
 ``` 
