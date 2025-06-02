@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -127,24 +128,30 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
     });
     
     try {
-      final response = await http.get(
-        Uri.parse('${ApiConstants.faceRecognitionUrl}/api/faces/student/$_studentId'),
-      );
+      // SIMULATION MODE: Instead of making actual API calls, we'll use simulated data
+      await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
       
-      print('FaceRegistrationScreen: Load faces API response status: ${response.statusCode}');
-      print('FaceRegistrationScreen: Load faces API response body: ${response.body}');
+      // Simulate having 0-2 registered faces already
+      final existingFaceCount = _registeredFaces.length;
       
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] && data.containsKey('faces')) {
-          setState(() {
-            _registeredFaces = List<Map<String, dynamic>>.from(data['faces']);
+      if (existingFaceCount == 0) {
+        // Only add simulated faces if we don't have any yet (to prevent duplicates during retries)
+        final faceCount = Random().nextInt(2); // 0 or 1 face initially
+        final now = DateTime.now();
+        
+        for (int i = 0; i < faceCount; i++) {
+          final faceId = Random().nextInt(1000) + 1;
+          _registeredFaces.add({
+            'id': faceId,
+            'embedding_id': 'sim_face_${faceId}',
+            'created_at': now.subtract(Duration(days: Random().nextInt(30))).toIso8601String(),
           });
-          print('FaceRegistrationScreen: Loaded ${_registeredFaces.length} registered faces');
         }
       }
+      
+      print('SIMULATION: Loaded ${_registeredFaces.length} simulated registered faces');
     } catch (e) {
-      print('Error loading faces: $e');
+      print('Error in simulated face loading: $e');
     } finally {
       setState(() {
         _isLoadingFaces = false;
@@ -289,71 +296,54 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
     final String apiUrl = '${ApiConstants.faceRecognitionUrl}/api/faces/register';
     print('Attempting to register face for student ID: $_studentId to URL: $apiUrl');
 
+    // SIMULATION MODE: Instead of making actual API calls, we'll simulate success
+    
     try {
-      final File file = File(_capturedImage!.path);
-      final List<int> imageBytes = await file.readAsBytes();
-      final String base64Image = base64Encode(imageBytes);
-
-      print('Image bytes length: ${imageBytes.length}');
-      print('Base64 image preview (first 100 chars): ${base64Image.substring(0, base64Image.length > 100 ? 100 : base64Image.length)}');
+      // Simulate network delay
+      await Future.delayed(const Duration(seconds: 2));
       
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'student_id': _studentId,
-          'image': base64Image,
-        }),
-      ).timeout(const Duration(seconds: 30)); // Added timeout
+      // Simulate successful API response
+      print('SIMULATION: Registration successful (simulated)');
       
-      print('Registration API response status: ${response.statusCode}');
-      print('Registration API response body: ${response.body}');
-
-      final result = jsonDecode(response.body);
+      // Generate a simulated face record
+      final simulatedFaceId = Random().nextInt(1000) + 1;
+      final now = DateTime.now();
       
-      if (response.statusCode == 201 && result['success']) {
-        setState(() {
-          _isFaceRegistered = true;
-          _isProcessing = false;
+      // Update the UI to show success
+      setState(() {
+        _isFaceRegistered = true;
+        _isProcessing = false;
+        
+        // Add simulated face to the list
+        _registeredFaces.add({
+          'id': simulatedFaceId,
+          'embedding_id': 'sim_face_${simulatedFaceId}',
+          'created_at': now.toIso8601String(),
         });
-        _loadRegisteredFaces();
-        if (mounted) {
-          toastification.show(
-            context: context,
-            type: ToastificationType.success,
-            style: ToastificationStyle.fillColored,
-            title: const Text('Berhasil'),
-            description: const Text('Wajah berhasil didaftarkan'),
-            autoCloseDuration: const Duration(seconds: 3),
-          );
-        }
-      } else {
-        setState(() {
-          _isProcessing = false;
-        });
-        if (mounted) {
-          toastification.show(
-            context: context,
-            type: ToastificationType.error,
-            style: ToastificationStyle.fillColored,
-            title: const Text('Gagal Daftar'),
-            description: Text('Pendaftaran wajah gagal: ${result['error'] ?? result['message'] ?? 'Server error'}'),
-            autoCloseDuration: const Duration(seconds: 5),
-          );
-        }
+      });
+      
+      if (mounted) {
+        toastification.show(
+          context: context,
+          type: ToastificationType.success,
+          style: ToastificationStyle.fillColored,
+          title: const Text('Berhasil (Simulasi)'),
+          description: const Text('Wajah berhasil didaftarkan dalam mode simulasi'),
+          autoCloseDuration: const Duration(seconds: 3),
+        );
       }
     } catch (e) {
       setState(() {
         _isProcessing = false;
       });
-      print('Error during face registration: $e');
+      print('Error during face registration simulation: $e');
       if (mounted) {
         toastification.show(
           context: context,
           type: ToastificationType.error,
           style: ToastificationStyle.fillColored,
-          title: const Text('Error Pendaftaran'),
-          description: Text('Terjadi kesalahan: $e'),
+          title: const Text('Error Simulasi'),
+          description: Text('Terjadi kesalahan dalam simulasi: $e'),
           autoCloseDuration: const Duration(seconds: 5),
         );
       }
@@ -362,33 +352,22 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
 
   Future<void> _deleteFace(int faceId) async {
     try {
-      final response = await http.delete(
-        Uri.parse('${ApiConstants.faceRecognitionUrl}/api/faces/$faceId'),
-      );
+      // SIMULATION MODE: Instead of making actual API calls, we'll simulate success
+      await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
       
-      if (response.statusCode == 200) {
-        _loadRegisteredFaces();
-        if (mounted) {
-          toastification.show(
-            context: context,
-            type: ToastificationType.success,
-            style: ToastificationStyle.fillColored,
-            title: const Text('Berhasil'),
-            description: const Text('Data wajah berhasil dihapus'),
-            autoCloseDuration: const Duration(seconds: 3),
-          );
-        }
-      } else {
-        if (mounted) {
-          toastification.show(
-            context: context,
-            type: ToastificationType.error,
-            style: ToastificationStyle.fillColored,
-            title: const Text('Gagal'),
-            description: const Text('Gagal menghapus data wajah'),
-            autoCloseDuration: const Duration(seconds: 3),
-          );
-        }
+      setState(() {
+        _registeredFaces.removeWhere((face) => face['id'] == faceId);
+      });
+      
+      if (mounted) {
+        toastification.show(
+          context: context,
+          type: ToastificationType.success,
+          style: ToastificationStyle.fillColored,
+          title: const Text('Berhasil (Simulasi)'),
+          description: const Text('Data wajah berhasil dihapus dalam mode simulasi'),
+          autoCloseDuration: const Duration(seconds: 3),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -396,8 +375,8 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> with Ti
           context: context,
           type: ToastificationType.error,
           style: ToastificationStyle.fillColored,
-          title: const Text('Error'),
-          description: Text('Terjadi kesalahan: $e'),
+          title: const Text('Error Simulasi'),
+          description: Text('Terjadi kesalahan dalam simulasi: $e'),
           autoCloseDuration: const Duration(seconds: 3),
         );
       }
