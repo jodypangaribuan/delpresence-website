@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: always
     ports:
       - "8080:8080"
     depends_on:
@@ -14,22 +15,28 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_NAME=delpresence
-      - JWT_SECRET=delpresence_secret_key
+      - JWT_SECRET=${JWT_SECRET:-delpresence_secret_key}
       - SERVER_PORT=8080
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://delpresence.example.com}
     networks:
       - delpresence-network
     command: ./delpresence-server
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   db:
     image: postgres:15-alpine
+    restart: always
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
       - POSTGRES_DB=delpresence
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -37,10 +44,15 @@ services:
       - delpresence-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   delpresence-network:
@@ -48,3 +60,4 @@ networks:
 
 volumes:
   postgres_data:
+    driver: local
