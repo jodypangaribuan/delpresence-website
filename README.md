@@ -142,3 +142,61 @@ This will start both the API server and PostgreSQL database.
 ## License
 
 MIT
+
+## Cara Deploy ke VPS
+
+### Persiapan
+1. Pastikan Docker dan Docker Compose sudah terinstall di VPS
+2. Clone repository ini ke VPS
+3. Pastikan struktur folder berikut sudah ada:
+   - `nginx/nginx.conf` - File konfigurasi Nginx
+   - `nextjs/` - Folder aplikasi Next.js dengan semua file yang diperlukan
+
+### Deployment
+
+1. Copy file konfigurasi environment:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit file .env dan ganti `your-vps-ip` dengan IP VPS Anda:
+   ```
+   NEXT_PUBLIC_API_URL=http://your-vps-ip/api
+   ```
+
+3. Jalankan script deployment:
+   ```bash
+   chmod +x deploy.sh
+   ./deploy.sh
+   ```
+
+4. Aplikasi seharusnya sekarang bisa diakses di http://[IP-VPS] tanpa port
+
+### Troubleshooting
+
+Jika aplikasi tidak bisa diakses:
+
+1. Periksa apakah container berjalan:
+   ```bash
+   docker-compose ps
+   ```
+
+2. Periksa logs:
+   ```bash
+   docker-compose logs nginx
+   docker-compose logs nextjs
+   ```
+
+3. Pastikan port 80 tidak diblokir oleh firewall:
+   ```bash
+   sudo ufw status
+   ```
+   Jika port 80 tidak ada dalam list, tambahkan dengan:
+   ```bash
+   sudo ufw allow 80/tcp
+   ```
+
+4. Pastikan tidak ada layanan lain yang menggunakan port 80:
+   ```bash
+   sudo netstat -tulpn | grep 80
+   ```
