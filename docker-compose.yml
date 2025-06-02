@@ -1,19 +1,39 @@
 version: '3.8'
 
 services:
-  frontend:
+  nextjs:
+    container_name: delpresence-nextjs
     build:
-      context: .
+      context: ./nextjs
       dockerfile: Dockerfile
       args:
-        - NODE_ENV=production
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost/api}
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      - PORT=3000
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+  nginx:
+    container_name: delpresence-nginx
+    image: nginx:stable-alpine
+    restart: always
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/logs:/var/log/nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - nextjs
+    networks:
+      - app-network
 
 networks:
-  default:
+  app-network:
     driver: bridge
