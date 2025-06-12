@@ -1,229 +1,164 @@
-# DelPresence Website
+# DelPresence
 
-DelPresence is a web application for academic management with authentication features.
+## Panduan Menjalankan Proyek DelPresence
 
-## Project Structure
+Dokumen ini berisi panduan untuk menjalankan seluruh komponen proyek DelPresence menggunakan Docker.
 
-This project is divided into two main parts:
+## Daftar Isi
 
-1. **Frontend**: A Next.js application with React
-2. **Backend**: A Go API server with PostgreSQL database
+- [Prasyarat](#prasyarat)
+- [Frontend (Next.js)](#frontend-nextjs)
+- [Backend (Go)](#backend-go)
+- [Aplikasi Mobile (Flutter)](#aplikasi-mobile-flutter)
+- [Menjalankan Seluruh Stack](#menjalankan-seluruh-stack)
 
-## Prerequisites
+## Prasyarat
 
-- Node.js 18 or later
-- Go 1.21 or later
-- PostgreSQL 15 or later
-- Docker and Docker Compose (optional)
+Sebelum memulai, pastikan Anda telah menginstal:
 
-## Frontend
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+- [Flutter SDK](https://flutter.dev/docs/get-started/install) (untuk pengembangan aplikasi mobile)
+- [Git](https://git-scm.com/downloads)
 
-The frontend is built with Next.js and uses:
+## Frontend (Next.js)
 
-- Tailwind CSS for styling
-- React components from shadcn/ui
-- Client-side authentication
+Frontend DelPresence dibuat menggunakan Next.js.
 
-### Running the Frontend
+### Menjalankan dengan Docker
 
-1. Install dependencies:
+1. Salin file `.env.example` menjadi `.env` dan sesuaikan konfigurasi:
+
+```bash
+cp env.example .env
+```
+
+2. Bangun dan jalankan container NextJS:
+
+```bash
+docker-compose up -d
+```
+
+3. Aplikasi frontend akan berjalan di `http://localhost:80`
+
+### Pengembangan Lokal (Tanpa Docker)
+
+1. Instal dependensi:
 
 ```bash
 npm install
 ```
 
-2. Create a `.env.local` file with:
-
-```
-# API Configuration
-NEXT_PUBLIC_API_URL=http://localhost:8080
-
-# Frontend Configuration
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-
-# Authentication Configuration
-NEXT_PUBLIC_TOKEN_EXPIRY_HOURS=12
-
-# CORS Configuration
-NEXT_PUBLIC_CORS_ALLOWED_ORIGINS=http://localhost:3000
-
-# Development Configuration
-NEXT_PUBLIC_DEV_MODE=true
-```
-
-3. Start the development server:
+2. Jalankan server pengembangan:
 
 ```bash
 npm run dev
 ```
 
-The frontend will run on `http://localhost:3000`.
+3. Buka `http://localhost:3000` di browser Anda
 
-## Backend
+## Backend (Go)
 
-The backend is built with Go and uses:
+Backend DelPresence dibangun menggunakan Go dengan database PostgreSQL.
 
-- Gin web framework
-- PostgreSQL database
-- JWT authentication
+### Menjalankan dengan Docker
 
-### Running the Backend
-
-1. Navigate to the backend directory:
+1. Masuk ke direktori backend:
 
 ```bash
 cd backend
 ```
 
-2. Create a PostgreSQL database:
-
-```sql
-CREATE DATABASE delpresence;
-```
-
-3. Configure environment variables in `.env`:
-
-```
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_NAME=delpresence
-JWT_SECRET=delpresence_secret_key
-SERVER_PORT=8080
-CORS_ALLOWED_ORIGINS=http://localhost:3000
-```
-
-4. Install dependencies:
+2. Siapkan variabel lingkungan (opsional):
 
 ```bash
-go mod download
+# Konfigurasi database
+export DB_PASSWORD=postgres  # default: postgres
+export JWT_SECRET=rahasia_kunci_jwt  # default: delpresence_secret_key
+export CORS_ALLOWED_ORIGINS=http://localhost,https://delpresence.example.com  # sesuaikan dengan domain frontend Anda
 ```
 
-5. Run the server:
+3. Bangun dan jalankan container:
 
 ```bash
-go run cmd/server/main.go
-```
-
-The backend will run on `http://localhost:8080`.
-
-### Using Docker Compose
-
-You can also run the backend with Docker Compose:
-
-```bash
-cd backend
 docker-compose up -d
 ```
 
-This will start both the API server and PostgreSQL database.
+4. API backend akan berjalan di `http://localhost:8080`
 
-## Default Admin User
+### Pengembangan Lokal (Tanpa Docker)
 
-- Username: `admin`
-- Password: `delpresence`
+1. Masuk ke direktori backend:
 
-## API Endpoints
+```bash
+cd backend
+```
 
-### Authentication
+2. Pastikan PostgreSQL berjalan di mesin lokal Anda
 
-- `POST /api/auth/login`: Log in with username and password
-- `POST /api/auth/refresh`: Refresh an expired token
-- `GET /api/auth/me`: Get current user information (protected)
+3. Sesuaikan konfigurasi di dalam kode atau variabel lingkungan
 
-## Development
+4. Jalankan server:
 
-- Frontend code is in the `src` directory
-- Backend code is in the `backend` directory
-- UI components are in `src/components`
-- Authentication logic is in `backend/internal/auth`
+```bash
+go run ./cmd/server/main.go
+```
 
-## License
+## Aplikasi Mobile (Flutter)
 
-MIT
+Aplikasi mobile DelPresence dibuat menggunakan Flutter.
 
-## Cara Deploy ke VPS
+### Menjalankan Aplikasi Mobile
 
-### Persiapan
-1. Pastikan Docker dan Docker Compose sudah terinstall di VPS
-2. Clone repository ini ke VPS
-3. Pastikan struktur folder berikut sudah ada:
-   - `nginx/nginx.conf` - File konfigurasi Nginx
-   - `nextjs/` - Folder aplikasi Next.js dengan semua file yang diperlukan
+1. Masuk ke direktori aplikasi mobile:
 
-### Deployment
+```bash
+cd mobile-app
+```
 
-1. Copy file konfigurasi environment:
-   ```bash
-   cp .env.example .env
-   ```
+2. Ambil dependensi Flutter:
 
-2. Edit file .env dan ganti `your-vps-ip` dengan IP VPS Anda:
-   ```
-   NEXT_PUBLIC_API_URL=http://your-vps-ip/api
-   ```
+```bash
+flutter pub get
+```
 
-3. Jalankan script deployment:
-   ```bash
-   chmod +x deploy.sh
-   ./deploy.sh
-   ```
+3. Jalankan aplikasi di emulator atau perangkat fisik:
 
-4. Aplikasi seharusnya sekarang bisa diakses di http://[IP-VPS] tanpa port
+```bash
+flutter run
+```
 
-### Deployment to GitHub and VM
+### Build APK
 
-When pushing to GitHub and deploying to your VM, follow these steps to ensure proper configuration:
+Untuk membuat file APK yang dapat diinstal:
 
-1. **For GitHub**: 
-   - The default configuration in docker-compose.yml uses a placeholder (`YOUR_VM_IP`).
-   - This allows others to clone and set up their own environment.
-   - DO NOT commit your actual .env file with your VM IP to GitHub.
+```bash
+flutter build apk --release
+```
 
-2. **For VM Deployment**:
-   - On your VM, create a .env file with your actual VM IP:
-     ```
-     NEXT_PUBLIC_API_URL=http://34.70.12.251/api
-     ```
-   - This file will be used during deployment but won't be pushed to GitHub.
+File APK akan tersedia di `build/app/outputs/flutter-apk/app-release.apk`
 
-3. **To update your deployment**:
-   ```bash
-   # Pull the latest code
-   git pull
-   
-   # Make sure your .env file has the correct VM IP
-   
-   # Restart the containers
-   docker-compose down && docker-compose up -d --build
-   ```
+## Menjalankan Seluruh Stack
 
-### Troubleshooting
+Untuk menjalankan seluruh stack aplikasi (frontend dan backend) sekaligus:
 
-Jika aplikasi tidak bisa diakses:
+1. Di root direktori proyek:
 
-1. Periksa apakah container berjalan:
-   ```bash
-   docker-compose ps
-   ```
+```bash
+# Jalankan backend
+cd backend && docker-compose up -d && cd ..
 
-2. Periksa logs:
-   ```bash
-   docker-compose logs nginx
-   docker-compose logs nextjs
-   ```
+# Jalankan frontend
+docker-compose up -d
+```
 
-3. Pastikan port 80 tidak diblokir oleh firewall:
-   ```bash
-   sudo ufw status
-   ```
-   Jika port 80 tidak ada dalam list, tambahkan dengan:
-   ```bash
-   sudo ufw allow 80/tcp
-   ```
+2. Dengan cara ini, Anda dapat mengakses:
 
-4. Pastikan tidak ada layanan lain yang menggunakan port 80:
-   ```bash
-   sudo netstat -tulpn | grep 80
-   ```
+   - Frontend: `http://localhost:80`
+   - Backend API: `http://localhost:8080`
+
+3. Untuk aplikasi mobile, Anda perlu menjalankannya secara terpisah seperti yang dijelaskan di bagian [Aplikasi Mobile](#aplikasi-mobile-flutter).
+
+---
+
+© DelPresence.
