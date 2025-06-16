@@ -161,4 +161,4 @@ docker-compose up -d
 
 ---
 
-© DelPresence.
+© DelPresence 2025.
