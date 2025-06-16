@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Create required directories
 mkdir -p nginx/logs
 
