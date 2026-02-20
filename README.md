@@ -1,4 +1,7 @@
-<h1 align="center">DelPresence</h1>
+<div align="center">
+  <img src="public/images/logo2.png" alt="DelPresence Logo" width="250" />
+  <h1>DelPresence</h1>
+</div>
 
 <div align="center">
   <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue.svg?cacheSeconds=2592000" />
