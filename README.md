@@ -13,6 +13,8 @@
 
 <div align="center">
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js%2016-black?style=flat-square&logo=next.js&logoColor=white" />
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js%2025-339933?style=flat-square&logo=nodedotjs&logoColor=white" />
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind%20CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white" />
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter%203-02569B?style=flat-square&logo=flutter&logoColor=white" />
   <img alt="Go" src="https://img.shields.io/badge/Go%201.23-00ADD8?style=flat-square&logo=go&logoColor=white" />
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL%2015-4169E1?style=flat-square&logo=postgresql&logoColor=white" />
@@ -59,7 +61,7 @@ The DelPresence application in this repository is divided into 3 main component 
 
 ### System Prerequisites
 Ensure your operating system has the following installed:
-- [Node.js](https://nodejs.org/) (version 20 or above)
+- [Node.js](https://nodejs.org/) (version 25 or above)
 - [Go](https://golang.org/) (version 1.23 or above)
 - [Flutter SDK](https://flutter.dev/) (version 3.0+)
 - [PostgreSQL](https://www.postgresql.org/) (version 15 or above)
