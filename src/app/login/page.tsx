@@ -51,11 +51,11 @@ interface LoginResponse {
 // Save auth data to localStorage (cookies would be better but this is simpler for demo)
 function saveAuthData(data: LoginResponse) {
   if (typeof window === "undefined") return;
-  
-  localStorage.setItem("access_token", data.token);
-  localStorage.setItem("refresh_token", data.refresh_token);
-  localStorage.setItem("user", JSON.stringify(data.user));
-  localStorage.setItem("token_expiry", (Date.now() + TOKEN_EXPIRY_MS).toString());
+
+  window.localStorage.setItem("access_token", data.token);
+  window.localStorage.setItem("refresh_token", data.refresh_token);
+  window.localStorage.setItem("user", JSON.stringify(data.user));
+  window.localStorage.setItem("token_expiry", (Date.now() + TOKEN_EXPIRY_MS).toString());
 }
 
 // Loader component for Suspense
@@ -116,33 +116,33 @@ function LoginContent() {
   // Handle redirect to dashboard if already authenticated
   useEffect(() => {
     setMounted(true);
-    
+
     const handleRedirect = () => {
       if (!isAuthenticated || isRedirecting) return;
-      
+
       // Get the last redirect time
-      const lastRedirectTime = sessionStorage.getItem('lastLoginRedirect')
-        ? parseInt(sessionStorage.getItem('lastLoginRedirect') || '0')
+      const lastRedirectTime = window.sessionStorage.getItem('lastLoginRedirect')
+        ? parseInt(window.sessionStorage.getItem('lastLoginRedirect') || '0')
         : 0;
-      
+
       // Check if we're within the cooldown period
       if (Date.now() - lastRedirectTime < REDIRECT_DELAY) {
         console.log("[LoginPage] Redirect cooldown active, skipping redirect");
         return;
       }
-      
+
       console.log("[LoginPage] User already authenticated, redirecting to dashboard");
       setIsRedirecting(true);
-      sessionStorage.setItem('lastLoginRedirect', Date.now().toString());
-      
+      window.sessionStorage.setItem('lastLoginRedirect', Date.now().toString());
+
       // Check if there's a redirect path saved
-      const redirectPath = sessionStorage.getItem('redirectAfterLogin') || '/dashboard';
+      const redirectPath = window.sessionStorage.getItem('redirectAfterLogin') || '/dashboard';
       console.log(`[LoginPage] Redirecting to: ${redirectPath}`);
-      
+
       // Use window.location for a full page reload to reset any potentially bad state
       window.location.href = redirectPath;
     };
-    
+
     if (mounted) {
       handleRedirect();
     }
@@ -152,7 +152,7 @@ function LoginContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    
+
     setIsLoading(true);
     setError("");
 
@@ -160,23 +160,23 @@ function LoginContent() {
       console.log("[LoginPage] Attempting login for:", username);
       // Call the login function
       await login(username, password);
-      
+
       // If we get here, login was successful
       console.log("[LoginPage] Login successful");
-      
+
       // Wait briefly to avoid immediate redirect
       setTimeout(() => {
         setIsRedirecting(true);
-        sessionStorage.setItem('lastLoginRedirect', Date.now().toString());
-        
+        window.sessionStorage.setItem('lastLoginRedirect', Date.now().toString());
+
         // Get redirect path if any
-        const redirectPath = sessionStorage.getItem('redirectAfterLogin') || '/dashboard';
+        const redirectPath = window.sessionStorage.getItem('redirectAfterLogin') || '/dashboard';
         console.log(`[LoginPage] Redirecting to: ${redirectPath}`);
-        
+
         // Use window.location for a clean redirect
         window.location.href = redirectPath;
       }, 300);
-      
+
     } catch (err: unknown) {
       console.error("[LoginPage] Login error:", err);
       if (err instanceof Error) {
@@ -289,11 +289,10 @@ function LoginContent() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div
-                  className={`w-4 h-4 border ${
-                    remember
+                  className={`w-4 h-4 border ${remember
                       ? "bg-[#0687C9] border-[#0687C9]"
                       : "border-[#CBD5E1] bg-white"
-                  } rounded flex items-center justify-center cursor-pointer transition-colors`}
+                    } rounded flex items-center justify-center cursor-pointer transition-colors`}
                   onClick={() => setRemember(!remember)}
                 >
                   {remember && <BsCheck className="text-white" size={14} />}
@@ -316,9 +315,8 @@ function LoginContent() {
 
             <Button
               type="submit"
-              className={`w-full h-11 text-white font-medium bg-[#0687C9] hover:bg-[#046293] transition-colors ${
-                isLoading ? "btn-loading-pulse opacity-90" : ""
-              }`}
+              className={`w-full h-11 text-white font-medium bg-[#0687C9] hover:bg-[#046293] transition-colors ${isLoading ? "btn-loading-pulse opacity-90" : ""
+                }`}
               disabled={isLoading}
             >
               {isLoading ? (

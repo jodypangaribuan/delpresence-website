@@ -41,13 +41,13 @@ import LoadingLink from "@/components/ui/LoadingLink";
 
 // Function to check if token is valid
 function checkTokenValidity(): boolean {
-  if (typeof window === "undefined") return true;
-  
-  const token = localStorage.getItem("access_token");
-  const expiry = localStorage.getItem("token_expiry");
-  
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined" || typeof window.localStorage.getItem !== "function") return true;
+
+  const token = window.localStorage.getItem("access_token");
+  const expiry = window.localStorage.getItem("token_expiry");
+
   if (!token || !expiry) return false;
-  
+
   return parseInt(expiry) > Date.now();
 }
 
@@ -101,34 +101,34 @@ export function Sidebar() {
         window.location.href = "/login";
         return;
       }
-      
+
       const role = getUserRole();
       setUserRole(role);
       console.log("[Sidebar] Current user role:", role);
-      
+
       // Check if the current path is allowed for this role
       if (
-        (pathname.startsWith('/dashboard/academic/') || 
-         pathname.startsWith('/dashboard/courses/') || 
-         pathname.startsWith('/dashboard/schedules/manage') || 
-         pathname.startsWith('/dashboard/users/')) && 
+        (pathname.startsWith('/dashboard/academic/') ||
+          pathname.startsWith('/dashboard/courses/') ||
+          pathname.startsWith('/dashboard/schedules/manage') ||
+          pathname.startsWith('/dashboard/users/')) &&
         role !== UserRole.ADMIN
       ) {
         console.log("[Sidebar] Redirecting: Admin-only path accessed by non-admin");
         window.location.href = "/dashboard";
       }
-      
+
       if (pathname.startsWith('/dashboard/lecturer/') && role !== UserRole.LECTURER) {
         console.log("[Sidebar] Redirecting: Lecturer-only path accessed by non-lecturer");
         window.location.href = "/dashboard";
       }
-      
+
       if (pathname.startsWith('/dashboard/assistant/') && role !== UserRole.ASSISTANT) {
         console.log("[Sidebar] Redirecting: Assistant-only path accessed by non-assistant");
         window.location.href = "/dashboard";
       }
     };
-    
+
     // Re-fetch user role on pathname changes to ensure fresh data
     fetchUserRole();
   }, [pathname]);
@@ -138,29 +138,29 @@ export function Sidebar() {
     if (!checkTokenValidity()) {
       return false;
     }
-    
+
     // First check if the user role has permission for this path
-    if (path.startsWith('/dashboard/academic/') || 
-        path.startsWith('/dashboard/courses/') || 
-        path.startsWith('/dashboard/schedules/manage') || 
-        path.startsWith('/dashboard/users/')) {
+    if (path.startsWith('/dashboard/academic/') ||
+      path.startsWith('/dashboard/courses/') ||
+      path.startsWith('/dashboard/schedules/manage') ||
+      path.startsWith('/dashboard/users/')) {
       if (userRole !== UserRole.ADMIN) return false;
     }
-    
+
     if (path.startsWith('/dashboard/lecturer/')) {
       if (userRole !== UserRole.LECTURER) return false;
     }
-    
+
     if (path.startsWith('/dashboard/assistant/')) {
       if (userRole !== UserRole.ASSISTANT) return false;
     }
-    
+
     // Now check if the path matches
     if (path === "/dashboard") {
       // Only consider dashboard active if we're exactly at /dashboard or /
       return pathname === "/dashboard" || pathname === "/";
     }
-    
+
     // For all other paths, check if the current pathname starts with the path
     return pathname.startsWith(`${path}`);
   };
@@ -173,23 +173,21 @@ export function Sidebar() {
   // Helper function to create menu links with loading animation
   const MenuLink = ({ href, icon, children }: { href: string; icon: React.ReactNode; children: React.ReactNode }) => {
     const active = isLinkActive(href);
-    
+
     return (
       <li>
         <LoadingLink
           href={href}
-          className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${
-            active
-              ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
-              : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
-          }`}
+          className={`flex items-center rounded-lg px-3 py-2 text-sm transition-all group ${active
+            ? "bg-[#0687C9]/10 text-[#0687C9] font-medium"
+            : "text-neutral-600 hover:bg-[#0687C9]/10 hover:text-[#0687C9]"
+            }`}
           isActive={active}
         >
-          <div className={`mr-3 h-6 w-6 flex items-center justify-center ${
-            active
-              ? "text-[#0687C9]"
-              : "text-neutral-600 group-hover:text-[#0687C9]"
-          }`}>
+          <div className={`mr-3 h-6 w-6 flex items-center justify-center ${active
+            ? "text-[#0687C9]"
+            : "text-neutral-600 group-hover:text-[#0687C9]"
+            }`}>
             {icon}
           </div>
           {children}
@@ -220,7 +218,7 @@ export function Sidebar() {
           </p>
         </div>
         <ul className="space-y-1 mb-6">
-          <MenuLink 
+          <MenuLink
             href="/dashboard"
             icon={<SidebarIcons.LayoutDashboard />}
           >

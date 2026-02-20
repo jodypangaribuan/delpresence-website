@@ -4,11 +4,16 @@ export enum UserRole {
   ASSISTANT = "Asisten Dosen",
 }
 
+// Safe check for browser environment with working localStorage
+function isBrowser(): boolean {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined" && typeof window.localStorage.getItem === "function";
+}
+
 // Get user from localStorage
 export function getUser() {
-  if (typeof window === "undefined") return null;
-  
-  const userJson = localStorage.getItem("user");
+  if (!isBrowser()) return null;
+
+  const userJson = window.localStorage.getItem("user");
   if (!userJson) {
     return {
       id: "1",
@@ -16,7 +21,7 @@ export function getUser() {
       role: UserRole.ADMIN,
     };
   }
-  
+
   try {
     return JSON.parse(userJson);
   } catch (e) {
@@ -31,13 +36,13 @@ export function getUser() {
 
 // Check if user is authenticated
 export function isAuthenticated(): boolean {
-  if (typeof window === "undefined") return true; // For SSR
-  
-  const token = localStorage.getItem("access_token");
-  const expiry = localStorage.getItem("token_expiry");
-  
+  if (!isBrowser()) return false; // Not authenticated during SSR
+
+  const token = window.localStorage.getItem("access_token");
+  const expiry = window.localStorage.getItem("token_expiry");
+
   if (!token || !expiry) return false;
-  
+
   return parseInt(expiry) > Date.now();
 }
 
@@ -45,7 +50,7 @@ export function isAuthenticated(): boolean {
 export function getUserRole(): UserRole {
   const user = getUser();
   if (!user) return UserRole.ADMIN; // Default for development
-  
+
   switch (user.role) {
     case "Admin":
       return UserRole.ADMIN;
@@ -60,12 +65,12 @@ export function getUserRole(): UserRole {
 
 // Logout function
 export function logout() {
-  if (typeof window === "undefined") return;
-  
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("token_expiry");
-  localStorage.removeItem("user");
-  
+  if (!isBrowser()) return;
+
+  window.localStorage.removeItem("access_token");
+  window.localStorage.removeItem("refresh_token");
+  window.localStorage.removeItem("token_expiry");
+  window.localStorage.removeItem("user");
+
   window.location.href = "/login";
 } 

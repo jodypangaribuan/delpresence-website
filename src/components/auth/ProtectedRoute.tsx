@@ -13,15 +13,15 @@ interface ProtectedRouteProps {
 // Helper to prevent infinite redirects
 const REDIRECT_TIMEOUT = 2000; // 2 seconds timeout between redirects
 
-export default function ProtectedRoute({ 
-  children, 
-  requiredRoles = [] 
+export default function ProtectedRoute({
+  children,
+  requiredRoles = []
 }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user, checkRole } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
-  
+
   // Initialize on client side only
   useEffect(() => {
     setIsClient(true);
@@ -37,40 +37,40 @@ export default function ProtectedRoute({
 
     const handleAuthRedirect = () => {
       // Get last redirect timestamp
-      const lastRedirectTime = sessionStorage.getItem('lastAuthRedirect') 
-        ? parseInt(sessionStorage.getItem('lastAuthRedirect') || '0')
+      const lastRedirectTime = window.sessionStorage.getItem('lastAuthRedirect')
+        ? parseInt(window.sessionStorage.getItem('lastAuthRedirect') || '0')
         : 0;
-        
+
       const currentTime = Date.now();
-      
+
       // Check if we're in a redirect cooldown period
       if (currentTime - lastRedirectTime < REDIRECT_TIMEOUT) {
         console.log('[ProtectedRoute] Redirect cooldown active, skipping redirect');
         return;
       }
-      
+
       if (!isAuthenticated) {
         // Only redirect to login if not already on login page
         if (pathname !== '/login') {
           console.log("[ProtectedRoute] Not authenticated, redirecting to login");
-          sessionStorage.setItem('lastAuthRedirect', currentTime.toString());
-          sessionStorage.setItem('redirectAfterLogin', pathname); // Save current path
+          window.sessionStorage.setItem('lastAuthRedirect', currentTime.toString());
+          window.sessionStorage.setItem('redirectAfterLogin', pathname); // Save current path
           window.location.href = '/login';
         }
       } else if (requiredRoles.length > 0 && !checkRole(requiredRoles)) {
         // For role-based protection
         console.log("[ProtectedRoute] Insufficient permissions for", pathname);
-        sessionStorage.setItem('lastAuthRedirect', currentTime.toString());
-        
+        window.sessionStorage.setItem('lastAuthRedirect', currentTime.toString());
+
         // Clear any path-specific session state to prevent path persistence between different user roles
-        sessionStorage.removeItem('lastPath');
-        sessionStorage.removeItem('previousPath');
-        
+        window.sessionStorage.removeItem('lastPath');
+        window.sessionStorage.removeItem('previousPath');
+
         // Use replace instead of href to clear the history entry
         window.location.replace('/dashboard');
       }
     };
-    
+
     handleAuthRedirect();
   }, [isAuthenticated, isLoading, pathname, user, requiredRoles, checkRole, isClient]);
 
@@ -90,7 +90,7 @@ export default function ProtectedRoute({
     if (typeof window !== 'undefined') {
       window.location.replace('/dashboard');
     }
-    
+
     // In the meantime, show a loading indicator instead of the unauthorized content
     return (
       <div className="flex h-screen w-full items-center justify-center">
