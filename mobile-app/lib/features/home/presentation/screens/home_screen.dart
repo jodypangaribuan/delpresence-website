@@ -1811,7 +1811,7 @@ class _HomePageState extends State<_HomePage> {
 
               // Content with rounded top corners
               Positioned(
-                top: 140, // Return to original position
+                top: 155, // Increased top offset to give space below NIM
                 left: 0,
                 right: 0,
                 bottom: 0,

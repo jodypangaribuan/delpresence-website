@@ -11,7 +11,7 @@ class ApiConfig {
 
   // API configuration constants
   static const String DEFAULT_BASE_URL =
-      'https://b668-2404-c0-5610-00-ead-cdb7.ngrok-free.app';
+      'http://127.0.0.1:8080';
   static const String FACE_RECOGNITION_BASE_URL =
       'http://10.0.2.2:5000';
   static const String API_PATH = '/api/v1';

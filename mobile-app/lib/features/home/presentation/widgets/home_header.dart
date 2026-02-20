@@ -107,7 +107,7 @@ class _HomeHeaderState extends State<HomeHeader> {
         }
 
         return Container(
-          height: 170, // Keep original height
+          height: 185, // Increased height to provide more space
           margin: const EdgeInsets.only(bottom: 0),
           child: Stack(
             clipBehavior: Clip.none, // Important for shadow to be visible
