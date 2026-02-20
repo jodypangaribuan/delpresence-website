@@ -11,6 +11,16 @@
 
 <br />
 
+<div align="center">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js%2016-black?style=flat-square&logo=next.js&logoColor=white" />
+  <img alt="Flutter" src="https://img.shields.io/badge/Flutter%203-02569B?style=flat-square&logo=flutter&logoColor=white" />
+  <img alt="Go" src="https://img.shields.io/badge/Go%201.23-00ADD8?style=flat-square&logo=go&logoColor=white" />
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL%2015-4169E1?style=flat-square&logo=postgresql&logoColor=white" />
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" />
+</div>
+
+<br />
+
 <p align="center">
   <strong>An integrated cloud-based platform for digital and real-time attendance management at Del Institute of Technology (IT Del).</strong>
 </p>
