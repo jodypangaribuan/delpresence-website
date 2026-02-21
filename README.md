@@ -27,6 +27,12 @@
   <strong>An integrated cloud-based platform for digital and real-time attendance management at Del Institute of Technology (IT Del).</strong>
 </p>
 
+<br />
+
+<p align="center">
+  <img src="mobile-app/assets/images/delpresence-mockup.png" alt="DelPresence Mockup" width="800"/>
+</p>
+
 ## Executive Summary
 
 **DelPresence** is a digital attendance system (Final Project for Group 4 at IT Del) that combines a Mobile App (Flutter) and a Web App (Next.js). This platform utilizes **QR Code** and **Face Recognition** for attendance tracking, replacing manual paper-based processes that are time-consuming and prone to fraud.
@@ -52,6 +58,33 @@
 | **Backend API** | Go 1.23, Gin Framework, PostgreSQL, GORM, JWT Auth |
 | **Mobile App** | Flutter (Dart ≥3.0) + `flutter_face_api` + `qr_code_scanner` |
 | **Infrastructure/Deployment**| Docker, Docker Compose, Nginx (Reverse Proxy), GCP |
+
+---
+
+## Project Structure
+
+This project adopts a structured monorepo-style setup containing the web application, mobile application, and backend services:
+
+```text
+delpresence-website/
+├── backend/               # Backend API built with Go and Gin framework
+├── src/                   # Web Application Main Source Code (Next.js & React)
+├── mobile-app/            # Mobile Application built with Flutter
+│   ├── android/           # Application configuration directory for the Android platform
+│   ├── ios/               # Application configuration directory for the iOS platform
+│   ├── assets/            # Static application assets (images, icons, fonts, etc.)
+│   ├── lib/               # Main Flutter application source code
+│   │   ├── constants/     # App-wide constants (themes, colors, text styles)
+│   │   ├── providers/     # State management providers (Theme, Navigation)
+│   │   ├── routes/        # App routing configurations
+│   │   ├── screens/       # UI Screens (Home, Explore, Search, Profile, Messages, etc.)
+│   │   ├── services/      # External services APIs (Firebase, Supabase, Notifications)
+│   │   ├── widgets/       # Global and reusable UI components (Bottom Navigation, Custom Buttons)
+│   │   └── main.dart      # Application entry point
+│   └── pubspec.yaml       # Flutter package configuration & dependencies file
+├── application-desc.md    # Detailed functional and non-functional project description
+└── README.md              # Main project guide & documentation file
+```
 
 ---
 
