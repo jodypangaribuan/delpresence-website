@@ -39,14 +39,20 @@
 
 ## Key Features
 
-- **Mobile App (Flutter)**: 
-  - Fast attendance using QR Code & Face Recognition.
-  - View class schedules & attendance history.
-- **Web App (Next.js)**: 
-  - **Admin Panel**: Centralized academic data management.
-  - **Lecturer & Assistant Panel**: Open lecture sessions, generate QR Codes, mark attendance manually, and download reports in spreadsheet format.
-- **System Integration**: Direct synchronization from IT Del's Campus API (auth, authorization, academic data).
-- **Security & Scalability**: JWT Authentication with Role-Based Access Control, bcrypt, dockerized.
+- **📱 Mobile App (Flutter)**: 
+  - **Fast Attendance**: Perform attendance via QR Code (`qr_code_scanner_plus`) & Face Recognition (`flutter_face_api`).
+  - **Face Registration**: Securely register student faces for precise biometric verification.
+  - **Academic Info**: View active class schedules, ongoing attendance sessions, and detailed attendance history.
+  - **Unified Account**: Single sign-on authentication synchronized directly with the campus API.
+- **🖥️ Web App (Next.js)**: 
+  - **Admin Panel**: Centralized management for all academic data (faculties, programs, buildings, rooms, academic years, courses, student groups) and personnel (lecturers, assistants, students, staff).
+  - **Lecturer Panel**: Manage course sessions, open/close/cancel attendance, generate session QR Codes, manually mark attendance, and view real-time statistics.
+  - **Assistant Panel**: Manage attendance sessions and generate QR Codes on behalf of assigned lecturers.
+  - **Reporting**: Easily download detailed attendance reports in spreadsheet format.
+- **🔗 System Integration & Security**:
+  - **Campus API Sync**: Direct synchronization of academic and personnel data from IT Del's integrated Campus API.
+  - **Secure Authentication**: Multi-role robust JWT authentication (Admin, Lecturer, Assistant, Student) with Role-Based Access Control (RBAC).
+  - **Scalable Infrastructure**: Containerized application using Docker, orchestrated locally with Docker Compose, and deployed safely on GCP via Nginx Reverse Proxy.
 
 ---
 
